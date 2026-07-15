@@ -3,14 +3,27 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const heroTitleHtml = html.match(/<h1 id="hero-title">([\s\S]*?)<\/h1>/)?.[1] ?? "";
+const heroTitleText = heroTitleHtml.replace(/<[^>]+>/g, "");
 
 test("presents the approved DeepArchi positioning and collaboration paths", () => {
-  assert.match(html, /从战略判断到持续运营/);
+  assert.match(html, /AI 原生服务公司/);
+  assert.match(heroTitleText, /把专业判断变成/);
   assert.match(html, /战略咨询/);
-  assert.match(html, /验证型交付/);
+  assert.match(html, /AI 原生交付/);
   assert.match(html, /工具平台/);
   assert.match(html, /探索解决方案/);
   assert.match(html, /探索合作/);
+});
+
+test("uses controlled Chinese headline wrapping instead of splitting key phrases", () => {
+  assert.match(html, /line-break: strict/);
+  assert.match(html, /text-wrap: balance/);
+  assert.match(html, /class="no-break"/);
+});
+
+test("declares an inline favicon so page loads without a missing static asset", () => {
+  assert.match(html, /<link rel="icon" href="data:image\/svg\+xml/);
 });
 
 test("keeps BLM as a framework and uses the approved accountability title", () => {
