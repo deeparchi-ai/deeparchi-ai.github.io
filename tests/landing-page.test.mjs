@@ -51,7 +51,7 @@ test('Chinese typography and responsive/reduced-motion contracts remain local', 
   assert.match(css, /prefers-reduced-motion:reduce/);
   assert.match(css, /grid-template-columns:repeat\(2/);
   assert.match(html, /aria-controls="nav-links"/);
-  assert.match(html, /data:image\/svg\+xml/);
+  assert.match(html, /href="assets\/deeparchi-favicon\.png"/);
   assert.doesNotMatch(html+css, /https?:\/\/(?:fonts|cdn)|@import/);
 });
 
