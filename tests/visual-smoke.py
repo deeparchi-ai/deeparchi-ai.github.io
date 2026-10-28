@@ -1,13 +1,43 @@
 from pathlib import Path
+from contextlib import contextmanager
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import os
+from threading import Thread
+from urllib.parse import urlsplit
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+except ImportError as error:
+    raise SystemExit(
+        "Playwright is required: install requirements-dev.txt in a virtual environment, "
+        "then run python -m playwright install chromium."
+    ) from error
 
 
-BASE_URL = "http://127.0.0.1:4173"
-CHROME_PATH = os.environ.get(
-    "CHROME_PATH", r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-)
+BASE_URL = os.environ.get("BASE_URL")
+CHROME_PATH = os.environ.get("CHROME_PATH")
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def site_url():
+    if BASE_URL is not None:
+        url = urlsplit(BASE_URL)
+        if url.scheme not in {"http", "https"} or not url.hostname:
+            raise ValueError(f"BASE_URL must be an HTTP(S) URL: {BASE_URL!r}")
+        yield BASE_URL
+        return
+
+    handler = partial(SimpleHTTPRequestHandler, directory=str(ROOT))
+    with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 def page_errors(page):
@@ -79,13 +109,17 @@ def check_mobile(browser):
 
 
 if __name__ == "__main__":
-    if not Path(CHROME_PATH).is_file():
-        raise FileNotFoundError(f"Chrome executable not found: {CHROME_PATH}")
+    if CHROME_PATH is not None and not Path(CHROME_PATH).is_file():
+        raise FileNotFoundError(f"CHROME_PATH is not a file: {CHROME_PATH!r}")
 
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
-        try:
-            check_desktop(browser)
-            check_mobile(browser)
-        finally:
-            browser.close()
+    with site_url() as BASE_URL:
+        print(f"Testing {BASE_URL}", flush=True)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
+            try:
+                check_desktop(browser)
+                print("PASS: desktop 1440x960 — hero, contact navigation, no horizontal overflow or page/resource errors", flush=True)
+                check_mobile(browser)
+                print("PASS: mobile 390x844 — menu open/close, capabilities navigation, no horizontal overflow or page/resource errors", flush=True)
+            finally:
+                browser.close()

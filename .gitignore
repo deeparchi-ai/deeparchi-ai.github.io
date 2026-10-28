@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+test-results/
+playwright-report/
+screenshots/
+tests/screenshots/
+tests/*-screenshot.png
+# Local agent handoff notes; never publish with the website.
+context/

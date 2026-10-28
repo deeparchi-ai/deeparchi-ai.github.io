@@ -1,0 +1,2 @@
+# Confirmed on PyPI: https://pypi.org/project/playwright/1.61.0/
+playwright==1.61.0
