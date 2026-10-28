@@ -96,7 +96,7 @@
     <div class="fld">
       <label class="f" for="email">回复邮箱<span class="req">*</span></label>
       <div class="hint b" id="h-email">回执发到这个邮箱</div>
-      <input id="email" name="email" type="email" inputmode="email" maxlength="120" required aria-required="true" aria-describedby="h-email" autocomplete="email" spellcheck="false" placeholder="例：name@company.com">
+      <input id="email" name="email" type="email" inputmode="email" maxlength="120" required aria-required="true" aria-describedby="h-email" autocomplete="email" spellcheck="false" placeholder="例：填写你的常用邮箱">
       <div class="emsg" id="e-email" role="alert">请填写有效的邮箱地址</div>
     </div>
     <div class="fld">
@@ -315,8 +315,8 @@
       .catch(function (e) {
         out.className = "out bad";
         out.textContent = (e && e.name === "AbortError")
-          ? "提交超时（15 秒未返回）。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。"
-          : "网络异常，提交未送达。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。";
+          ? "提交超时（15 秒未返回）。可在官网 deeparchi.com.cn 联系我们，附上公司名称与联系方式。"
+          : "网络异常，提交未送达。可在官网 deeparchi.com.cn 联系我们，附上公司名称与联系方式。";
         focusEl(out);
       })
       .finally(function () {
