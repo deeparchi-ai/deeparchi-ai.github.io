@@ -8,7 +8,7 @@
   <title>DeepArchi 深度架构 · AI 原生服务</title>
   <link rel="icon" type="image/png" sizes="128x128" href="assets/deeparchi-favicon.png">
   <link rel="stylesheet" href="assets/site.css?v=738eb81c4c95">
-  <script type="module" src="assets/site.mjs?v=2c8197191dd8"></script>
+  <script type="module" src="assets/site.mjs?v=cc018631bb30"></script>
 </head>
 <body>
 <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -26,8 +26,9 @@
   <aside class="signal-choice" data-analytics data-analytics-banner hidden aria-label="可选匿名统计">
     <p>可选匿名交互统计，不含需求正文。</p>
     <div class="analytics-options" data-analytics-options hidden><button type="button" data-consent="accept">允许</button><button type="button" data-consent="reject">拒绝</button></div>
-    <details><summary>统计详情</summary><p data-analytics-status role="status"></p><a href="privacy.html">隐私说明</a></details>
+    <a href="privacy.html">隐私说明</a><details><summary>统计详情</summary><p data-analytics-status role="status"></p></details>
   </aside>
+  <p class="small" data-analytics-feedback role="status" aria-live="polite" aria-atomic="true"></p>
 </div></section>
 <section class="services section" id="capabilities" aria-labelledby="capability-title">
   <div class="wrap">
@@ -51,15 +52,15 @@
   <h2 id="contact-title">你需要什么专业服务？</h2><p>从一个重要的问题，开始一次专业对话。</p>
   <div class="actions"><button type="button" class="button primary" data-intent="general" data-surface="contact" data-js hidden>描述我的需求</button><a href="mailto:contact@deeparchi.com.cn">contact@deeparchi.com.cn</a><button type="button" id="copy-email" data-js hidden>复制邮箱</button></div>
   <p class="small" id="email-status" role="status">也可直接邮件联系。</p><p class="small" id="contact-data-warning">请勿发送敏感数据、密码或密钥。</p>
-  <div class="contact-shortcuts support" id="collaborate" aria-label="其他合作需求">
+  <div class="contact-shortcuts" id="collaborate" aria-label="其他合作需求">
     <button type="button" id="contact-consulting" data-intent="consulting" data-surface="contact" data-js hidden>咨询服务</button>
-    <button type="button" data-intent="integration" data-surface="support" data-js hidden>工具集成</button>
+    <button type="button" data-intent="integration" data-surface="contact" data-js hidden>工具集成</button>
     <button type="button" id="contact-partnership" data-intent="partnership" data-surface="contact" data-js hidden>伙伴合作</button>
     <button type="button" id="contact-a2a" data-intent="a2a" data-surface="contact" data-js hidden>A2A 意向</button>
   </div>
 </div></section>
 </main>
-<footer class="wrap footer"><p>© 2026 DeepArchi · 上海申渡架固信息技术有限公司</p><div><details class="analytics-panel" data-analytics><summary>匿名统计设置</summary><p data-analytics-status role="status">匿名统计未连接，未收集事件。</p><div class="analytics-options" data-analytics-options hidden><button type="button" data-consent="accept">允许匿名统计</button><button type="button" data-consent="reject">拒绝 / 关闭统计</button></div><p>默认关闭；如启用，需你主动同意。本页有效，可随时关闭，尊重 DNT/GPC。</p></details><a href="privacy.html">隐私说明</a><a href="developers.html">开发者</a><a href="#top">返回顶部 ↑</a></div></footer>
+<footer class="wrap footer"><p>© 2026 DeepArchi · 上海申渡架固信息技术有限公司</p><div><details class="analytics-panel" data-analytics><summary>匿名统计设置</summary><p data-analytics-status role="status">匿名统计未连接，未收集事件。</p><div class="analytics-options" data-analytics-options hidden><button type="button" data-consent="accept">允许匿名统计</button><button type="button" data-consent="reject">拒绝 / 关闭统计</button></div><p>默认关闭；如启用，需你主动同意。本页有效，可随时关闭，尊重 DNT/GPC。</p></details><a href="privacy.html">隐私说明</a><a href="developers.html">开发者</a><a href="service-catalog.json">服务目录</a><a href="#top">返回顶部 ↑</a></div></footer>
 <dialog id="a2a-dialog" aria-labelledby="a2a-title" aria-describedby="a2a-note">
   <button type="button" class="close" data-close aria-label="关闭协作演示" autofocus>关闭 ×</button>
   <p class="eyebrow">A2A · 概念演示</p><h2 id="a2a-title">一次协作，五步样例。</h2>

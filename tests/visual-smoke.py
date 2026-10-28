@@ -245,7 +245,7 @@ def check_contact_paths(browser):
         # Clipboard denial is an explicit fixture, not a successful system clipboard claim.
         page.evaluate("Object.defineProperty(navigator, 'clipboard', {value: {writeText: async () => {throw new Error('fixture denial');}}, configurable:true})")
         routes = [(f'.product [data-service="{service}"]', name) for service, name in [("ip-guard","IP 守护"),("deep-blm","Deep BLM"),("architecture","技术架构规划"),("tech-ma","Tech M&A")]]
-        routes += [('.support [data-intent="consulting"]','咨询服务'),('.support [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
+        routes += [('.contact-shortcuts [data-intent="consulting"]','咨询服务'),('.contact-shortcuts [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
         user_text = '<img src=x onerror="window.BAD=true"> + 商业问题 & 第二行'
         for selector, source in routes:
             trigger = page.locator(selector)
@@ -316,14 +316,19 @@ def check_contact_paths(browser):
         panel = page.locator("footer [data-analytics]")
         banner = page.locator("[data-analytics-banner]")
         assert banner.is_visible()
+        assert banner.locator('a[href="privacy.html"]').is_visible()
+        assert page.locator('[data-analytics-feedback]').inner_text() == ''
         banner.locator('[data-consent="reject"]').click()
         assert not banner.is_visible()
+        assert page.locator('[data-analytics-feedback]').is_visible()
+        assert '未获同意' in page.locator('[data-analytics-feedback]').inner_text()
         panel.locator("summary").click()
         assert "未获同意" in panel.inner_text()
         panel.locator('[data-consent="reject"]').click()
         assert "未获同意" in panel.inner_text()
         panel.locator('[data-consent="accept"]').click()
         assert "已允许" in panel.inner_text()
+        assert '已允许' in page.locator('[data-analytics-feedback]').inner_text()
         page.locator('[data-demo="ip-guard"]').click()
         page.keyboard.press("Escape")
         assert outbound == []
@@ -362,6 +367,11 @@ def check_contact_paths(browser):
         assert not page.locator('#a2a-dialog').is_visible()
         page.keyboard.press('Escape')
         page.wait_for_function("document.activeElement.id === 'open-a2a'")
+        page.locator('#open-a2a').click()
+        assert 'SAMPLE 1 / 5' in page.locator('#a2a-stage-label').inner_text()
+        assert not page.locator('#a2a-artifact').is_visible()
+        assert not page.locator('#a2a-intent').is_visible()
+        page.keyboard.press('Escape')
         page.locator('[data-demo="deep-blm"]').click()
         page.locator("#demo-intent").click()
         page.locator("#problem").fill(user_text)
@@ -373,10 +383,14 @@ def check_contact_paths(browser):
         page.locator('#contact-a2a').click()
         assert page.locator('#demand-source').inner_text() == '来源：A2A 意向'
         page.keyboard.press('Escape')
-        page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'a2a' && e.service === null) && window.fixtureEvents.some(e => e.event === 'mailto_click')")
+        page.locator('button[data-intent="integration"]').click()
+        assert page.locator('#demand-source').inner_text() == '来源：工具集成'
+        page.keyboard.press('Escape')
+        page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'a2a' && e.service === null) && window.fixtureEvents.some(e => e.event === 'mailto_click') && window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'integration')")
         recorded = page.evaluate("window.fixtureEvents")
         assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] is None for event in recorded)
         assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] == 'tech-ma' and event['surface'] == 'a2a' for event in recorded)
+        assert any(event['event'] == 'intent_open' and event['category'] == 'integration' and event['surface'] == 'contact' and event['service'] is None for event in recorded)
         assert not any(event['event'] == 'a2a_interest' and event['surface'] == 'contact' for event in recorded)
         assert {"demo_open", "intent_open", "mail_draft_ready", "mailto_click"}.issubset({event["event"] for event in recorded})
         assert all(event['event'] != 'demo_complete' for event in recorded)

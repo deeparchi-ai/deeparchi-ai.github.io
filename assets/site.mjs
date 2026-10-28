@@ -30,6 +30,8 @@ export async function initAnalytics({transport} = {}) {
       panel.querySelector('[data-analytics-options]').hidden = !signals.available();
       if (panel.hasAttribute('data-analytics-banner')) panel.hidden = !signals.available() || decisionMade;
     });
+    const feedback = $('[data-analytics-feedback]');
+    if (feedback) feedback.textContent = decisionMade ? signals.status() : '';
   };
   panels.forEach(panel => panel.querySelectorAll('[data-consent]').forEach(button => { button.onclick = () => {
     const accept = button.dataset.consent === 'accept';
@@ -88,7 +90,7 @@ function initHome() {
     });
   });
   demo.addEventListener('close', () => { if (!demand.open) demoTrigger?.focus(); });
-  a2aTrigger.addEventListener('click', () => a2a.showModal());
+  a2aTrigger.addEventListener('click', () => { stage = 0; renderStage(); a2a.showModal(); });
   a2a.addEventListener('close', () => { if (!demand.open) a2aTrigger.focus(); });
   demand.addEventListener('close', () => { form.reset(); clearDraft(); demandTrigger?.focus(); });
   function clearDraft() {
