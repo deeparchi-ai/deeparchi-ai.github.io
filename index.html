@@ -334,6 +334,8 @@
     .asset { min-height: 148px; padding: 20px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--paper-bright); }
     .asset h4 { margin: 28px 0 5px; font-family: var(--display); font-size: 22px; letter-spacing: -.035em; }
     .asset p { margin: 0; color: var(--muted); font-size: 13px; }
+    .asset-link { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; margin-top: 8px; color: var(--ink); font-size: 13px; overflow-wrap: anywhere; text-underline-offset: 3px; }
+    .evidence-note, .contact-note { margin: 18px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
     .status { color: var(--signal); font-size: 10px; }
     .status.preview { color: #8a7022; }
     .status.building { color: var(--muted); }
@@ -357,8 +359,10 @@
     .contact .section-title { margin-bottom: 20px; }
     .contact-copy { max-width: 570px; margin: 0; color: var(--muted); font-size: 17px; }
     .contact-actions { display: grid; align-content: center; gap: 12px; }
-    .contact-actions a { display: flex; justify-content: space-between; gap: 18px; padding: 16px 0; border-bottom: 1px solid #aaa69a; color: var(--ink); font-family: var(--mono); font-size: 13px; text-decoration: none; }
+    .contact-actions a { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; padding: 16px 0; overflow-wrap: anywhere; border-bottom: 1px solid #aaa69a; color: var(--ink); font-family: var(--mono); font-size: 13px; text-decoration: none; }
     .contact-actions a:hover { color: var(--signal); }
+    .contact-actions a[id] { scroll-margin-top: 90px; }
+    .asset-link:focus-visible, .contact-actions a[id]:focus-visible, .contact-actions a[id]:target { outline: 3px solid var(--ink); outline-offset: 4px; }
     .contact-actions span:last-child { color: var(--signal); }
 
     footer { padding: 24px; color: rgba(244, 240, 231, .62); background: var(--ink-deep); }
@@ -547,13 +551,13 @@
           <p class="card-kicker">FOR CLIENTS</p>
           <h3>从问题开始，<br><span class="no-break">而不是从工具开始</span></h3>
           <p>共同界定优先事项，组装可验证能力，再进入可持续运营。您获得的不是一套抽象建议，而是一条可以启动、检验和迭代的路径。</p>
-          <a class="path-link" href="#contact">讨论你的关键议题 →</a>
+          <a class="path-link" href="#contact-consulting">讨论你的关键议题 →</a>
         </article>
         <article class="path-card">
           <p class="card-kicker">FOR PARTNERS</p>
           <h3>共同售前、共同交付，<br><span class="no-break">共同产品化</span></h3>
           <p>把行业专长、数据、工具与交付能力组合为可复制的联合方案；在客户前呈现一支边界清晰、能力互补的专业团队。</p>
-          <a class="path-link" href="#contact">发起合作对话 →</a>
+          <a class="path-link" href="#contact-partnership">发起合作对话 →</a>
         </article>
       </div>
     </section>
@@ -586,11 +590,12 @@
           <p>我们区分已上线、内测与开发中的能力；呈现真实进度，而不是以展示代替承诺。</p>
         </div>
         <div class="asset-grid">
-          <article class="asset"><p class="status">已上线</p><h4>Patent MCP</h4><p>面向 Agent 的开源专利检索与分析基础设施。</p></article>
-          <article class="asset"><p class="status">已上线</p><h4>SanctionsSight</h4><p>面向出海业务的制裁、风险与情报能力。</p></article>
-          <article class="asset"><p class="status preview">内测</p><h4>认知外骨骼</h4><p>将个人专业判断转化为可协作的认知能力。</p></article>
-          <article class="asset"><p class="status building">开发中</p><h4>MACS</h4><p>持续演进中的多 Agent 能力与协同资产。</p></article>
+          <article class="asset"><p class="status">已上线</p><h4>Patent MCP</h4><p>面向 Agent 的开源专利检索与分析基础设施。</p><a class="asset-link" href="https://github.com/deeparchi-ai/patent-mcp-server" target="_blank" rel="noopener noreferrer">查看开源文档 ↗</a></article>
+          <article class="asset"><p class="status">已上线</p><h4>SanctionsSight</h4><p>面向出海业务的制裁、风险与情报能力。</p><a class="asset-link" href="mailto:contact@deeparchi.com.cn?subject=DeepArchi%EF%BD%9CSanctionsSight%20%E6%BC%94%E7%A4%BA%E9%A2%84%E7%BA%A6">预约演示 →</a></article>
+          <article class="asset"><p class="status preview">内测</p><h4>认知外骨骼</h4><p>将个人专业判断转化为可协作的认知能力。</p><a class="asset-link" href="mailto:contact@deeparchi.com.cn?subject=DeepArchi%EF%BD%9C%E8%AE%A4%E7%9F%A5%E5%A4%96%E9%AA%A8%E9%AA%BC%20%E5%86%85%E6%B5%8B%E5%92%A8%E8%AF%A2">咨询内测 →</a></article>
+          <article class="asset"><p class="status building">开发中</p><h4>MACS</h4><p>持续演进中的多 Agent 能力与协同资产。</p><a class="asset-link" href="https://github.com/deeparchi-ai/macs" target="_blank" rel="noopener noreferrer">查看开源进展 ↗</a></article>
         </div>
+        <p class="evidence-note">开源项目可查看文档与代码；未提供公开入口的能力可预约沟通，具体开放范围以沟通确认为准。</p>
       </div>
     </section>
 
@@ -615,7 +620,7 @@
             <p class="protocol-label">A2A / PRIVATE PREVIEW</p>
             <h3>A2A 私测申请中</h3>
             <p>A2A 能力面向需要 Agent 间任务协作、专业分工与复杂结果交付的合作伙伴开放。当前以受控私测方式接入，确保身份、权限与协作边界在扩展前被充分验证。</p>
-            <a class="protocol-link" href="#contact">申请 A2A 私测接入 →</a>
+            <a class="protocol-link" href="#contact-a2a">申请 A2A 私测接入 →</a>
             <p class="protocol-note">状态：私测 · 按场景与合作关系开放 · 不发布虚构服务地址</p>
           </article>
         </div>
@@ -627,9 +632,13 @@
         <div>
           <p class="section-code">06 / START A CONVERSATION</p>
           <h2 class="section-title" id="contact-title">从一个真实问题，<br><span class="no-break">或一次认真合作开始。</span></h2>
-          <p class="contact-copy">如果你正在判断 AI 应从哪里切入，或希望共同构建可交付、可运营的专业能力，欢迎直接发来问题、场景与已有资源。</p>
+          <p class="contact-copy">欢迎就业务咨询、合作洽谈或技术接入发来问题与场景，一起明确目标、分工与接入边界。</p>
+          <p class="contact-note">以下入口会预填邮件主题；如未配置邮件客户端，可直接向页面展示的邮箱地址发送邮件。请勿发送密码、密钥或敏感业务数据。</p>
         </div>
         <div class="contact-actions" aria-label="联系方式">
+          <a id="contact-consulting" href="mailto:contact@deeparchi.com.cn?subject=DeepArchi%EF%BD%9C%E4%B8%9A%E5%8A%A1%E5%92%A8%E8%AF%A2"><span>业务咨询</span><span>场景与目标 ↗</span></a>
+          <a id="contact-partnership" href="mailto:contact@deeparchi.com.cn?subject=DeepArchi%EF%BD%9C%E5%90%88%E4%BD%9C%E6%B4%BD%E8%B0%88"><span>合作洽谈</span><span>能力与分工 ↗</span></a>
+          <a id="contact-a2a" href="mailto:contact@deeparchi.com.cn?subject=DeepArchi%EF%BD%9CA2A%20%E7%A7%81%E6%B5%8B%E7%94%B3%E8%AF%B7"><span>A2A 私测申请</span><span>场景与接入边界 ↗</span></a>
           <a href="mailto:contact@deeparchi.com.cn"><span>contact@deeparchi.com.cn</span><span>邮件联系 ↗</span></a>
           <a href="https://github.com/deeparchi-ai" target="_blank" rel="noreferrer"><span>github.com/deeparchi-ai</span><span>查看开源能力 ↗</span></a>
         </div>
