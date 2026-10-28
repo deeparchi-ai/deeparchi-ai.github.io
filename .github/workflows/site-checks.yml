@@ -1,0 +1,38 @@
+name: Site checks
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create virtual environment and install dev dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Install Chromium and Linux browser dependencies
+        run: .venv/bin/python -m playwright install --with-deps chromium
+      - name: Check static site
+        run: .venv/bin/python scripts/check_site.py
+      - name: Test static checker
+        run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Check landing page content
+        run: node --test tests/landing-page.test.mjs
+      - name: Check desktop and mobile browser scenarios
+        run: .venv/bin/python tests/visual-smoke.py
