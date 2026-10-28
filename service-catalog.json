@@ -31,7 +31,7 @@
     {
       "id": "deep-blm",
       "name": "Deep BLM",
-      "availability": "concept-demo",
+      "availability": "web-trial",
       "production_ready": false,
       "proposed_input": [
         "业务议题",
@@ -42,7 +42,14 @@
         "关键假设",
         "验证计划"
       ],
-      "human_contact": "contact@deeparchi.com.cn"
+      "human_contact": "contact@deeparchi.com.cn",
+      "web_trial": {
+        "url": "apps/deepblm.html",
+        "desktop_min_width": 1024,
+        "mobile": "product-and-consultation",
+        "storage": "local-browser",
+        "ai": "optional-byo-key-experimental"
+      }
     },
     {
       "id": "architecture",

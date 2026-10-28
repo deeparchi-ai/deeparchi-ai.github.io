@@ -105,6 +105,11 @@ function initHome() {
     const id = button.dataset.demo;
     const product = PRODUCTS[id];
     if (!product) return;
+    if (button.matches('a[data-tool-entry]')) {
+      // Native navigation; demo_open counts entry interest, never tool completion.
+      track('demo_open', id, 'product', 'cards');
+      return;
+    }
     demoTrigger = button;
     $('#demo-title').textContent = product.name;
     $('#demo-problem').textContent = product.problem;

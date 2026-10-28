@@ -78,12 +78,14 @@ def check_desktop(browser):
         for card in page.locator(".product").all():
             assert card.locator(":scope > p").count() == 2
             assert card.locator(".outcome, ul, ol").count() == 0
-            assert "概念 Demo" in card.inner_text()
+            assert ("规划工具 · 试用" if card.get_attribute("id") == "deep-blm" else "概念 Demo") in card.inner_text()
         assert page.locator("#hero-title").evaluate("el => getComputedStyle(el).fontSize") == "56px"
         page.get_by_role("link", name="查看服务 Demo").click()
         page.wait_for_function("location.hash === '#capabilities'")
         products = {"ip-guard": "IP 守护", "deep-blm": "Deep BLM", "architecture": "技术架构规划", "tech-ma": "Tech M&A"}
         for service, name in products.items():
+            if service == "deep-blm":
+                continue  # Native tool entry is tested in deepblm-smoke.py; retain all four A2A samples below.
             trigger = page.locator(f'[data-demo="{service}"]')
             trigger.click()
             dialog = page.locator("#demo-dialog")
@@ -298,12 +300,12 @@ def check_contact_paths(browser):
         assert '长' * 500 in page.locator('#draft-text').inner_text()
         page.keyboard.press('Escape')
         page.wait_for_function("document.querySelector('#demand-dialog').open === false")
-        page.locator('[data-demo="deep-blm"]').click()
+        page.locator('[data-demo="architecture"]').click()
         page.locator("#demo-intent").click()
-        assert "产品需求 / Deep BLM" in page.locator("#demand-source").inner_text()
+        assert "产品需求 / 技术架构规划" in page.locator("#demand-source").inner_text()
         page.mouse.click(2, 2)
         assert not page.locator("#demand-dialog").is_visible()
-        assert page.locator('[data-demo="deep-blm"]').evaluate("el => el === document.activeElement")
+        assert page.locator('[data-demo="architecture"]').evaluate("el => el === document.activeElement")
         page.locator("#copy-email").click()
         assert "contact@deeparchi.com.cn" in page.locator("#email-status").inner_text()
         assert '请勿发送敏感数据、密码或密钥' in page.locator('#contact-data-warning').inner_text()
@@ -372,7 +374,7 @@ def check_contact_paths(browser):
         assert not page.locator('#a2a-artifact').is_visible()
         assert not page.locator('#a2a-intent').is_visible()
         page.keyboard.press('Escape')
-        page.locator('[data-demo="deep-blm"]').click()
+        page.locator('[data-demo="architecture"]').click()
         page.locator("#demo-intent").click()
         page.locator("#problem").fill(user_text)
         page.locator('#demand-form button[type="submit"]').click()
@@ -491,7 +493,7 @@ if __name__ == "__main__":
                 check_official_brand(browser)
                 print("PASS: official logo and favicon — all three pages, image decode, proportional sizing, 320/390/820/1440", flush=True)
                 check_desktop(browser)
-                print("PASS: desktop — four labelled dialogs, focus restoration, all A2A sample stages/reset/product changes", flush=True)
+                print("PASS: desktop — three labelled sample dialogs, focus restoration, all A2A sample stages/reset/product changes", flush=True)
                 check_mobile(browser)
                 print("PASS: 320/390/820/1440 — no overflow, navigation, keyboard, reduced motion, unavailable storage, no-JS", flush=True)
                 check_contact_paths(browser)
