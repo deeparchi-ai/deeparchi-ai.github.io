@@ -33,6 +33,6 @@ jobs:
       - name: Test static checker
         run: .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Check landing page content
-        run: node --test tests/landing-page.test.mjs
+        run: node --test tests/*.test.mjs
       - name: Check desktop and mobile browser scenarios
         run: .venv/bin/python tests/visual-smoke.py

@@ -1,0 +1,80 @@
+{
+  "version": "1",
+  "kind": "concept-service-catalog",
+  "description": "概念服务目录，不是可运行的 Agent Card，不声明协议符合性。",
+  "organization": {
+    "name": "DeepArchi 深度架构",
+    "legal_name": "上海申渡架固信息技术有限公司",
+    "human_contact": "contact@deeparchi.com.cn"
+  },
+  "a2a": {
+    "available": false,
+    "endpoint": null
+  },
+  "services": [
+    {
+      "id": "ip-guard",
+      "name": "IP 守护",
+      "availability": "concept-demo",
+      "production_ready": false,
+      "proposed_input": [
+        "创新主题",
+        "检索范围与约束"
+      ],
+      "proposed_output": [
+        "关注主题",
+        "检索路径",
+        "人工核验清单"
+      ],
+      "human_contact": "contact@deeparchi.com.cn"
+    },
+    {
+      "id": "deep-blm",
+      "name": "Deep BLM",
+      "availability": "concept-demo",
+      "production_ready": false,
+      "proposed_input": [
+        "业务议题",
+        "客户与能力假设"
+      ],
+      "proposed_output": [
+        "BLM 议题图",
+        "关键假设",
+        "验证计划"
+      ],
+      "human_contact": "contact@deeparchi.com.cn"
+    },
+    {
+      "id": "architecture",
+      "name": "技术架构规划",
+      "availability": "concept-demo",
+      "production_ready": false,
+      "proposed_input": [
+        "业务目标",
+        "系统现状与约束"
+      ],
+      "proposed_output": [
+        "方案比较",
+        "能力边界",
+        "演进路线"
+      ],
+      "human_contact": "contact@deeparchi.com.cn"
+    },
+    {
+      "id": "tech-ma",
+      "name": "Tech M&A",
+      "availability": "concept-demo",
+      "production_ready": false,
+      "proposed_input": [
+        "技术并购议题",
+        "授权核验范围"
+      ],
+      "proposed_output": [
+        "尽调框架",
+        "证据缺口",
+        "整合议题"
+      ],
+      "human_contact": "contact@deeparchi.com.cn"
+    }
+  ]
+}

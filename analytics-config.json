@@ -1,0 +1,7 @@
+{
+  "version": "1",
+  "enabled": true,
+  "endpoint": "https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/demand/collect",
+  "site_id": "deeparchi",
+  "consent_required": true
+}
