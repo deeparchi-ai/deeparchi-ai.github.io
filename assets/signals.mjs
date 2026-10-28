@@ -37,10 +37,15 @@ export function createSignals(rawConfig, {navigatorLike = {}, isTest = false, lo
   const blocked = () => privacyBlocked(navigatorLike);
   const available = () => Boolean(config?.enabled && !blocked());
   let session;
+  let queue = Promise.resolve(); // Avoid self-conflicting concurrent quota transactions.
+  let nextSendAt = 0;
   const sent = new Set(); // In-memory session dedupe only; never a unique-person count.
   return {
     available,
-    status: () => !config?.enabled ? '匿名统计未连接，未收集事件。' : blocked() ? '已尊重 DNT/GPC，匿名统计关闭。' : consent ? '已允许匿名统计，可随时关闭。' : '匿名统计未获同意，未收集事件。',
+    status: () => {
+      const status = !config ? rawConfig == null ? '匿名统计未连接，未收集事件。' : '统计配置无法读取或无效，已关闭；未收集事件。' : !config.enabled ? '匿名统计未连接，未收集事件。' : blocked() ? '已尊重 DNT/GPC，匿名统计关闭。' : consent ? '已允许匿名统计，可随时关闭。' : '匿名统计未获同意，未收集事件。';
+      return (isTest || local ? '内部测试 / 本地预览：不会真实上报。' : '') + status;
+    },
     setConsent(value) { consent = available() && value === true; if (!consent) { session = undefined; sent.clear(); } },
     async track(fields) {
       if (!available() || !consent || !exactKeys(fields, ['event', 'service', 'category', 'surface', 'step'])) return false;
@@ -54,8 +59,18 @@ export function createSignals(rawConfig, {navigatorLike = {}, isTest = false, lo
         if (sent.has(key)) return false;
         sent.add(key);
         const send = transport ?? ((endpoint, body) => fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', cache: 'no-store', redirect: 'error'}));
-        const response = await send(config.endpoint, payload);
-        return response?.ok === true;
+        const task = queue.then(async () => {
+          // Pace this page below gateway QPS; never batch-replay pre-consent actions.
+          const wait = Math.max(0, nextSendAt - Date.now());
+          if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+          // Consent can be withdrawn while an earlier request is still in flight.
+          if (!available() || !consent || session !== payload.session_id) return false;
+          nextSendAt = Date.now() + 600;
+          const response = await send(config.endpoint, payload);
+          return response?.ok === true;
+        });
+        queue = task.catch(() => false);
+        return await task;
       } catch { return false; }
     }
   };
@@ -67,5 +82,7 @@ export function mailDraft({source, problem, result = '', constraints = ''}) {
   const subject = `DeepArchi｜${source} 需求意向`;
   const body = `来源：${source}\r\n业务问题：${problem.trim()}\r\n期望结果：${result.trim() || '未填写'}\r\n约束：${constraints.trim() || '未填写'}`;
   const encode = value => encodeURIComponent(value).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
-  return {text: `收件人：${EMAIL}\n主题：${subject}\n\n${body}`, uri: `mailto:${EMAIL}?subject=${encode(subject)}&body=${encode(body)}`};
+  const uri = `mailto:${EMAIL}?subject=${encode(subject)}&body=${encode(body)}`;
+  const tooLong = uri.length > 1800;
+  return {text: `收件人：${EMAIL}\n主题：${subject}\n\n${body}`, uri: tooLong ? `mailto:${EMAIL}?subject=${encode(subject)}` : uri, tooLong};
 }

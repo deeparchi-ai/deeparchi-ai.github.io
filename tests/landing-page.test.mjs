@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {PRODUCTS} from '../assets/site.mjs';
-import {SERVICES} from '../assets/signals.mjs';
+import {SERVICES, validateConfig} from '../assets/signals.mjs';
 const read = file => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
 const [html, css, js, dev, privacy, catalogText, configText] = await Promise.all(['index.html','assets/site.css','assets/site.mjs','developers.html','privacy.html','service-catalog.json','analytics-config.json'].map(read));
 const catalog = JSON.parse(catalogText);
@@ -55,6 +55,26 @@ test('Chinese typography and responsive/reduced-motion contracts remain local', 
   assert.doesNotMatch(html+css, /https?:\/\/(?:fonts|cdn)|@import/);
 });
 
+test('product actions have eight distinct service-specific accessible names', () => {
+  const cards = [...html.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)].map(match => match[1]).join('');
+  const actions = [...cards.matchAll(/<button\b[^>]*(?:data-demo=|data-intent="product")[^>]*>/g)];
+  assert.equal(actions.length,8);
+  const names = actions.map(([tag]) => tag.match(/aria-label="([^"]+)"/)?.[1]);
+  assert.ok(names.every(Boolean));
+  assert.equal(new Set(names).size,8);
+  assert.match(html,/id="contact-data-warning">请勿发送敏感数据、密码或密钥/);
+});
+
+test('public privacy and developer guidance use honest receiver and retention semantics', () => {
+  assert.doesNotMatch(dev+privacy,/human 受众|已验证自然人/);
+  assert.match(privacy,/不承诺 30 天自动删除/);
+  assert.match(dev,/browser_interaction/);
+  assert.match(privacy,/没有自动删除机制/);
+  assert.match(privacy,/平台日志的具体字段与保留期限尚未核验/);
+  assert.match(privacy,/长草稿改为复制后粘贴/);
+  assert.doesNotMatch(js,/track\('demo_complete'/);
+});
+
 test('A2A is explicitly a sample with safe real resources and no fabricated runtime', () => {
   for (const stage of ['发现服务','描述需求','确认范围与授权','查看进度','接收交付样例']) assert.ok(html.includes(`<li>${stage}</li>`));
   assert.match(html, /本地样例演示，未连接真实 A2A 服务，不会执行真实任务或上传业务内容/);
@@ -78,5 +98,10 @@ test('draft handling exposes limits, safe text rendering and stable contact anch
     for (const mailto of document.matchAll(/href="(mailto:[^"]+)"/g)) assert.ok(!mailto[1].includes('+'));
   }
   assert.match(privacy, /不收集点击统计/);
-  assert.deepEqual(JSON.parse(configText), {version:'1',enabled:false,endpoint:null,site_id:'deeparchi',consent_required:true});
+  const config = JSON.parse(configText);
+  assert.ok(validateConfig(config));
+  assert.equal(config.version,'1');
+  assert.equal(config.site_id,'deeparchi');
+  assert.equal(config.consent_required,true);
+  assert.equal(config.endpoint,config.enabled ? 'https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/demand/collect' : null);
 });

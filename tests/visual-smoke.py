@@ -192,6 +192,8 @@ def check_contact_paths(browser):
             trigger = page.locator(selector)
             trigger.click()
             assert source in page.locator("#demand-source").inner_text()
+            if selector == '#contact-a2a':
+                assert page.locator('#demand-source').inner_text() == '来源：A2A 意向'
             page.locator('#demand-form button[type="submit"]').click()
             assert not page.locator("#draft").is_visible()
             assert not page.locator("#problem").evaluate("el => el.checkValidity()")
@@ -225,6 +227,18 @@ def check_contact_paths(browser):
             page.wait_for_function("document.querySelector('#problem').value === ''")
             assert trigger.evaluate("el => el === document.activeElement")
             assert page.locator("#problem").input_value() == ""
+        page.locator('#contact-a2a').click()
+        page.locator('#problem').fill('长' * 500)
+        page.locator('#result').fill('果' * 500)
+        page.locator('#constraints').fill('限' * 300)
+        page.locator('#demand-form button[type="submit"]').click()
+        assert '较长' in page.locator('#copy-status').inner_text()
+        assert '粘贴' in page.locator('#draft-mailto').inner_text()
+        assert page.locator('#copy-draft').evaluate("el => el.classList.contains('primary')")
+        assert 'body' not in parse_qs(urlsplit(page.locator('#draft-mailto').get_attribute('href')).query)
+        assert '长' * 500 in page.locator('#draft-text').inner_text()
+        page.keyboard.press('Escape')
+        page.wait_for_function("document.querySelector('#demand-dialog').open === false")
         page.locator('[data-demo="deep-blm"]').click()
         page.locator("#demo-intent").click()
         assert "产品需求 / Deep BLM" in page.locator("#demand-source").inner_text()
@@ -233,6 +247,7 @@ def check_contact_paths(browser):
         assert page.locator('[data-demo="deep-blm"]').evaluate("el => el === document.activeElement")
         page.locator("#copy-email").click()
         assert "contact@deeparchi.com.cn" in page.locator("#email-status").inner_text()
+        assert '请勿发送敏感数据、密码或密钥' in page.locator('#contact-data-warning').inner_text()
         assert page.locator('#contact a[href="mailto:contact@deeparchi.com.cn"]').is_visible()
         assert outbound == [], outbound
 
@@ -278,8 +293,16 @@ def check_contact_paths(browser):
         page.locator("#draft-mailto").evaluate("el => el.addEventListener('click', e => e.preventDefault(), {once:true})")
         page.locator("#draft-mailto").click()
         page.keyboard.press("Escape")
+        page.wait_for_function("document.querySelector('#demand-dialog').open === false")
+        page.locator('#contact-a2a').click()
+        assert page.locator('#demand-source').inner_text() == '来源：A2A 意向'
+        page.keyboard.press('Escape')
+        page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'a2a' && e.service === null) && window.fixtureEvents.some(e => e.event === 'mailto_click')")
         recorded = page.evaluate("window.fixtureEvents")
-        assert {"demo_open", "demo_complete", "intent_open", "mail_draft_ready", "mailto_click"}.issubset({event["event"] for event in recorded})
+        assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] is None for event in recorded)
+        assert not any(event['event'] == 'a2a_interest' and event['surface'] == 'contact' for event in recorded)
+        assert {"demo_open", "intent_open", "mail_draft_ready", "mailto_click"}.issubset({event["event"] for event in recorded})
+        assert all(event['event'] != 'demo_complete' for event in recorded)
         allowed = {"event", "service", "category", "surface", "version", "audience", "is_test", "session_id", "event_id", "step"}
         assert all(set(event) <= allowed and event["is_test"] is True and event["audience"] == "browser_interaction" for event in recorded)
         assert user_text not in str(recorded) and "商业问题" not in str(recorded)

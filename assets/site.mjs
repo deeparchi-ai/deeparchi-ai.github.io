@@ -22,8 +22,8 @@ export async function initAnalytics({transport} = {}) {
       const local = location.protocol !== 'https:' || !['www.deeparchi.com.cn', 'deeparchi.com.cn'].includes(location.hostname);
       const isTest = new URLSearchParams(location.search).get('internal_test') === '1';
       signals = createSignals(config, {navigatorLike: navigator, local, isTest, transport: isTest ? transport : undefined});
-    }
-  } catch { /* Offline and disabled config leave every interaction usable. */ }
+    } else signals = createSignals({});
+  } catch { signals = createSignals({}); /* Fail closed without exposing URLs or errors. */ }
   const render = () => {
     panels.forEach(panel => {
       panel.querySelector('[data-analytics-status]').textContent = signals.status();
@@ -94,13 +94,13 @@ function initHome() {
     $('#demo-intent').dataset.service = id;
     demo.showModal();
     track('demo_open', id, 'product', 'cards');
-    track('demo_complete', id, 'product', 'demo'); // Fully displayed sample, never a completed service.
+
   }));
 
   $$('[data-intent]').forEach(button => button.addEventListener('click', () => {
     const category = button.dataset.intent;
     if (!CATEGORIES[category]) return;
-    const service = button.id === 'a2a-intent' || category === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
+    const service = category === 'a2a' && button.dataset.surface === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
     const product = PRODUCTS[service];
     const source = `${CATEGORIES[category]}${product ? ` / ${product.name}` : ''}`;
     demandTrigger = demo.open ? demoTrigger : button;
@@ -110,7 +110,7 @@ function initHome() {
     $('#demand-source').textContent = `来源：${source}`;
     demand.showModal();
     track('intent_open', service, category, button.dataset.surface);
-    if (category === 'a2a') track('a2a_interest', service, category, button.dataset.surface);
+    if (category === 'a2a' && product) track('a2a_interest', service, category, button.dataset.surface);
   }));
   form.addEventListener('input', () => {
     $('#problem').setCustomValidity('');
@@ -125,8 +125,12 @@ function initHome() {
       draft = mailDraft({source: activeSource.source, problem: problem.value, result: $('#result').value, constraints: $('#constraints').value});
       $('#draft-text').textContent = draft.text;
       $('#draft-mailto').href = draft.uri;
+      $('#draft-mailto').textContent = draft.tooLong ? '打开邮件后粘贴草稿' : '打开邮件客户端确认';
+      $('#draft-mailto').classList.toggle('primary', !draft.tooLong);
+      $('#copy-draft').classList.toggle('button', draft.tooLong);
+      $('#copy-draft').classList.toggle('primary', draft.tooLong);
       $('#draft').hidden = false;
-      $('#copy-status').textContent = '也可复制草稿，粘贴到你使用的邮箱。';
+      $('#copy-status').textContent = draft.tooLong ? '草稿较长，邮件链接可能被客户端截断。请优先复制完整草稿，再打开邮件粘贴；邮件链接不携带正文。' : '也可复制草稿，粘贴到你使用的邮箱。';
       track('mail_draft_ready', activeSource.service, activeSource.category, 'demand');
     } catch { problem.setCustomValidity('请检查文本长度并重新准备草稿。'); form.reportValidity(); }
   });

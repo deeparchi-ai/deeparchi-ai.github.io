@@ -35,6 +35,25 @@ test('RFC6068 draft preserves Chinese, literal plus, HTML-like text and line bre
   for (const change of [{problem:' '},{problem:'x'.repeat(501)},{result:'x'.repeat(501)},{constraints:'x'.repeat(301)},{source:'bad\nheader'}]) assert.throws(() => mailDraft({source:'通用需求',problem:'ok',...change}));
 });
 
+test('long drafts preserve complete copyable text without an oversized mailto body', () => {
+  const problem = '长'.repeat(500), result = '果'.repeat(500), constraints = '限'.repeat(300);
+  const draft = mailDraft({source:'产品需求 / IP 守护',problem,result,constraints});
+  assert.equal(draft.tooLong,true);
+  assert.ok(draft.uri.length <= 1800);
+  assert.equal(new URLSearchParams(draft.uri.split('?')[1]).has('body'),false);
+  for (const text of [problem,result,constraints]) assert.ok(draft.text.includes(text));
+  assert.equal(mailDraft({source:'通用需求',problem:'简短问题'}).tooLong,false);
+});
+
+test('unconfigured, invalid and internal-test receivers have distinct safe diagnostics', () => {
+  assert.match(createSignals(null).status(),/未连接/);
+  assert.match(createSignals({}).status(),/配置.*无效/);
+  const testing = createSignals(fixture,{isTest:true,transport:async () => ({ok:true})});
+  testing.setConsent(true);
+  assert.match(testing.status(),/内部测试.*不会真实上报/);
+  assert.match(createSignals(fixture,{local:true}).status(),/本地预览.*不会真实上报/);
+});
+
 test('consent, DNT/GPC, disabled config and local/test guard send nothing', async () => {
   const calls = [];
   const transport = async (...args) => {calls.push(args);return {ok:true};};
@@ -82,4 +101,39 @@ test('fixture network failure does not throw or block contact', async () => {
   adapter.setConsent(true);
   assert.equal(await adapter.track(fields),false);
   assert.ok(mailDraft({source:'通用需求',problem:'继续使用'}).uri.startsWith('mailto:'));
+});
+
+test('fixture event transport serializes the page burst instead of conflicting with itself', async () => {
+  const calls = [];
+  let release;
+  const adapter = createSignals(fixture, {isTest:true,idFactory,transport:async (endpoint, body) => {
+    calls.push(body);
+    if (calls.length === 1) return await new Promise(resolve => {release = resolve;});
+    return {ok:true};
+  }});
+  adapter.setConsent(true);
+  const first = adapter.track(fields);
+  const second = adapter.track({...fields,service:'deep-blm'});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls.length,1);
+  release({ok:true});
+  assert.deepEqual(await Promise.all([first,second]),[true,true]);
+  assert.equal(calls.length,2);
+});
+
+test('withdrawal cancels queued events without claiming to recall an in-flight request', async () => {
+  const calls = [];
+  let release;
+  const adapter = createSignals(fixture, {isTest:true,idFactory,transport:async (endpoint, body) => {
+    calls.push(body);
+    return await new Promise(resolve => {release = resolve;});
+  }});
+  adapter.setConsent(true);
+  const first = adapter.track(fields);
+  const queued = adapter.track({...fields,service:'deep-blm'});
+  await new Promise(resolve => setImmediate(resolve));
+  adapter.setConsent(false);
+  release({ok:true});
+  assert.deepEqual(await Promise.all([first,queued]),[true,false]);
+  assert.equal(calls.length,1);
 });
