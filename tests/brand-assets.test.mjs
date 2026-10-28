@@ -33,4 +33,9 @@ test('approved logo and favicon PNGs are intact and retain their export dimensio
   const css = (await read('assets/site.css')).toString('utf8');
   assert.match(css,/\.brand-logo\{[^}]*height:88px;[^}]*width:auto;[^}]*object-fit:contain/);
   assert.doesNotMatch(css,/\.brand-mark\b/);
+  const version = createHash('sha256').update(css).digest('hex').slice(0,12);
+  for (const [path,html] of pages) {
+    const href = html.match(/<link rel="stylesheet" href="([^"]+)"/)?.[1];
+    assert.equal(href,`assets/site.css?v=${version}`,path);
+  }
 });
