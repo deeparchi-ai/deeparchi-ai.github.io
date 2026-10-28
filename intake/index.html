@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>制裁名单查询</title>
+<style>
+  :root{--bg:#F5F0E6;--card:#FFF;--text:#1D1D1F;--muted:#6B6B70;--teal:#7BA3A8;--teal-d:#5F888D;--accent:#A5653C;--line:#E6DFD2;--err:#C9453C;--btn:#4F7377;--btn-d:#456A6E}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
+  h1{font-size:30px;line-height:1.35;margin:0 0 8px;letter-spacing:-.4px}
+  .sub{color:var(--muted);margin:0 0 24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;box-shadow:0 1px 2px rgba(29,29,31,.04);margin:0 0 16px}
+  .sec-h{font-size:13px;font-weight:700;letter-spacing:.5px;color:var(--accent);margin:0 0 10px;text-transform:uppercase}
+  .scope{list-style:none;margin:0;padding:0}
+  .scope li{padding:7px 0 7px 26px;position:relative;font-size:14px;line-height:1.6;border-bottom:1px dashed var(--line)}
+  .scope li:last-child{border-bottom:0}
+  .scope li:before{content:"";position:absolute;left:4px;top:14px;width:7px;height:7px;border-radius:50%;background:var(--teal)}
+  .fld{margin:18px 0 0}
+  label.f{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+  .req{color:var(--err);margin-left:2px}
+  .hint{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+  .hint.b{display:block;margin:4px 0 0}
+  input[type=text],input[type=email],input[type=tel],textarea{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#FFFDF9;transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none}
+  input:focus,textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(123,163,168,.18);background:#fff}
+  input.err,textarea.err{border-color:var(--err);box-shadow:0 0 0 3px rgba(201,69,60,.12)}
+  input.key{font-size:17px;padding:14px 15px;font-weight:500}
+  textarea{min-height:76px;resize:vertical}
+  .emsg{display:none;color:var(--err);font-size:13px;margin-top:5px}
+  .emsg.show{display:block}
+  .qcc{display:none;margin-top:6px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+  .qcc .it{padding:11px 13px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line)}
+  .qcc .it:last-child{border-bottom:0}
+  .qcc .it:hover{background:#F3EFE6}
+  .consent{display:flex;gap:10px;align-items:flex-start;margin:20px 0 0;padding:8px 4px;font-size:14px;color:#3A3A3C;cursor:pointer;border-radius:9px}
+  .consent.bad{background:#FBF0ED;box-shadow:0 0 0 1px #EFD2CB}
+  .consent input{width:20px;height:20px;flex:0 0 20px;margin-top:1px;accent-color:var(--teal)}
+  button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:11px;background:var(--btn);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:background .15s,transform .05s}
+  button:hover{background:var(--btn-d)}
+  button:active{transform:scale(.99)}
+  button:disabled{opacity:.6;cursor:default;transform:none}
+  button:focus-visible{outline:3px solid var(--btn);outline-offset:2px}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:st}
+  .steps li{counter-increment:st;padding:8px 0 8px 34px;position:relative;font-size:14px;line-height:1.65}
+  .steps li:before{content:counter(st);position:absolute;left:0;top:9px;width:22px;height:22px;border-radius:50%;background:var(--btn);color:#fff;font-size:13px;font-weight:700;text-align:center;line-height:22px}
+  .note{margin-top:18px;font-size:13px;color:var(--muted);line-height:1.65}
+  .note b{color:#3A3A3C;font-weight:600}
+  .out{margin-top:18px;padding:16px;border-radius:10px;display:none;font-size:14px}
+  .out.ok{display:block;background:#EDF4EE;border:1px solid #C9DECB}
+  .out.bad{display:block;background:#FBF0ED;border:1px solid #EFD2CB}
+  .rcpt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;font-weight:700;letter-spacing:.4px}
+  footer{margin-top:26px;font-size:12px;color:var(--muted);text-align:center}
+  @media (max-width:480px){h1{font-size:25px}.wrap{padding:28px 16px 48px}}
+</style></head>
+<body><div class="wrap">
+  <h1>制裁名单查询</h1>
+  <p class="sub">核对一家公司是否出现在美国、欧盟、英国等公开的制裁与出口管制名单上，拿到一份事实清单。</p>
+
+  <div class="card">
+    <p class="sec-h">查询范围</p>
+    <ul class="scope">
+      <li>美国财政部（OFAC）· 特别指定国民（SDN）与非 SDN 制裁名单</li>
+      <li>美国商务部（BIS）· 实体清单、被拒清单、未经验证清单</li>
+      <li>美国国防部（DoD）· 中国军事公司清单（1260H）</li>
+      <li>欧盟 · 综合制裁名单</li>
+      <li>英国（OFSI）· 金融制裁名单</li>
+      <li>联合国 · 安理会综合制裁名单</li>
+    </ul>
+  </div>
+
+  <form class="card" id="f" method="post" action="" novalidate>
+      <p class="sec-h">填写信息</p>
+      <div class="fld">
+        <label class="f" for="subject">公司名称<span class="req">*</span></label>
+        <div class="hint b" id="h-subject">请输入工商注册全名，简称或同名会有歧义</div>
+        <input id="subject" name="subject" type="text" class="key" maxlength="200" required aria-required="true" aria-describedby="h-subject" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：华为技术有限公司（工商注册全名）">
+        <div class="emsg" id="e-subject" role="alert">请填写公司的工商注册全名（简称请补全）</div>
+        <!-- 企查查联想接口预留：后补时在此填充下拉建议，容器见 #qcc-suggest -->
+        <div class="qcc" id="qcc-suggest"></div>
+      </div>
+      <div class="fld">
+        <label class="f" for="email">回复邮箱<span class="req">*</span></label>
+        <div class="hint b" id="h-email">回执发到这个邮箱，提交后 1 个工作日内到</div>
+        <input id="email" name="email" type="email" inputmode="email" maxlength="120" required aria-required="true" aria-describedby="h-email" autocomplete="email" spellcheck="false" placeholder="例：name@company.com">
+        <div class="emsg" id="e-email" role="alert">请填写有效的邮箱地址</div>
+      </div>
+      <div class="fld">
+        <label class="f" for="wechat">微信号<span class="hint">选填，方便后续跟进</span></label>
+        <input id="wechat" name="wechat" type="text" maxlength="64" autocomplete="off" placeholder="例：wxid_abc123 或绑定手机号">
+      </div>
+      <div class="fld">
+        <label class="f" for="phone">联系电话<span class="hint">选填，方便后续跟进</span></label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="例：138 0013 8000">
+      </div>
+      <div class="fld">
+        <label class="f" for="concern">想问的问题<span class="hint" id="h-concern">选填，一句话</span></label>
+        <textarea id="concern" name="concern" maxlength="2000" placeholder="例：客户要求提供名单筛查证明，不确定我们的名字在不在上面"></textarea>
+      </div>
+      <div class="consent" id="consent-wrap">
+        <input id="consent" name="consent" type="checkbox" value="on">
+        <label for="consent">我已阅读下面的说明，同意提交；深度架构仅用于本次查询与回执，联系方式在交付后 30 天内删除，写「删除」可撤回并删除。</label>
+      </div>
+      <div class="emsg" id="e-consent" role="alert">请先勾选「同意提交」，否则无法提交。</div>
+      <button id="sb" type="submit">提交查询</button>
+      <div class="out" id="out" role="status" aria-live="polite" tabindex="-1"></div>
+    </form>
+
+  <div class="card">
+    <p class="sec-h">操作说明</p>
+    <ol class="steps">
+      <li>输入公司工商注册全名（选精确全名，避免简称歧义）</li>
+      <li>填写回复邮箱（回执发到这里），可选微信 / 电话</li>
+      <li>提交后 1 个工作日内，回复一份事实清单到你的邮箱</li>
+    </ol>
+    <div class="note">
+      <b>不做什么：</b>不做法律定性、不给「能不能交易」的结论、不出侵权结论、不做评分排名。<br>
+      结果只做公开名单的事实比对，不构成法律意见；名单命中不等于违法，也不等于不可交易。
+    </div>
+  </div>
+
+  <footer>深度架构 · 联系方式仅用于本次回执与后续跟进</footer>
+</div>
+<script>
+(function () {
+  var API = "https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/intake";
+  var form = document.getElementById("f");
+  var sb = document.getElementById("sb");
+  var out = document.getElementById("out");
+  var email = document.getElementById("email");
+  var subject = document.getElementById("subject");
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function setErr(input, msgEl, bad) {
+    if (bad) { input.classList.add("err"); if (msgEl) msgEl.classList.add("show"); input.setAttribute("aria-invalid", "true"); }
+    else { input.classList.remove("err"); if (msgEl) msgEl.classList.remove("show"); input.removeAttribute("aria-invalid"); }
+  }
+
+  // 出错后把视线/焦点带到第一个错处（原实现把错误留在视口外，实测 -112px）
+  function focusFirstError() {
+    var el = form.querySelector('[aria-invalid="true"]');
+    if (!el) return;
+    if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+  }
+
+  // 实时校验：邮箱失焦时验格式，输入时清错
+  email.addEventListener("blur", function () {
+    var v = email.value.trim();
+    setErr(email, document.getElementById("e-email"), v && !EMAIL_RE.test(v));
+  });
+  email.addEventListener("input", function () {
+    if (email.classList.contains("err") && EMAIL_RE.test(email.value.trim())) setErr(email, document.getElementById("e-email"), false);
+  });
+  var consentEl = document.getElementById("consent");
+  var consentWrap = document.getElementById("consent-wrap");
+  var eConsent = document.getElementById("e-consent");
+  consentEl.addEventListener("change", function () {
+    if (consentEl.checked) {
+      consentWrap.classList.remove("bad");
+      eConsent.classList.remove("show");
+      consentEl.removeAttribute("aria-invalid");
+    }
+  });
+  subject.addEventListener("input", function () {
+    if (subject.classList.contains("err") && subject.value.trim()) setErr(subject, document.getElementById("e-subject"), false);
+  });
+
+  // 【企查查联想接口预留】后补时：
+  // 1. subject 输入监听（防抖 300ms）→ fetch 云函数 /qcc-search?kw=关键字
+  // 2. 返回企业列表填充 #qcc-suggest，点击项填入 subject 并收起
+  // 云函数端点需在 core.mjs 增加 /qcc-search（代理企查查 openapi.qcc.com，key 存环境变量）
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var data = {
+      product: "SS",
+      subject: subject.value.trim(),
+      concern: document.getElementById("concern").value.trim(),
+      email: email.value.trim(),
+      wechat: document.getElementById("wechat").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      consent: document.getElementById("consent").checked
+    };
+    var bad = false;
+    if (!data.subject) { setErr(subject, document.getElementById("e-subject"), true); bad = true; }
+    if (!data.email) { setErr(email, document.getElementById("e-email"), true); bad = true; }
+    else if (!EMAIL_RE.test(data.email)) { setErr(email, document.getElementById("e-email"), true); bad = true; }
+    if (!data.consent) {
+      consentWrap.classList.add("bad");
+      eConsent.classList.add("show");
+      consentEl.setAttribute("aria-invalid", "true");
+      bad = true;
+    }
+    if (bad) { focusFirstError(); return; }
+
+    out.className = "out"; out.textContent = "";
+    sb.disabled = true; sb.textContent = "提交中…";
+    sb.setAttribute("aria-busy", "true");
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
+    fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j && j.receipt) {
+          out.className = "out ok";
+          out.innerHTML = "已收到。回执号 <span class=\"rcpt\">" + j.receipt + "</span><br>" +
+            (j.message || "1 个工作日内回事实清单到你的回复邮箱。");
+        } else {
+          out.className = "out bad";
+          out.textContent = (j && j.error) ? j.error : "提交未成功，请稍后重试。";
+        }
+        out.focus();
+      })
+      .catch(function (e) {
+        out.className = "out bad";
+        out.textContent = (e && e.name === "AbortError")
+          ? "提交超时（15 秒未返回）。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。"
+          : "网络异常，提交未送达。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。";
+        out.focus();
+      })
+      .finally(function () {
+        clearTimeout(timer);
+        sb.disabled = false; sb.textContent = "提交查询"; sb.removeAttribute("aria-busy");
+      });
+  });
+
+  // 移动端不自动聚焦：实测 375×667 落地即滚 379px，标题被顶到 -351px、键盘同时弹起
+  var finePointer = window.matchMedia && window.matchMedia("(hover:hover) and (pointer:fine)").matches;
+  if (finePointer) {
+    try { subject.focus({ preventScroll: true }); } catch (e) { subject.focus(); }
+  }
+})();
+</script>
+</body></html>
