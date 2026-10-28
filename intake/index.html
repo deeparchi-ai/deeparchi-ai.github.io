@@ -2,9 +2,9 @@
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>制裁名单查询</title>
+<title>制裁名单查询 · 当场初筛</title>
 <style>
-  :root{--bg:#F5F0E6;--card:#FFF;--text:#1D1D1F;--muted:#6B6B70;--teal:#7BA3A8;--teal-d:#5F888D;--accent:#A5653C;--line:#E6DFD2;--err:#C9453C;--btn:#4F7377;--btn-d:#456A6E}
+  :root{--bg:#F5F0E6;--card:#FFF;--text:#1D1D1F;--muted:#6B6B70;--teal:#7BA3A8;--teal-d:#5F888D;--accent:#A5653C;--line:#E6DFD2;--err:#C9453C;--btn:#4F7377;--btn-d:#456A6E;--hit-bg:#FBF6EA;--hit-line:#E3D2AE;--ok-bg:#EDF4EE;--ok-line:#C9DECB}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);font:16px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
   .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
@@ -28,93 +28,122 @@
   textarea{min-height:76px;resize:vertical}
   .emsg{display:none;color:var(--err);font-size:13px;margin-top:5px}
   .emsg.show{display:block}
-  .qcc{display:none;margin-top:6px;border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
-  .qcc .it{padding:11px 13px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--line)}
-  .qcc .it:last-child{border-bottom:0}
-  .qcc .it:hover{background:#F3EFE6}
   .consent{display:flex;gap:10px;align-items:flex-start;margin:20px 0 0;padding:8px 4px;font-size:14px;color:#3A3A3C;cursor:pointer;border-radius:9px}
   .consent.bad{background:#FBF0ED;box-shadow:0 0 0 1px #EFD2CB}
   .consent input{width:20px;height:20px;flex:0 0 20px;margin-top:1px;accent-color:var(--teal)}
-  button{margin-top:20px;width:100%;padding:14px;border:0;border-radius:11px;background:var(--btn);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:background .15s,transform .05s}
+  button{width:100%;padding:14px;border:0;border-radius:11px;background:var(--btn);color:#fff;font-size:16px;font-weight:600;cursor:pointer;transition:background .15s,transform .05s}
   button:hover{background:var(--btn-d)}
   button:active{transform:scale(.99)}
   button:disabled{opacity:.6;cursor:default;transform:none}
   button:focus-visible{outline:3px solid var(--btn);outline-offset:2px}
+  button.ghost{background:transparent;color:var(--btn);border:1px solid var(--btn)}
+  button.ghost:hover{background:rgba(79,115,119,.08)}
+  .mt{margin-top:14px}
   .steps{list-style:none;margin:0;padding:0;counter-reset:st}
   .steps li{counter-increment:st;padding:8px 0 8px 34px;position:relative;font-size:14px;line-height:1.65}
   .steps li:before{content:counter(st);position:absolute;left:0;top:9px;width:22px;height:22px;border-radius:50%;background:var(--btn);color:#fff;font-size:13px;font-weight:700;text-align:center;line-height:22px}
   .note{margin-top:18px;font-size:13px;color:var(--muted);line-height:1.65}
   .note b{color:#3A3A3C;font-weight:600}
   .out{margin-top:18px;padding:16px;border-radius:10px;display:none;font-size:14px}
-  .out.ok{display:block;background:#EDF4EE;border:1px solid #C9DECB}
+  .out.ok{display:block;background:var(--ok-bg);border:1px solid var(--ok-line)}
   .out.bad{display:block;background:#FBF0ED;border:1px solid #EFD2CB}
   .rcpt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;font-weight:700;letter-spacing:.4px}
+
+  /* 初筛结果区 */
+  #res{display:none;margin-top:18px;border-radius:12px;padding:18px;border:1px solid var(--line);background:#fff}
+  #res.show{display:block}
+  #res.hit{background:var(--hit-bg);border-color:var(--hit-line)}
+  #res.clear{background:var(--ok-bg);border-color:var(--ok-line)}
+  #res.fail{background:#FBF0ED;border-color:#EFD2CB}
+  .res-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .res-badge{font-size:13px;font-weight:700;letter-spacing:.5px;padding:3px 9px;border-radius:999px;background:rgba(29,29,31,.07);color:#3A3A3C}
+  .res-title{font-size:22px;font-weight:700;letter-spacing:-.3px;margin:0}
+  .res-meta{color:var(--muted);font-size:13px;margin-top:6px}
+  .hits{list-style:none;margin:14px 0 0;padding:0;border-top:1px dashed var(--hit-line)}
+  .hits li{padding:10px 0;border-bottom:1px dashed var(--hit-line);font-size:14px;line-height:1.6}
+  .hits li:last-child{border-bottom:0}
+  .hits .ln{font-weight:600}
+  .hits .nm{color:var(--text)}
+  .hits .dt{color:var(--muted);font-size:12.5px}
+  .res-note{font-size:12.5px;color:var(--muted);line-height:1.65;margin-top:12px}
+  .res-note b{color:#3A3A3C}
   footer{margin-top:26px;font-size:12px;color:var(--muted);text-align:center}
-  @media (max-width:480px){h1{font-size:25px}.wrap{padding:28px 16px 48px}}
+  @media (max-width:480px){h1{font-size:25px}.wrap{padding:28px 16px 48px}.res-title{font-size:20px}}
 </style></head>
 <body><div class="wrap">
   <h1>制裁名单查询</h1>
-  <p class="sub">核对一家公司是否出现在美国、欧盟、英国等公开的制裁与出口管制名单上，拿到一份事实清单。</p>
+  <p class="sub">输入工商注册全名，<strong>当场</strong>看它在不在公开的制裁与出口管制名单上；需要判断时，再留邮箱要详细报告。</p>
+
+  <!-- 第一步：初筛 -->
+  <form class="card" id="qf" novalidate>
+    <p class="sec-h">第一步 · 当场初筛</p>
+    <div class="fld">
+      <label class="f" for="subject">公司名称<span class="req">*</span></label>
+      <div class="hint b" id="h-subject">请输入工商注册全名，简称或同名会有歧义</div>
+      <input id="subject" name="subject" type="text" class="key" maxlength="200" required aria-required="true" aria-describedby="h-subject" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：××科技有限公司（工商注册全名）">
+      <div class="emsg" id="e-subject" role="alert">请填写公司的工商注册全名（简称请补全）</div>
+    </div>
+    <button id="qb" type="submit" class="mt">立即初筛</button>
+    <div class="res-note" style="margin-top:10px">比对 7 份机器可读名单，约 1 秒返回。命中不等于违法，未命中也不等于没有风险。</div>
+
+    <div id="res" role="status" aria-live="polite" tabindex="-1"></div>
+  </form>
+
+  <!-- 第二步：详细报告 -->
+  <form class="card" id="df" novalidate style="display:none">
+    <p class="sec-h">第二步 · 详细报告（付费）</p>
+    <div class="hint b" style="margin:0 0 6px">初筛只回答「名字在不在名单上」。要不要往下判断，取决于你的交易场景。详细报告含：命中条目的完整出处与版本、可能影响的业务动作、需要向对方索取的材料。<br><b>1 个工作日内回到邮箱；邮件确认报价后再开始。</b></div>
+    <div class="fld">
+      <label class="f" for="email">回复邮箱<span class="req">*</span></label>
+      <div class="hint b" id="h-email">回执发到这个邮箱</div>
+      <input id="email" name="email" type="email" inputmode="email" maxlength="120" required aria-required="true" aria-describedby="h-email" autocomplete="email" spellcheck="false" placeholder="例：name@company.com">
+      <div class="emsg" id="e-email" role="alert">请填写有效的邮箱地址</div>
+    </div>
+    <div class="fld">
+      <label class="f" for="wechat">微信号<span class="hint">选填</span></label>
+      <input id="wechat" name="wechat" type="text" maxlength="64" autocomplete="off" placeholder="例：wxid_abc123 或绑定手机号">
+    </div>
+    <div class="fld">
+      <label class="f" for="phone">联系电话<span class="hint">选填</span></label>
+      <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="例：138 0013 8000">
+    </div>
+    <div class="fld">
+      <label class="f" for="concern">想问的问题<span class="hint" id="h-concern">选填，一句话</span></label>
+      <textarea id="concern" name="concern" maxlength="2000" placeholder="例：客户要求提供名单筛查证明，不确定我们的名字在不在上面"></textarea>
+    </div>
+    <div class="consent" id="consent-wrap">
+      <input id="consent" name="consent" type="checkbox" value="on">
+      <label for="consent">我已阅读下面的说明，同意提交；深度架构仅用于本次查询与回执，联系方式在交付后 30 天内删除，写「删除」可撤回并删除。</label>
+    </div>
+    <div class="emsg" id="e-consent" role="alert">请先勾选「同意提交」，否则无法提交。</div>
+    <button id="db" type="submit" class="mt">提交，等详细报告</button>
+    <div class="out" id="out" role="status" aria-live="polite" tabindex="-1"></div>
+  </form>
 
   <div class="card">
     <p class="sec-h">查询范围</p>
     <ul class="scope">
-      <li>美国财政部（OFAC）· 特别指定国民（SDN）与非 SDN 制裁名单</li>
+      <li>美国财政部（OFAC）· 特别指定国民名单（SDN）</li>
+      <li>美国财政部（OFAC）· 非 SDN 综合制裁名单</li>
       <li>美国商务部（BIS）· 实体清单、被拒清单、未经验证清单</li>
       <li>美国国防部（DoD）· 中国军事公司清单（1260H）</li>
-      <li>欧盟 · 综合制裁名单</li>
-      <li>英国（OFSI）· 金融制裁名单</li>
+      <li>欧盟 · FSF 与理事会官方公报综合名单</li>
       <li>联合国 · 安理会综合制裁名单</li>
+      <li>OpenSanctions 聚合库 · 含部分英国等国指定名单条目</li>
     </ul>
+    <div class="note">英国 UK Sanctions List 尚未单独加载，与 UFLPA、FCC 覆盖清单一样不在本次即时比对内；详细报告会说明每个清单覆盖到哪一层。</div>
   </div>
 
-  <form class="card" id="f" method="post" action="" novalidate>
-      <p class="sec-h">填写信息</p>
-      <div class="fld">
-        <label class="f" for="subject">公司名称<span class="req">*</span></label>
-        <div class="hint b" id="h-subject">请输入工商注册全名，简称或同名会有歧义</div>
-        <input id="subject" name="subject" type="text" class="key" maxlength="200" required aria-required="true" aria-describedby="h-subject" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="例：华为技术有限公司（工商注册全名）">
-        <div class="emsg" id="e-subject" role="alert">请填写公司的工商注册全名（简称请补全）</div>
-        <!-- 企查查联想接口预留：后补时在此填充下拉建议，容器见 #qcc-suggest -->
-        <div class="qcc" id="qcc-suggest"></div>
-      </div>
-      <div class="fld">
-        <label class="f" for="email">回复邮箱<span class="req">*</span></label>
-        <div class="hint b" id="h-email">回执发到这个邮箱，提交后 1 个工作日内到</div>
-        <input id="email" name="email" type="email" inputmode="email" maxlength="120" required aria-required="true" aria-describedby="h-email" autocomplete="email" spellcheck="false" placeholder="例：name@company.com">
-        <div class="emsg" id="e-email" role="alert">请填写有效的邮箱地址</div>
-      </div>
-      <div class="fld">
-        <label class="f" for="wechat">微信号<span class="hint">选填，方便后续跟进</span></label>
-        <input id="wechat" name="wechat" type="text" maxlength="64" autocomplete="off" placeholder="例：wxid_abc123 或绑定手机号">
-      </div>
-      <div class="fld">
-        <label class="f" for="phone">联系电话<span class="hint">选填，方便后续跟进</span></label>
-        <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="例：138 0013 8000">
-      </div>
-      <div class="fld">
-        <label class="f" for="concern">想问的问题<span class="hint" id="h-concern">选填，一句话</span></label>
-        <textarea id="concern" name="concern" maxlength="2000" placeholder="例：客户要求提供名单筛查证明，不确定我们的名字在不在上面"></textarea>
-      </div>
-      <div class="consent" id="consent-wrap">
-        <input id="consent" name="consent" type="checkbox" value="on">
-        <label for="consent">我已阅读下面的说明，同意提交；深度架构仅用于本次查询与回执，联系方式在交付后 30 天内删除，写「删除」可撤回并删除。</label>
-      </div>
-      <div class="emsg" id="e-consent" role="alert">请先勾选「同意提交」，否则无法提交。</div>
-      <button id="sb" type="submit">提交查询</button>
-      <div class="out" id="out" role="status" aria-live="polite" tabindex="-1"></div>
-    </form>
-
   <div class="card">
-    <p class="sec-h">操作说明</p>
+    <p class="sec-h">说明</p>
     <ol class="steps">
-      <li>输入公司工商注册全名（选精确全名，避免简称歧义）</li>
-      <li>填写回复邮箱（回执发到这里），可选微信 / 电话</li>
-      <li>提交后 1 个工作日内，回复一份事实清单到你的邮箱</li>
+      <li>初筛只用公司名做机器比对，不收费、不用注册</li>
+      <li>需要判断对交易的影响，留邮箱要详细报告（付费，1 个工作日）</li>
+      <li>报告只做公开名单的事实比对与出处核对</li>
     </ol>
     <div class="note">
       <b>不做什么：</b>不做法律定性、不给「能不能交易」的结论、不出侵权结论、不做评分排名。<br>
-      结果只做公开名单的事实比对，不构成法律意见；名单命中不等于违法，也不等于不可交易。
+      名单命中不等于违法，也不等于不可交易；未命中也不等于没有风险。
     </div>
   </div>
 
@@ -122,28 +151,110 @@
 </div>
 <script>
 (function () {
-  var API = "https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/intake";
-  var form = document.getElementById("f");
-  var sb = document.getElementById("sb");
-  var out = document.getElementById("out");
-  var email = document.getElementById("email");
-  var subject = document.getElementById("subject");
+  var QUICK = "https://sanctions-sight-272499-9-1445250546.sh.run.tcloudbase.com/api/screen/quick";
+  var API   = "https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/intake";
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  var qf = document.getElementById("qf"), qb = document.getElementById("qb");
+  var subject = document.getElementById("subject"), res = document.getElementById("res");
+  var df = document.getElementById("df");
+  var email = document.getElementById("email"), db = document.getElementById("db");
+  var out = document.getElementById("out");
+  var consentEl = document.getElementById("consent"), consentWrap = document.getElementById("consent-wrap");
+  var eConsent = document.getElementById("e-consent");
+  var lastQuery = "";
 
   function setErr(input, msgEl, bad) {
     if (bad) { input.classList.add("err"); if (msgEl) msgEl.classList.add("show"); input.setAttribute("aria-invalid", "true"); }
     else { input.classList.remove("err"); if (msgEl) msgEl.classList.remove("show"); input.removeAttribute("aria-invalid"); }
   }
-
-  // 出错后把视线/焦点带到第一个错处（原实现把错误留在视口外，实测 -112px）
-  function focusFirstError() {
-    var el = form.querySelector('[aria-invalid="true"]');
-    if (!el) return;
-    if (el.scrollIntoView) el.scrollIntoView({ block: "center" });
-    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+  function focusEl(el) { try { el.scrollIntoView({ block: "center" }); el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} } }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function showDetailForm() {
+    if (df.style.display === "none") {
+      df.style.display = "";
+      df.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
-  // 实时校验：邮箱失焦时验格式，输入时清错
+  // ── 第一步：当场初筛 ──
+  qf.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var name = subject.value.trim();
+    if (!name) { setErr(subject, document.getElementById("e-subject"), true); focusEl(subject); return; }
+    setErr(subject, document.getElementById("e-subject"), false);
+
+    lastQuery = name;
+    qb.disabled = true; qb.textContent = "比对中…"; qb.setAttribute("aria-busy", "true");
+    res.className = ""; res.innerHTML = "<div class='res-meta'>正在比对名单…</div>";
+
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 8000);
+
+    fetch(QUICK + "?fast=1&name=" + encodeURIComponent(name), { signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function (j) {
+        clearTimeout(timer);
+        if (j && j.error) throw new Error(j.error);
+        renderResult(j, name);
+      })
+      .catch(function (e) {
+        clearTimeout(timer);
+        res.className = "show fail";
+        res.innerHTML = "<div class='res-top'><span class='res-badge'>暂不可用</span><p class='res-title'>即时比对没连上</p></div>" +
+          "<div class='res-note'>可以重试一次；也可以直接留邮箱，我们人工核对后回你。错误信息：<code>" + esc(e && e.message ? e.message : "network") + "</code></div>";
+        showDetailForm();
+      })
+      .finally(function () {
+        qb.disabled = false; qb.textContent = "立即初筛"; qb.removeAttribute("aria-busy");
+        focusEl(res);
+      });
+  });
+
+  function renderResult(j, name) {
+    var hits = j.hits || [];
+    var matched = !!j.matched;
+    var asOf = j.as_of ? String(j.as_of).replace("T", " ").slice(0, 16) : "";
+    var cov = j.coverage_note || "";
+
+    if (matched) {
+      res.className = "show hit";
+      var rows = hits.slice(0, 5).map(function (h) {
+        return "<li><span class='ln'>" + esc(h.list_name || "未命名名单") + "</span> · " +
+          "<span class='nm'>" + esc(h.matched_name || "") + "</span>" +
+          (h.matched_field ? "<span class='dt'>（匹配字段：" + esc(h.matched_field) + "）</span>" : "") +
+          (h.list_date || h.published_at || h.as_of ? "<div class='dt'>名单日期：" + esc(h.list_date || h.published_at || h.as_of) + "</div>" : "") +
+          "</li>";
+      }).join("");
+      res.innerHTML =
+        "<div class='res-top'><span class='res-badge'>命中</span><p class='res-title'>在名单上找到 " + hits.length + " 处</p></div>" +
+        "<div class='res-meta'>查询：" + esc(name) + (asOf ? " · 名单数据截至 " + esc(asOf) : "") + "</div>" +
+        "<ul class='hits'>" + rows + "</ul>" +
+        (hits.length > 5 ? "<div class='res-note'>另有 " + (hits.length - 5) + " 条，详细报告里会逐条列出。</div>" : "") +
+        "<div class='res-note'><b>命中不等于违法，也不等于不可交易。</b>同名、同集团不同主体、历史条目都可能造成命中；是否受影响要看具体交易与清单条款。<br>" +
+        "下一步：<button class='ghost mt' id='go' type='button'>要一份详细报告</button></div>" +
+        (cov ? "<div class='res-note'>" + esc(cov) + "</div>" : "");
+    } else {
+      res.className = "show clear";
+      res.innerHTML =
+        "<div class='res-top'><span class='res-badge'>未命中</span><p class='res-title'>这 7 份名单里没有匹配</p></div>" +
+        "<div class='res-meta'>查询：" + esc(name) + (asOf ? " · 名单数据截至 " + esc(asOf) : "") + "</div>" +
+        "<div class='res-note'><b>未命中不等于没有风险。</b>只代表这个名字与已加载的名单条目没有匹配；简称、英文名、子公司名可能对不上。<br>" +
+        "下一步：<button class='ghost mt' id='go' type='button'>要一份详细报告</button></div>" +
+        (cov ? "<div class='res-note'>" + esc(cov) + "</div>" : "");
+    }
+    var go = document.getElementById("go");
+    if (go) go.addEventListener("click", function () {
+      showDetailForm();
+      try { document.getElementById("concern").value = "初筛结果：" + (matched ? "命中 " + hits.length + " 处" : "未命中") + "（" + name + "）"; } catch (e) {}
+    });
+  }
+
+  // ── 第二步：详细报告 ──
   email.addEventListener("blur", function () {
     var v = email.value.trim();
     setErr(email, document.getElementById("e-email"), v && !EMAIL_RE.test(v));
@@ -151,53 +262,39 @@
   email.addEventListener("input", function () {
     if (email.classList.contains("err") && EMAIL_RE.test(email.value.trim())) setErr(email, document.getElementById("e-email"), false);
   });
-  var consentEl = document.getElementById("consent");
-  var consentWrap = document.getElementById("consent-wrap");
-  var eConsent = document.getElementById("e-consent");
   consentEl.addEventListener("change", function () {
     if (consentEl.checked) {
-      consentWrap.classList.remove("bad");
-      eConsent.classList.remove("show");
-      consentEl.removeAttribute("aria-invalid");
+      consentWrap.classList.remove("bad"); eConsent.classList.remove("show"); consentEl.removeAttribute("aria-invalid");
     }
   });
-  subject.addEventListener("input", function () {
-    if (subject.classList.contains("err") && subject.value.trim()) setErr(subject, document.getElementById("e-subject"), false);
-  });
 
-  // 【企查查联想接口预留】后补时：
-  // 1. subject 输入监听（防抖 300ms）→ fetch 云函数 /qcc-search?kw=关键字
-  // 2. 返回企业列表填充 #qcc-suggest，点击项填入 subject 并收起
-  // 云函数端点需在 core.mjs 增加 /qcc-search（代理企查查 openapi.qcc.com，key 存环境变量）
-
-  form.addEventListener("submit", function (ev) {
+  df.addEventListener("submit", function (ev) {
     ev.preventDefault();
     var data = {
       product: "SS",
-      subject: subject.value.trim(),
+      subject: (lastQuery || subject.value.trim()),
       concern: document.getElementById("concern").value.trim(),
       email: email.value.trim(),
       wechat: document.getElementById("wechat").value.trim(),
       phone: document.getElementById("phone").value.trim(),
-      consent: document.getElementById("consent").checked
+      consent: consentEl.checked
     };
     var bad = false;
-    if (!data.subject) { setErr(subject, document.getElementById("e-subject"), true); bad = true; }
+    if (!data.subject) { showDetailForm(); setErr(subject, document.getElementById("e-subject"), true); bad = true; }
     if (!data.email) { setErr(email, document.getElementById("e-email"), true); bad = true; }
     else if (!EMAIL_RE.test(data.email)) { setErr(email, document.getElementById("e-email"), true); bad = true; }
-    if (!data.consent) {
-      consentWrap.classList.add("bad");
-      eConsent.classList.add("show");
-      consentEl.setAttribute("aria-invalid", "true");
-      bad = true;
+    if (!data.consent) { consentWrap.classList.add("bad"); eConsent.classList.add("show"); consentEl.setAttribute("aria-invalid", "true"); bad = true; }
+    if (bad) {
+      var el = df.querySelector('[aria-invalid="true"]');
+      if (el) focusEl(el);
+      return;
     }
-    if (bad) { focusFirstError(); return; }
 
     out.className = "out"; out.textContent = "";
-    sb.disabled = true; sb.textContent = "提交中…";
-    sb.setAttribute("aria-busy", "true");
+    db.disabled = true; db.textContent = "提交中…"; db.setAttribute("aria-busy", "true");
     var ctrl = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
+
     fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -207,32 +304,30 @@
       .then(function (j) {
         if (j && j.receipt) {
           out.className = "out ok";
-          out.innerHTML = "已收到。回执号 <span class=\"rcpt\">" + j.receipt + "</span><br>" +
-            (j.message || "1 个工作日内回事实清单到你的回复邮箱。");
+          out.innerHTML = "已收到。回执号 <span class='rcpt'>" + esc(j.receipt) + "</span><br>" +
+            (j.message || "1 个工作日内回详细报告到你的邮箱。");
         } else {
           out.className = "out bad";
           out.textContent = (j && j.error) ? j.error : "提交未成功，请稍后重试。";
         }
-        out.focus();
+        focusEl(out);
       })
       .catch(function (e) {
         out.className = "out bad";
         out.textContent = (e && e.name === "AbortError")
           ? "提交超时（15 秒未返回）。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。"
           : "网络异常，提交未送达。可直接发邮件到 service@deeparchi.com.cn，附上公司名称与联系方式。";
-        out.focus();
+        focusEl(out);
       })
       .finally(function () {
         clearTimeout(timer);
-        sb.disabled = false; sb.textContent = "提交查询"; sb.removeAttribute("aria-busy");
+        db.disabled = false; db.textContent = "提交，等详细报告"; db.removeAttribute("aria-busy");
       });
   });
 
-  // 移动端不自动聚焦：实测 375×667 落地即滚 379px，标题被顶到 -351px、键盘同时弹起
+  // 桌面端聚焦输入框；移动端不自动聚焦（避免键盘顶走标题）
   var finePointer = window.matchMedia && window.matchMedia("(hover:hover) and (pointer:fine)").matches;
-  if (finePointer) {
-    try { subject.focus({ preventScroll: true }); } catch (e) { subject.focus(); }
-  }
+  if (finePointer) { try { subject.focus({ preventScroll: true }); } catch (e) { subject.focus(); } }
 })();
 </script>
 </body></html>
