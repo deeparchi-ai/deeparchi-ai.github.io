@@ -336,6 +336,46 @@ def check_contact_paths(browser):
             context.close()
 
 
+def check_official_brand(browser):
+    base_url = BASE_URL
+    assert base_url is not None
+    page = browser.new_page(viewport={"width": 1440, "height": 960})
+    errors, failed_responses, failed_requests = page_errors(page)
+    screenshot_dir = os.environ.get("BRAND_SCREENSHOT_DIR")
+    if screenshot_dir:
+        Path(screenshot_dir).mkdir(parents=True, exist_ok=True)
+    try:
+        for document in ("index.html", "developers.html", "privacy.html"):
+            page.goto(base_url + "/" + document + "?internal_test=1", wait_until="networkidle")
+            logo = page.locator(".brand-logo")
+            assert logo.count() == 1 and logo.is_visible(), document
+            assert logo.get_attribute("src") == "assets/deeparchi-logo.png"
+            assert logo.get_attribute("alt") == "DeepArchi 公司标志"
+            dimensions = logo.evaluate("img => ({ready: img.complete, w: img.naturalWidth, h: img.naturalHeight})")
+            assert dimensions == {"ready": True, "w": 498, "h": 512}, (document, dimensions)
+            favicon = page.locator('link[rel="icon"]')
+            assert favicon.get_attribute("href") == "assets/deeparchi-favicon.png"
+            loaded = page.evaluate("""async href => {
+                const response = await fetch(href);
+                const bytes = new Uint8Array(await response.arrayBuffer());
+                return {status: response.status, signature: Array.from(bytes.slice(0, 8))};
+            }""", favicon.get_attribute("href"))
+            assert loaded == {"status": 200, "signature": [137, 80, 78, 71, 13, 10, 26, 10]}, document
+            for width in (320, 390, 820, 1440):
+                page.set_viewport_size({"width": width, "height": 960})
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (document, width)
+                bounds = logo.bounding_box()
+                header = page.locator(".site-header").bounding_box()
+                assert bounds and header and bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= width
+                assert bounds["y"] >= header["y"] and bounds["y"] + bounds["height"] <= header["y"] + header["height"]
+                assert abs(bounds["width"] / bounds["height"] - 498 / 512) < 0.005, (document, width)
+                if screenshot_dir and width in (390, 1440):
+                    page.screenshot(path=str(Path(screenshot_dir) / f"{Path(document).stem}-{width}.png"))
+        assert not errors and not failed_responses and not failed_requests, (errors, failed_responses, failed_requests)
+    finally:
+        page.close()
+
+
 if __name__ == "__main__":
     if CHROME_PATH is not None and not Path(CHROME_PATH).is_file():
         raise FileNotFoundError(f"CHROME_PATH is not a file: {CHROME_PATH!r}")
@@ -345,6 +385,8 @@ if __name__ == "__main__":
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
             try:
+                check_official_brand(browser)
+                print("PASS: official logo and favicon — all three pages, image decode, proportional sizing, 320/390/820/1440", flush=True)
                 check_desktop(browser)
                 print("PASS: desktop — four labelled dialogs, focus restoration, all A2A sample stages/reset/product changes", flush=True)
                 check_mobile(browser)
