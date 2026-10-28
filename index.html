@@ -295,6 +295,8 @@
     .service-list.compact { gap: 10px; }
     .service-list.compact li { color: var(--muted); font-size: 14px; }
     .capability:hover .service-list.compact li { color: rgba(244, 240, 231, .78); }
+    .capability > p.service-scope { font-size: 13px; margin-top: 22px; line-height: 1.8; }
+    .service-boundary { font-size: 13px; color: var(--muted); margin-top: 20px; }
 
     .collaboration-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
     .path-card { min-height: 300px; padding: 34px; border: 1px solid var(--line); background: var(--paper-bright); }
@@ -448,7 +450,7 @@
       <div class="hero-inner">
         <p class="eyebrow">AI-NATIVE SERVICES COMPANY</p>
         <h1 id="hero-title"><span class="hero-line">AI 原生服务公司，</span><span class="hero-line"><span class="no-break">把专业判断</span>变成<span class="no-break">可运行的能力。</span></span></h1>
-        <p class="hero-copy">DeepArchi 不是传统咨询的 AI 外挂。我们以咨询定义方向，以 Agent 和专家协同完成交付，以工具平台持续运营结果。</p>
+        <p class="hero-copy">帮助企业明确 AI 投入方向，将选定场景做成可验证的工作流，并为后续使用提供工具与运营支持。</p>
         <div class="button-row">
           <a class="button button-primary" href="#contact">探索解决方案</a>
           <a class="button button-secondary" href="#collaborate">探索合作</a>
@@ -487,8 +489,8 @@
       <div class="section-heading">
         <p class="section-code">02 / CAPABILITIES</p>
         <div>
-          <h2 class="section-title" id="capability-title">一家 <span class="no-break">AI 原生服务公司</span>的<br>三层生产体系。</h2>
-          <p class="section-intro">模型、工具和 Agent 平台提供底层能力；DeepArchi 将它们变成客户可购买、伙伴可共建、团队可持续运营的专业服务系统。</p>
+          <h2 class="section-title" id="capability-title">从方向判断到落地运营，<br>三种合作方式。</h2>
+          <p class="section-intro">先明确业务问题，再选择战略咨询、AI 原生交付或工具平台。合作从交付范围、验收方式和责任边界的约定开始。</p>
         </div>
       </div>
       <div class="capability-chain">
@@ -497,34 +499,39 @@
           <h3>战略咨询</h3>
           <p>把 AI 的技术机会转化为业务选择、能力架构与组织行动。</p>
           <ul class="service-list">
-            <li><strong>AI 战略诊断</strong><span>识别业务机会、现有能力、关键约束与优先议题。</span></li>
-            <li><strong>战略共创与转型路线图</strong><span>以 BLM 等框架为基础，明确阶段目标、投资重点与行动路径。</span></li>
-            <li><strong>AI 原生能力、架构与组织设计</strong><span>统筹业务流程、Agent 与数据能力、技术架构、角色分工和治理机制。</span></li>
+            <li><strong>适合谁</strong><span>需要确定 AI 投入方向、业务优先级与转型路径的企业管理团队。</span></li>
+            <li><strong>解决什么</strong><span>AI 应先进入哪些业务，现有能力与目标之间有哪些差距。</span></li>
+            <li><strong>交付什么</strong><span>诊断结论、能力架构、转型路线图与行动建议。</span></li>
+            <li><strong>如何开始</strong><span>说明业务目标、已有投入与关键约束，先界定诊断议题。</span></li>
           </ul>
+          <p class="service-scope">服务范围：AI 战略诊断 · 战略共创与转型路线图 · AI 原生能力、架构与组织设计。以 BLM 等框架为基础，明确阶段目标、投资重点与行动路径。</p>
         </article>
         <article class="capability">
           <span class="capability-number">02 / AGENT DELIVERY</span>
           <h3>AI 原生交付</h3>
-          <p>让 Agent、数据、专家判断和客户流程组成一套可运行、可验证、可持续改进的交付系统。</p>
-          <ul class="service-list compact">
-            <li>IP 守护：知识产权情报与工作流</li>
-            <li>Deep BLM：战略方法的 AI 原生实践</li>
-            <li>技术架构规划：从目标架构到实施路径</li>
-            <li>Tech M&amp;A：技术能力与整合尽调支持</li>
+          <p>围绕一个明确场景，把 Agent、数据和专家判断接入真实工作流。</p>
+          <ul class="service-list">
+            <li><strong>适合谁</strong><span>已有具体业务场景，需要验证 Agent 或工作流如何落地的团队。</span></li>
+            <li><strong>解决什么</strong><span>从概念和演示走向真实流程中的接入、协作与结果验证。</span></li>
+            <li><strong>交付什么</strong><span>按场景约定的工作流、部署或接入说明与验证记录。</span></li>
+            <li><strong>如何开始</strong><span>选择一个工作流，明确输入、预期输出、数据权限与验收标准。</span></li>
           </ul>
+          <p class="service-scope">服务范围：IP 守护 · Deep BLM · 技术架构规划 · Tech M&amp;A。</p>
         </article>
         <article class="capability">
           <span class="capability-number">03 / OPERATE</span>
           <h3>工具平台</h3>
-          <p>为专业服务型 OPC 提供经过筛选、集成和持续运营的 AI 能力组件。</p>
-          <ul class="service-list compact">
-            <li>OPC AI 工具箱：场景、组件与托管能力</li>
-            <li>Patent MCP：开源专利 Agent 基础设施</li>
-            <li>SanctionsSight：出海风险与情报能力</li>
-            <li>认知外骨骼与 MACS：持续演进中的能力资产</li>
+          <p>从选型与接入开始，让 AI 工具进入日常专业工作。</p>
+          <ul class="service-list">
+            <li><strong>适合谁</strong><span>需要把 AI 工具接入专业工作流的团队与专业服务型 OPC。</span></li>
+            <li><strong>解决什么</strong><span>工具选型、接入配置，以及使用中的维护与协作问题。</span></li>
+            <li><strong>交付什么</strong><span>按支持范围约定的组件选型、接入配置与使用维护说明。</span></li>
+            <li><strong>如何开始</strong><span>说明工作场景与现有工具环境，先确认可用组件和接入边界。</span></li>
           </ul>
+          <p class="service-scope">服务范围：OPC AI 工具箱 · Patent MCP · SanctionsSight · 认知外骨骼 · MACS。</p>
         </article>
       </div>
+      <p class="service-boundary">以上为合作范围与交付示例；具体交付内容、验收标准和支持边界，以双方确认的项目约定为准。</p>
     </section>
 
     <section class="section" id="collaborate" aria-labelledby="collaborate-title">
@@ -623,7 +630,7 @@
           <p class="contact-copy">如果你正在判断 AI 应从哪里切入，或希望共同构建可交付、可运营的专业能力，欢迎直接发来问题、场景与已有资源。</p>
         </div>
         <div class="contact-actions" aria-label="联系方式">
-          <a href="mailto:kuangmi@nudge.com.cn"><span>kuangmi@nudge.com.cn</span><span>邮件联系 ↗</span></a>
+          <a href="mailto:contact@deeparchi.com.cn"><span>contact@deeparchi.com.cn</span><span>邮件联系 ↗</span></a>
           <a href="https://github.com/deeparchi-ai" target="_blank" rel="noreferrer"><span>github.com/deeparchi-ai</span><span>查看开源能力 ↗</span></a>
         </div>
       </div>

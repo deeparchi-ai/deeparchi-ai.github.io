@@ -40,3 +40,34 @@ test("describes integrations without publishing unsafe or fabricated endpoints",
   assert.doesNotMatch(html, /(?:localhost|127\.0\.0\.1|0\.0\.0\.0)/i);
   assert.doesNotMatch(html, /https:\/\/\{[^}]+\}/);
 });
+
+test("explains all three services with four answers, retained scopes and project boundaries", () => {
+  const section = html.match(/<section[^>]+id="capabilities"[^>]*>([\s\S]*?)<\/section>/)?.[1] ?? "";
+  const cards = [...section.matchAll(/<article class="capability">([\s\S]*?)<\/article>/g)];
+  const expected = [
+    ["战略咨询", "AI 战略诊断 · 战略共创与转型路线图 · AI 原生能力、架构与组织设计。以 BLM 等框架为基础，明确阶段目标、投资重点与行动路径。"],
+    ["AI 原生交付", "IP 守护 · Deep BLM · 技术架构规划 · Tech M&amp;A。"],
+    ["工具平台", "OPC AI 工具箱 · Patent MCP · SanctionsSight · 认知外骨骼 · MACS。"],
+  ];
+  assert.equal(cards.length, expected.length);
+  cards.forEach(([, card], index) => {
+    assert.equal(card.match(/<h3>(.*?)<\/h3>/)?.[1], expected[index][0]);
+    const list = card.match(/<ul class="service-list">([\s\S]*?)<\/ul>/)?.[1] ?? "";
+    const items = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)];
+    assert.equal(items.length, 4);
+    items.forEach(([, item], itemIndex) => {
+      const answer = item.match(/^<strong>([^<]+)<\/strong><span>([^<]+)<\/span>$/);
+      assert.ok(answer, "each item has a question and answer");
+      assert.equal(answer[1], ["适合谁", "解决什么", "交付什么", "如何开始"][itemIndex]);
+      assert.ok(answer[2].trim(), "each answer is nonempty");
+    });
+    assert.equal(card.match(/<\/ul>\s*<p class="service-scope">服务范围：(.*?)<\/p>/)?.[1], expected[index][1]);
+  });
+  assert.match(section, /<\/article>\s*<\/div>\s*<p class="service-boundary">以上为合作范围与交付示例；具体交付内容、验收标准和支持边界，以双方确认的项目约定为准。<\/p>/);
+});
+
+test("publishes the owner-specified corporate contact email consistently", () => {
+  assert.ok(html.includes('href="mailto:contact@deeparchi.com.cn"'));
+  assert.ok(html.includes('<span>contact@deeparchi.com.cn</span>'));
+  assert.doesNotMatch(html, /mailto:kuangmi@/);
+});
