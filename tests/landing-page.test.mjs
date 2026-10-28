@@ -47,12 +47,52 @@ test('catalogue, cards, selection and sample definitions share exactly four serv
 test('Chinese typography and responsive/reduced-motion contracts remain local', () => {
   assert.match(css, /line-break:strict/);
   assert.match(css, /text-wrap:balance/);
-  assert.match(css, /Songti SC/);
+  assert.match(css, /--sans:-apple-system,BlinkMacSystemFont,"PingFang SC"/);
+  assert.doesNotMatch(css, /Songti SC|Iowan Old Style|--copper|--ink:#15302c/);
   assert.match(css, /prefers-reduced-motion:reduce/);
   assert.match(css, /grid-template-columns:repeat\(2/);
   assert.match(html, /aria-controls="nav-links"/);
   assert.match(html, /href="assets\/deeparchi-favicon\.png"/);
   assert.doesNotMatch(html+css, /https?:\/\/(?:fonts|cdn)|@import/);
+});
+
+test('homepage keeps four concise sections and discloses A2A details in a closed dialog', () => {
+  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
+  // Conservative budget includes no-JS and disclosure copy as well as default content.
+  assert.ok([...main.replace(/<[^>]+>/g, '').matchAll(/\p{Script=Han}/gu)].length <= 749 * .65);
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]), ['top','capabilities','integrate','contact']);
+  assert.doesNotMatch(main, /hero-copy|class="outcome"|预期交付|SERVICE EXPLORATIONS|ALSO HERE TO HELP|a2a-workspace/);
+  const cards = [...main.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)];
+  assert.equal(cards.length,4);
+  for (const [, card] of cards) {
+    const paragraphs = [...card.matchAll(/<p\b[^>]*>(.*?)<\/p>/g)];
+    assert.equal(paragraphs.length,2);
+    assert.match(paragraphs[0][1], /概念 Demo/);
+    assert.ok([...paragraphs[1][1].matchAll(/\p{Script=Han}/gu)].length <= 24);
+    assert.doesNotMatch(card, /<ul|<ol|<details/);
+  }
+  assert.match(main, /id="open-a2a"[^>]*aria-controls="a2a-dialog"/);
+  assert.match(main, /概念演示 · 尚未连接真实 A2A 服务/);
+  const dialog = html.match(/<dialog id="a2a-dialog"([^>]*)>([\s\S]*?)<\/dialog>/);
+  assert.ok(dialog);
+  assert.doesNotMatch(dialog[1], /\bopen\b/);
+  assert.match(dialog[2], /aria-label="关闭协作演示"/);
+  assert.match(dialog[2], /class="a2a-workspace"/);
+  assert.equal((dialog[2].match(/<option value=/g)||[]).length,4);
+  for (const product of Object.values(PRODUCTS)) {
+    for (const output of product.output) assert.ok(!main.includes(output));
+  }
+  assert.match(main, /id="collaborate"/);
+  assert.match(main, /data-intent="integration"[^>]*>工具集成/);
+  assert.match(main, /id="contact-consulting"[^>]*>咨询服务/);
+});
+
+test('compact consent prompt retains explicit choices, optional scope and accessible details', () => {
+  const banner = html.match(/<aside\b[^>]*data-analytics-banner[\s\S]*?<\/aside>/)[0];
+  assert.match(banner, /可选匿名交互统计，不含需求正文/);
+  for (const choice of ['accept','reject']) assert.match(banner, new RegExp(`data-consent="${choice}"`));
+  assert.match(banner, /<details><summary>统计详情<\/summary><p data-analytics-status role="status">/);
+  assert.match(banner, /href="privacy.html"/);
 });
 
 test('product actions have eight distinct service-specific accessible names', () => {

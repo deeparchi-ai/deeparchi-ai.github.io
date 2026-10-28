@@ -60,20 +60,36 @@ function initHome() {
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && nav.classList.contains('open')) { closeMenu(); menu.focus(); } });
 
   const demo = $('#demo-dialog');
+  const a2a = $('#a2a-dialog');
+  const a2aTrigger = $('#open-a2a');
   const demand = $('#demand-dialog');
   const form = $('#demand-form');
   let demoTrigger;
   let demandTrigger;
   let activeSource;
   let draft;
-  [demo, demand].forEach(dialog => {
+  [demo, a2a, demand].forEach(dialog => {
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      const controls = [...dialog.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')]
+        .filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    });
     dialog.addEventListener('click', event => {
       const rect = dialog.getBoundingClientRect();
       if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
     });
   });
   demo.addEventListener('close', () => { if (!demand.open) demoTrigger?.focus(); });
+  a2aTrigger.addEventListener('click', () => a2a.showModal());
+  a2a.addEventListener('close', () => { if (!demand.open) a2aTrigger.focus(); });
   demand.addEventListener('close', () => { form.reset(); clearDraft(); demandTrigger?.focus(); });
   function clearDraft() {
     draft = undefined;
@@ -103,8 +119,9 @@ function initHome() {
     const service = category === 'a2a' && button.dataset.surface === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
     const product = PRODUCTS[service];
     const source = `${CATEGORIES[category]}${product ? ` / ${product.name}` : ''}`;
-    demandTrigger = demo.open ? demoTrigger : button;
+    demandTrigger = demo.open ? demoTrigger : a2a.open ? a2aTrigger : button;
     if (demo.open) demo.close();
+    if (a2a.open) a2a.close();
     activeSource = {category, service, source};
     form.reset(); clearDraft();
     $('#demand-source').textContent = `来源：${source}`;
