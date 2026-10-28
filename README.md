@@ -1,6 +1,6 @@
 # DeepArchi 需求验证 Demo
 
-无需构建的静态概念网站，沿用暖纸、深绿、铜色与系统中文字体。目标是围绕 IP 守护、Deep BLM、技术架构规划、Tech M&A 了解需求，再决定开发优先级。无框架、第三方脚本、外部字体、运行时依赖、永久服务器或新增付费服务。
+无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。围绕 IP 守护、Deep BLM、技术架构规划、Tech M&A 了解需求；Deep BLM 另提供桌面规划工具试用。无框架、外部字体、永久服务器或新增付费服务；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
 
 ## 文件
 
@@ -20,7 +20,7 @@
 
 所有服务均为“概念 Demo · 招募试点”，所有样例均为虚构场景与拟议交付结构。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立的次要入口，无需先购买咨询才能表达产品需求。
 
-A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录中的 `availability=concept-demo`、`production_ready=false`、`a2a.available=false`、`a2a.endpoint=null` 如实反映状态。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
+A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录中 Deep BLM 为 `availability=web-trial`，其余为 `concept-demo`；全部保持 `production_ready=false`、`a2a.available=false`、`a2a.endpoint=null`。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
 
 需求表单只要求业务问题，期望结果与约束可选，不收集个人邮箱或电话。不要输入敏感数据、密码或密钥。打开/准备草稿都不发信、不上传；用户必须主动点邮件链接，并在本机邮件客户端确认发送。mailto 使用 RFC6068 百分号编码，空格为 `%20`，不是 `+`。复制失败时可手动复制；关闭窗口清空字段与草稿；不依赖 localStorage。文本通过 `textContent` 显示，不插入用户 HTML。短草稿仅在用户主动打开的本机 mailto 中携带正文；编码 URI 超过 1800 字符时保留完整可复制文本，邮件链接不带正文，并提示先复制再粘贴，避免客户端截断。统计和目录不包含正文。
 
@@ -66,10 +66,41 @@ git diff --check
 
 浏览器脚本默认仅监听 `127.0.0.1` 的临时随机端口，并在成功/失败时关闭服务器、线程与浏览器；无常驻进程。可传 `BASE_URL` 使用父流程提供的预览，脚本不会管理该外部服务器；`CHROME_PATH` 可指向既有 Chromium。所有测试页面使用测试标识，正式文件不注入测试配置。
 
-浏览器覆盖：320/390/820/1440 无溢出、导航与锚点、键盘/减少动态效果、四项真实按钮的样例内容、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
+浏览器覆盖：320/390/820/1440 无溢出、导航与锚点、键盘/减少动态效果、其余三项演示按钮的样例内容及 Deep BLM 原生工具入口、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
 
 编码子进程的沙箱可能禁止创建本地 socket，不能据此宣称浏览器通过；应在已授权的父流程环境中真跑交互。实际发布状态以对应 PR 的 CI、Pages 构建及发布后核验报告为准，本机测试不代表线上发布成功或真实手机蜂窝网可达。
 
 ## 发布边界
 
-本轮基线为 `c8cd94cb9cdf29db604cde3effc3e58f2f23c42e`，实现分支为 `feat/demand-validation-demo`。不改 DNS、CNAME、Pages 源、邮箱或凭据。发布前须独立审查、实跑浏览器并核验已授权的外部集成，再通过 PR 合并；CI 不承担部署，也不能假定推送后失败的检查会自动阻止 Pages 发布。共享免费统计环境的接收量限制不等于费用或额度隔离；禁止未经确认开启超额付费或调整既有服务。
+Deep BLM 集成基线为 `b83271a83c5cb0a155b7c57bb32c49526ebd3a16`，实现分支为 `feat/deepblm-trial-integration`。不改 DNS、CNAME、Pages 源、邮箱或凭据。发布前须独立审查、实跑浏览器并核验已授权的外部集成，再通过 PR 合并；CI 不承担部署，也不能假定推送后失败的检查会自动阻止 Pages 发布。共享免费统计环境的接收量限制不等于费用或额度隔离；禁止未经确认开启超额付费或调整既有服务。
+
+### Deep BLM 规划工具试用
+
+入口为 [`apps/deepblm.html`](apps/deepblm.html)。这是完整 15 步浏览器规划工具的公开试用，不是 A2A endpoint，`production_ready` 仍为 false。只使用已获授权的工具字段定义；未包含其他私有仓库材料或业务数据。选定源文件 SHA256 为 `f85c8ccdbbe7bd8d50ecc56ecab285f15791e0e6b41de7a7ca6efab75e7242c7`。
+
+- 初次访问宽度至少 1024px 时加载真实本地 EasyMDE 和 DOMPurify。320/390/820px 为产品、使用场景与咨询说明，不请求编辑器/vendor JS，不创建 Key 表单；从窄屏变为宽屏需刷新才能进入工作台。已启动的桌面会话在缩窄窗口时保留内存，恢复宽屏不会重新初始化或删除草稿。入口不跳转，`internal_test=1` 查询保持不变。
+- 工作台沿用原 15 步字段、表格和提示内容，提供编辑、预览、添加/删除行、会话内撤销/重做、本机自动保存、手工完整性检查、校验报告及修订记录。自动保存使用 `deepblm-draft-v1`；旧版扁平 `blm-strategy-data` 和 `blm-validation-report` 可恢复，旧原件保留。无账号、云端保存或跨设备自动同步。
+- JSON 导入兼容扁平字段与 `{title,created,steps:[{id,title,data}]}`，保留结构化文件的标题与创建时间；新版 `metadata` 保存完成标记与校验报告（含合法旧版字段快照）。字段与表格形状采用白名单；最大 4 MiB、字段 100000 字符、表格 200 行/每单元格 8000 字符、深度 9，节点 60000。未知字段、原型键、错误类型或超限会拒绝，不能用宽松解析静默丢弃内容。导入先校验并保存成功，再替换内存；失败不改草稿或存储。
+- 异常旧存储不自动删除或覆盖，暂停自动保存并提供原始恢复副本导出。可显式确认清除本工具数据后重新导入。恢复副本不是规划导入格式；需先在本机检查与修复。浏览器拒绝存储或空间不足时可继续在内存编辑并导出。清理只使用模块列出的工具键，绝不调用 `localStorage.clear()`。
+- JSON 用于备份/恢复，Markdown 与 **Word 兼容 .doc** 用于阅读导出；后者是净化的 HTML，不是原生 `.docx`，Office 实际排版尚待核验。不接受 `.docx` 导入；字段可从 UTF-8 `.txt`/`.md` 导入。
+- AI 为实验性、自备 Key 的可选功能，仅提供 OpenAI 兼容 Chat Completions 接口设置；用户自行核对模型 ID、费用、权限和 CORS。未使用真实凭据验证真实生成。页面打开不请求模型，发送必须主动同意向选定接口传送规划全文、已有校验记录与问题。Key 始终仅在页面内存中，刷新丢失；只有提供方、接口和模型 ID 可显式写入 `deepblm-preferences-v1`。不读取其他应用配置，不自动使用 `blm-ai-config` 的旧 Key，检测存在后提供显式删除按钮。
+- 自定义接口只接受公共域名的 HTTPS URL，拒绝 URL 凭据、查询、片段、非标准端口、本地名称与 IP 字面量；静态浏览器应用不能审计提供方的 DNS 配置或数据处理，请自行核对所填接口。请求不携带 Cookie，不跟随重定向；错误仅显示通用说明/HTTP 状态，不显示或记录原始提供方响应。
+- 公共链接导入、AllOrigins、自动网络搜索、共享 Key/Cursor 配置桥接均未纳入新版。全部运行依赖在 `assets/vendor`，版本、字节数和 SHA256 见 `manifest.json`；保留上游许可。EasyMDE 禁用字体自动下载与拼写检查，不用 CDN 回退。Font Awesome 资产保留但工作台未使用图标字体。
+- 工具不导入 `site.mjs`/`signals.mjs`，不初始化首页统计。首页 Deep BLM 卡为普通链接，保留 `data-demo="deep-blm"` 身份与需求按钮；用户同意后的现有 `demo_open` 仅说明入口兴趣，不是规划完成。
+- 内容安全入口为 `deepblm-security.mjs`：真实 DOMPurify 严格标签白名单，去除图片等自动外载、事件、样式、SVG、表单、框架等；只允许显式 HTTP(S)/mailto 链接并加 `noopener noreferrer`。文本/表格使用 DOM 文本或转义；预览、AI 回复、报告、修订与 Word HTML 共用净化路径。新版不保留旧内联事件处理器；CSP 的脚本限同源，无 `unsafe-eval` 或内联脚本许可。样式仍允许 `unsafe-inline` 以兼容编辑器布局，AI 的动态 HTTPS 接口使 `connect-src` 为 `https:`，不宣称是完全锁定的 CSP。浏览器端存储与 Key 仍受同源其他页面代码及浏览器扩展的安全边界限制。
+
+关键实现：`assets/deepblm-{entry,workspace,data,schema,security}.mjs` 与独立 `assets/deepblm.css`；纯 Node 测试 `tests/deepblm.test.mjs`；真实浏览器验收 `tests/deepblm-smoke.py`。
+
+```sh
+node --test tests/*.test.mjs
+.venv/bin/python scripts/check_site.py
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py'
+.venv/bin/python tests/visual-smoke.py
+.venv/bin/python tests/deepblm-smoke.py
+# 可选：BASE_URL=https://预览站点、CHROME_PATH=/浏览器路径
+# 可选：DEEPBLM_SCREENSHOT_DIR=${TMPDIR}/deepblm-screenshots
+```
+
+浏览器脚本复用既有回环 HTTP helper；AI 请求只使用显式 `fixture-only` 路由与非真实 Key，不调用收费模型。重点选择器：`a[data-tool-entry="deep-blm"]`、`#companion`、`#workspace`、`#step-nav [data-step]`、`[data-field] .CodeMirror`、`#import-json`/`#import-file`、`#export-json`/`#export-word`、`#storage-recovery`、`#clear-local`、`#ai-consent`。
+
+验收应同时运行上述纯逻辑、静态与真实浏览器命令；受限编码沙箱的 socket 拒绝不等于浏览器验收成功。模型请求验收仅使用显式非真实夹具，不证明真实提供方的 CORS、账户权限或生成质量；Word 实际排版也需单独核验。同一浏览器请勿在多个标签页同时编辑同一规划，以免后保存的草稿覆盖先前版本；开始研讨前请先导出 JSON 备份。

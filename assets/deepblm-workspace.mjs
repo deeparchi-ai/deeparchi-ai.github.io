@@ -1,0 +1,417 @@
+import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, normalizeImport, structuredExport, normalizeReport, parseBoundedJSON, normalizeConfig, validateEndpoint} from './deepblm-data.mjs';
+import {escapeHTML, renderMarkdown, sanitizeRichHTML} from './deepblm-security.mjs';
+const $ = selector => document.querySelector(selector);
+const clone = value => JSON.parse(JSON.stringify(value));
+function el(tag, attrs = {}, text) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function button(text, action, attrs = {}) {
+  const node = el('button', {type: 'button', ...attrs}, text);
+  node.addEventListener('click', action);
+  return node;
+}
+function asset(path, kind) {
+  return new Promise((resolve, reject) => {
+    const node = el(kind === 'script' ? 'script' : 'link', kind === 'script' ? {src: new URL(path, import.meta.url).href} : {rel: 'stylesheet', href: new URL(path, import.meta.url).href});
+    node.onload = resolve; node.onerror = reject; document.head.append(node);
+  });
+}
+let started = false;
+export async function startWorkspace() {
+  if (started || !matchMedia('(min-width: 1024px)').matches) return;
+  started = true;
+  await Promise.all([
+    asset('./vendor/easymde/easymde.min.js', 'script'),
+    asset('./vendor/dompurify/purify.min.js', 'script'),
+    asset('./vendor/easymde/easymde.min.css', 'style'),
+  ]);
+  if (!matchMedia('(min-width: 1024px)').matches) return;
+  buildWorkspace();
+}
+function buildWorkspace() {
+  let formData = {}, metadata = {}, currentStep = 0, editors = [];
+  let storageBlocked = false, configBlocked = false, undo = [], redo = [], lastEdit = {}, pending = false, aiEpoch = 0;
+  let config = {provider: 'deepseek', ...PROVIDERS.deepseek};
+  const recovery = new Map();
+  const host = $('#workspace');
+  host.className = 'workbench';
+  const intro = el('div', {class: 'workbench-intro'}), titleBox = el('div');
+  titleBox.append(el('h2', {}, '战略规划工作台'), el('p', {}, '15 步战略规划 · 本机自动保存 · 无云端同步'));
+  intro.append(titleBox, button('AI 设置与辅助（可选）', () => { aiDetails.open = true; aiDetails.scrollIntoView({block: 'start'}); }, {id: 'open-ai'}));
+  host.append(intro);
+  const status = el('p', {id: 'save-status', class: 'status', role: 'status', 'aria-live': 'polite'});
+  const message = el('p', {id: 'tool-message', class: 'status', role: 'status', 'aria-live': 'polite'});
+  const recoveryBox = el('div', {id: 'storage-recovery', class: 'notice warning', hidden: ''});
+  recoveryBox.append(el('p', {}, '本工具发现无法读取的本地数据，已保留原件并暂停自动保存。可导出恢复副本，检查文件后重新导入，或确认清除本工具数据。'));
+  recoveryBox.append(button('导出恢复副本', () => {
+    if (!recovery.size) { say('浏览器存储不可用；可用下方 JSON 导出保留当前内存草稿。'); return; }
+    download('deepblm-recovery.json', JSON.stringify(Object.fromEntries(recovery), null, 2), 'application/json');
+  }, {id: 'export-recovery'}));
+  const toolbar = el('div', {class: 'toolbar', role: 'group', 'aria-label': '草稿操作'});
+  const undoBtn = button('撤销', () => historyMove(undo, redo), {id: 'undo'});
+  const redoBtn = button('重做', () => historyMove(redo, undo), {id: 'redo'});
+  toolbar.append(undoBtn, redoBtn, button('保存到本机', () => save(), {id: 'save-draft', class: 'primary'}));
+  const importInput = el('input', {type: 'file', accept: '.json,application/json', hidden: '', id: 'import-file', 'aria-label': '导入规划 JSON'});
+  toolbar.append(button('导入 JSON', () => importInput.click(), {id: 'import-json'}), importInput);
+  toolbar.append(button('导出 JSON', () => exportFile('json'), {id: 'export-json'}), button('导出 Markdown', () => exportFile('md'), {id: 'export-markdown'}), button('Word 兼容 .doc', () => exportFile('doc'), {id: 'export-word'}));
+  toolbar.append(button('清除本工具本地数据', clearLocal, {id: 'clear-local'}));
+  host.append(toolbar, status, message, recoveryBox);
+  const help = el('details', {id: 'tool-help'});
+  help.append(el('summary', {}, '使用与数据说明'), el('p', {}, '手工编辑始终可用。先填写企业信息，再沿侧栏推进 15 步；可添加或删除表格行，使用撤销、重做与逐字段预览。校验报告和修订建议也可手工编写。'), el('p', {}, '草稿与非秘密模型设置只保存在当前浏览器。请定期导出 JSON 备份；导入兼容旧版扁平 JSON 和分步结构 JSON。Markdown 与 Word 兼容 .doc 用于阅读交付，不是原生 .docx；不支持 .docx 导入。'), el('p', {}, '本次试用关闭公共链接导入、代理抓取与自动网络搜索，避免通过隐藏第三方发送网址或查询。请使用 JSON 文件或字段的文本/Markdown 文件导入。本站不提供账号或跨设备自动同步。'));
+  host.append(help);
+  const grid = el('div', {class: 'workspace-grid'}), sidebar = el('aside', {class: 'step-sidebar', 'aria-label': '规划进度'});
+  const progressLabel = el('p', {id: 'progress-label', class: 'small'}), progress = el('progress', {id: 'planning-progress', max: '15', value: '0', 'aria-label': '有内容的步骤数'});
+  const nav = el('nav', {'aria-label': '15 步规划导航', id: 'step-nav'});
+  const stepButtons = steps.map((s, i) => {
+    const b = button(`${i + 1}. ${s.title}`, () => goToStep(i), {'data-step': s.id});
+    nav.append(b); return b;
+  });
+  sidebar.append(progressLabel, progress, nav);
+  const body = el('section', {class: 'step-body', id: 'step-content', 'aria-label': '当前规划步骤'});
+  grid.append(sidebar, body); host.append(grid);
+  const aiDetails = el('details', {id: 'ai-panel'});
+  aiDetails.append(el('summary', {}, '实验性 AI 辅助 · 自备 Key，按需启用'));
+  aiDetails.append(el('p', {}, '发送时，当前规划全文、已有校验报告和你的问题会交给所选提供方或你填写的自定义 HTTPS 接口；对方会处理这些数据与 Key。API 费用由你的账户承担。请先确认授权范围，不要发送敏感资料。'), el('p', {}, '未使用真实凭据验证 CORS、模型兼容性或真实生成质量。仅提供 OpenAI 兼容 Chat Completions 接口选项；请向提供方核对模型 ID 与浏览器跨域支持。打开页面不会请求模型。Key 始终仅在本页内存，刷新即丢失，不随草稿保存或导出。'));
+  const aiGrid = el('div', {class: 'ai-grid'});
+  function aiField(name, node) { const l = el('label'); l.append(el('span', {}, name), node); aiGrid.append(l); return node; }
+  const provider = aiField('提供方', el('select', {id: 'ai-provider'}));
+  for (const [id, name] of [['deepseek', 'DeepSeek（需自行核对）'], ['openai', 'OpenAI（填写可用模型 ID）'], ['custom', '自定义 OpenAI 兼容接口']]) provider.append(el('option', {value: id}, name));
+  const endpoint = aiField('完整 HTTPS Chat Completions 地址', el('input', {type: 'url', id: 'ai-endpoint', maxlength: '500', autocomplete: 'off', spellcheck: 'false'}));
+  const model = aiField('模型 ID', el('input', {id: 'ai-model', maxlength: '100', autocomplete: 'off'}));
+  const key = aiField('API Key（仅本页内存）', el('input', {type: 'password', id: 'ai-key', autocomplete: 'off', spellcheck: 'false', maxlength: '4096'}));
+  aiDetails.append(aiGrid);
+  const consentLabel = el('label');
+  const consent = el('input', {type: 'checkbox', id: 'ai-consent'});
+  consentLabel.append(consent, document.createTextNode('我同意向上述接口发送规划上下文并承担 API 费用（每次打开页面重新选择）。'));
+  aiDetails.append(consentLabel);
+  const aiBar = el('div', {class: 'toolbar'});
+  aiBar.append(button('保存非秘密设置', () => {
+    try {
+      const next = readConfig();
+      if (configBlocked && !confirm('原设置无法读取。确认用当前非秘密设置替换？')) return;
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(next)); config = next; configBlocked = false; say('只保存了提供方、接口与模型 ID。Key 和同意状态未保存。');
+    } catch { say('设置无效或浏览器无法保存。原设置未更改。'); }
+  }, {id: 'save-ai-preferences'}), button('忘记内存 Key', () => { key.value = ''; aiSettingsChanged(); say('本页 Key 已清空。'); }, {id: 'forget-key'}));
+  const legacyNotice = el('div', {id: 'legacy-settings', class: 'notice', hidden: ''});
+  legacyNotice.append(el('p', {}, '检测到旧版 blm-ai-config 设置。新版不会读取其中的 Key，也不会自动使用或迁移。你可以显式删除旧设置。'), button('清除旧版 AI 设置', () => {
+    if (!confirm('确认只删除 blm-ai-config 旧版 AI 设置？')) return;
+    try { localStorage.removeItem('blm-ai-config'); legacyNotice.hidden = true; say('旧版 AI 设置已删除。'); } catch { say('浏览器不允许删除本地设置。'); }
+  }, {id: 'clear-legacy-settings'}));
+  const targetLabel = el('p', {id: 'ai-target', class: 'small'}, '当前目标：规划讨论（不会写入字段）');
+  aiBar.append(button('仅讨论，不写入字段', () => chooseAITarget(null), {id: 'ai-discussion'}));
+  const questionLabel = el('label', {for: 'ai-question'}, '补充问题（可选）');
+  const question = el('textarea', {id: 'ai-question', maxlength: '8000', placeholder: '例如：这些战略目标与关键任务之间有哪些缺口？'});
+  const aiSend = button('发送问题与规划上下文', () => runAI(null), {id: 'ai-send', class: 'primary'});
+  const aiCancel = button('取消请求', () => { aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true; aiAnswer = ''; aiApply.hidden = true; aiResult.textContent = '已停止等待。已发送内容无法撤回，提供方仍可能处理或计费。'; say('已停止等待 AI 回复；草稿未更改。'); }, {id: 'ai-cancel', disabled: ''});
+  const aiResult = el('div', {id: 'ai-result', class: 'rich-content ai-result', 'aria-live': 'polite'});
+  const aiApply = button('采用到目标字段', () => applyAI(), {id: 'ai-apply', hidden: ''});
+  const sendBar = el('div', {class: 'toolbar'}); sendBar.append(aiSend, aiCancel);
+  aiDetails.append(aiBar, legacyNotice, targetLabel, questionLabel, question, sendBar, aiResult, aiApply);
+  host.append(aiDetails);
+  let controller = null, aiAnswer = '', aiTarget = null;
+  function say(text) { message.textContent = text; }
+  function chooseAITarget(target) {
+    aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true;
+    aiTarget = target; aiAnswer = ''; aiApply.hidden = true; aiResult.replaceChildren();
+    targetLabel.textContent = target ? `当前目标：${target.step.title} / ${target.field.name}（建议需确认后采用）` : '当前目标：规划讨论（不会写入字段）';
+  }
+  function snapshot() { return {formData: clone(formData), metadata: clone(metadata)}; }
+  function pushHistory(editKey = '') {
+    const now = Date.now();
+    if (!editKey || lastEdit.key !== editKey || now - lastEdit.time > 700) { undo.push(snapshot()); if (undo.length > 30) undo.shift(); }
+    lastEdit = {key: editKey, time: now}; redo = []; updateHistory();
+  }
+  function updateHistory() { undoBtn.disabled = !undo.length; redoBtn.disabled = !redo.length; }
+  function historyMove(from, to) {
+    if (!from.length) return;
+    to.push(snapshot()); const state = from.pop();
+    formData = state.formData; metadata = state.metadata; lastEdit = {};
+    save(); renderStep(); updateHistory();
+  }
+  function commitField(id, value, editKey = id) {
+    const f = steps.flatMap(s => s.fields.map(f => ({...f, id: `${s.id}-${f.name}`}))).find(f => f.id === id);
+    const maxLength = f?.maxlength ?? LIMITS.text;
+    if (typeof value === 'string' && value.length > maxLength) { say(`此字段最多 ${maxLength} 个字符，请缩短内容。`); return false; }
+    if (f?.type === 'table' && value.length > LIMITS.rows) { say(`每张表最多 ${LIMITS.rows} 行。`); return false; }
+    pushHistory(editKey); formData[id] = value;
+    if (id === 'strategy-validation-逻辑校验报告') { metadata.validationReport = {content: value, savedAt: Date.now()}; formData['strategy-validation-completed'] = value.trim() ? 'true' : 'false'; }
+    if (id === 'revision-修改建议列表') formData['revision-completed'] = value.trim() ? 'true' : 'false';
+    save(); updateProgress(); return true;
+  }
+  function save() {
+    if (storageBlocked) { status.textContent = '自动保存已暂停；原存储保留。请导出草稿备份或使用恢复选项。'; return false; }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(structuredExport(formData, metadata))); status.textContent = `已自动保存到本机浏览器 · ${new Date().toLocaleTimeString('zh-CN')} · 无云端同步`; return true; }
+    catch { status.textContent = '保存失败：空间、格式限制或存储权限不足。请导出 JSON 备份，当前内容仍在内存。'; return false; }
+  }
+  function load() {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved !== null) {
+        recovery.set(DRAFT_KEY, saved);
+        ({formData, metadata} = normalizeImport(saved));
+        const selectedStep = localStorage.getItem(STEP_KEY);
+        if (/^(?:[0-9]|1[0-4])$/.test(selectedStep ?? '')) currentStep = Number(selectedStep);
+      } else {
+        const legacy = localStorage.getItem('blm-strategy-data');
+        if (legacy !== null) { recovery.set('blm-strategy-data', legacy); ({formData, metadata} = normalizeImport(legacy)); }
+        const report = localStorage.getItem('blm-validation-report');
+        if (report !== null) {
+          recovery.set('blm-validation-report', report);
+          metadata.validationReport = normalizeReport(parseBoundedJSON(report));
+          if (!formData['strategy-validation-逻辑校验报告']) formData['strategy-validation-逻辑校验报告'] = metadata.validationReport.content;
+        }
+        const step = localStorage.getItem('blm-strategy-step');
+        if (/^(?:[0-9]|1[0-4])$/.test(step ?? '')) currentStep = Number(step);
+      }
+      status.textContent = saved !== null || Object.keys(formData).length ? '已恢复本机草稿；旧版原件保留。' : '尚未填写；编辑后自动保存到本机浏览器。';
+    } catch { storageBlocked = true; recoveryBox.hidden = false; status.textContent = '本地数据异常或存储不可用；未覆盖原件。当前可在内存中编辑并导出。'; }
+    try {
+      // Deliberately detect only presence. Never parse or reuse persisted legacy secrets.
+      legacyNotice.hidden = localStorage.getItem('blm-ai-config') === null;
+      const raw = localStorage.getItem(CONFIG_KEY);
+      if (raw !== null) config = normalizeConfig(raw);
+    } catch { configBlocked = true; say('非秘密 AI 设置无法读取，已保留原件；AI 默认关闭。'); }
+    writeConfig();
+  }
+  function writeConfig() { provider.value = config.provider; endpoint.value = config.endpoint; model.value = config.model; }
+  function readConfig() { return normalizeConfig({provider: provider.value, endpoint: endpoint.value.trim(), model: model.value.trim()}); }
+  function aiSettingsChanged() { consent.checked = false; aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true; }
+  provider.addEventListener('change', () => { config = {provider: provider.value, ...PROVIDERS[provider.value]}; writeConfig(); aiSettingsChanged(); });
+  endpoint.addEventListener('input', aiSettingsChanged); model.addEventListener('input', aiSettingsChanged); key.addEventListener('input', aiSettingsChanged);
+  consent.addEventListener('change', () => { if (!consent.checked) aiSettingsChanged(); });
+  function updateProgress() {
+    const hasContent = value => Array.isArray(value) ? value.some(row => row.some(cell => cell.trim())) : typeof value === 'string' && !!value.trim();
+    const count = steps.filter(s => s.fields.some(f => hasContent(formData[`${s.id}-${f.name}`]))).length;
+    progress.value = count; progressLabel.textContent = `${count} / 15 步已有内容`;
+    stepButtons.forEach((b, i) => { if (i === currentStep) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+  }
+  function goToStep(index) {
+    currentStep = index;
+    if (!storageBlocked) { try { localStorage.setItem(STEP_KEY, String(index)); } catch { say('步骤位置无法保存，规划内容仍可导出。'); } }
+    renderStep();
+    $('#step-heading').focus({preventScroll: true});
+  }
+  function renderStep() {
+    for (const e of editors) e.toTextArea(); editors = [];
+    body.replaceChildren();
+    const step = steps[currentStep];
+    const title = el('h2', {id: 'step-heading', tabindex: '-1'}, `${currentStep + 1}. ${step.title}`);
+    body.append(title, el('p', {class: 'step-description'}, step.description));
+    const stepTools = el('div', {class: 'toolbar'});
+    stepTools.append(button('重置当前步骤', () => {
+      if (!confirm(`确认重置“${step.title}”？可使用撤销恢复当前会话内容。`)) return;
+      pushHistory(); for (const f of step.fields) delete formData[`${step.id}-${f.name}`];
+      if (step.id === 'strategy-validation') { delete metadata.validationReport; delete formData['strategy-validation-completed']; }
+      if (step.id === 'revision') delete formData['revision-completed'];
+      save(); renderStep();
+    }, {id: 'reset-step'}));
+    if (step.id === 'strategy-validation') stepTools.append(button('生成本地完整性报告', basicValidation, {id: 'basic-validation'}));
+    if (step.id === 'revision') stepTools.append(button('复制校验报告到修订草稿', () => {
+      if (formData['revision-修改建议列表'] && !confirm('确认替换现有修订草稿？')) return;
+      commitField('revision-修改建议列表', formData['strategy-validation-逻辑校验报告'] || metadata.validationReport?.content || '请先完成战略逻辑校验，再记录修改项、责任人与处理结果。'); renderStep();
+    }, {id: 'revision-from-report'}));
+    body.append(stepTools);
+    if (step.id === 'revision') {
+      body.append(el('p', {}, '手工记录修改建议与处理结果。通过下列链接回到对应步骤修改；关键决策须由你确认，AI 不会自动改写其他字段。'));
+      const links = el('div', {class: 'revision-links'});
+      steps.slice(0, 13).forEach((s, i) => links.append(button(s.title, () => goToStep(i)))); body.append(links);
+    }
+    for (const field of step.fields) renderField(step, field);
+    const pager = el('div', {class: 'step-pager'});
+    const prev = button('上一步', () => goToStep(currentStep - 1), {id: 'previous-step'}); prev.disabled = currentStep === 0;
+    const next = button('下一步', () => goToStep(currentStep + 1), {id: 'next-step', class: 'primary'}); next.disabled = currentStep === 14;
+    pager.append(prev, next); body.append(pager); updateProgress();
+  }
+  function renderField(step, field) {
+    const id = `${step.id}-${field.name}`;
+    const box = el('section', {class: 'field', 'data-field': id});
+    const head = el('div', {class: 'field-heading'}), label = el('h3');
+    label.append(el('label', {for: id}, field.name));
+    if (field.type === 'table') label.firstChild.removeAttribute('for');
+    const actions = el('div', {class: 'field-actions'});
+    actions.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); aiDetails.open = true; question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; aiDetails.scrollIntoView({block: 'start'}); say('请核对 AI 设置、外部处理同意与上下文，然后主动发送。'); }, {'data-ai-field': id}));
+    if (field.type !== 'table') {
+      const file = el('input', {type: 'file', accept: '.txt,.md,text/plain,text/markdown', hidden: '', 'aria-label': `导入${field.name}文本`});
+      file.addEventListener('change', async () => {
+        try {
+          const f = file.files[0]; if (!f) return;
+          if (!/\.(txt|md)$/i.test(f.name) || f.size > LIMITS.text * 3) throw new Error();
+          const text = await f.text();
+          if ((formData[id] || '') && !confirm(`确认用文件文本替换“${field.name}”？`)) return;
+          if (commitField(id, text, '')) renderStep();
+        } catch { say('仅支持限长的 UTF-8 文本或 Markdown 文件；不支持 .docx。原字段未更改。'); }
+      });
+      actions.append(button('导入文本', () => file.click()), file);
+    }
+    head.append(label, actions); box.append(head);
+    if (field.type === 'table') {
+      const wrap = el('div', {class: 'table-wrap'}), table = el('table', {class: 'table-input', 'aria-label': field.name});
+      const tr = el('tr'); for (const c of [...field.columns, '操作']) tr.append(el('th', {scope: 'col'}, c));
+      const thead = el('thead'); thead.append(tr); table.append(thead); const tbody = el('tbody');
+      const rows = formData[id]?.length ? formData[id] : [field.columns.map(() => '')];
+      rows.forEach((row, r) => {
+        const line = el('tr'); row.forEach((cell, c) => {
+          const td = el('td'), input = el('textarea', {'aria-label': `${field.name} 第${r + 1}行 ${field.columns[c]}`, maxlength: String(LIMITS.cell), 'data-row': r, 'data-column': c}); input.value = cell;
+          input.addEventListener('input', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data[r][c] = input.value; commitField(id, data, `${id}-${r}-${c}`); }); td.append(input); line.append(td);
+        });
+        const operation = el('td'); operation.append(button('删除', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.splice(r, 1); commitField(id, data, ''); renderStep(); }, {'aria-label': `删除${field.name}第${r + 1}行`})); line.append(operation); tbody.append(line);
+      });
+      table.append(tbody); wrap.append(table); box.append(wrap, button('添加行', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.push(field.columns.map(() => '')); if (commitField(id, data, '')) renderStep(); }, {'data-add-row': id}));
+    } else {
+      const columns = el('div', {class: 'editor-preview'}), editPane = el('div', {class: 'editor-pane'}), preview = el('div', {class: 'preview-pane'});
+      preview.append(el('h4', {}, '预览'));
+      const rich = el('div', {class: 'rich-content', id: `${id}-preview`}); preview.append(rich);
+      const maxLength = field.maxlength ?? LIMITS.text;
+      const input = el('textarea', {id, 'aria-label': field.name, maxlength: String(maxLength), placeholder: field.placeholder || '支持 Markdown；可手工编辑并保存。'});
+      input.value = formData[id] || '';
+      editPane.append(input); columns.append(editPane, preview); box.append(columns); body.append(box);
+      const editor = new window.EasyMDE({element: input, autoDownloadFontAwesome: false, spellChecker: false, autosave: {enabled: false}, status: ['lines', 'words'], toolbar: false, minHeight: field.type === 'input' ? '80px' : '140px', maxHeight: '430px', previewRender: renderMarkdown, renderingConfig: {sanitizerFunction: sanitizeRichHTML}, inputStyle: 'textarea', lineWrapping: true, forceSync: true, shortcuts: {togglePreview: null, toggleSideBySide: null, toggleFullScreen: null, drawImage: null, drawLink: null, undo: null, redo: null}});
+      editor.codemirror.getInputField().setAttribute('aria-label', `${field.name} Markdown 编辑`);
+      editors.push(editor);
+      const syncPreview = value => { rich.innerHTML = renderMarkdown(value); };
+      syncPreview(input.value);
+      editor.codemirror.setOption('extraKeys', {'Ctrl-Z': () => historyMove(undo, redo), 'Cmd-Z': () => historyMove(undo, redo), 'Ctrl-Y': () => historyMove(redo, undo), 'Cmd-Shift-Z': () => historyMove(redo, undo)});
+      editor.codemirror.on('beforeChange', (_cm, change) => {
+        const current = editor.value();
+        const nextLength = current.length - (editor.codemirror.indexFromPos(change.to) - editor.codemirror.indexFromPos(change.from)) + change.text.join('\n').length;
+        if (nextLength > maxLength) { change.cancel(); say(`此字段最多 ${maxLength} 个字符，已保留原内容。`); }
+      });
+      editor.codemirror.on('change', () => { const value = editor.value(); if (commitField(id, value)) syncPreview(value); });
+      return;
+    }
+    body.append(box);
+  }
+  function basicValidation() {
+    const incomplete = steps.slice(0, 13).flatMap(s => s.fields.filter(f => { const v = formData[`${s.id}-${f.name}`]; return Array.isArray(v) ? !v.some(row => row.some(c => c.trim())) : !v?.trim(); }).map(f => `- ${s.title} / ${f.name}：待补充`));
+    const report = `## 本地完整性检查\n\n${incomplete.length ? incomplete.join('\n') : '前 13 步均有内容。'}\n\n此检查仅核对是否填写，不能证明战略逻辑正确。请人工核验目标、业务设计、关键任务与资源之间的承接关系。`;
+    if (formData['strategy-validation-逻辑校验报告'] && !confirm('用本地完整性检查替换现有报告？')) return;
+    commitField('strategy-validation-逻辑校验报告', report, ''); renderStep(); say('已生成本地完整性报告，未调用 AI。');
+  }
+  importInput.addEventListener('change', async () => {
+    try {
+      const file = importInput.files[0]; if (!file) return;
+      if (!/\.json$/i.test(file.name) || file.size > LIMITS.bytes) throw new Error();
+      const next = normalizeImport(await file.text());
+      const serialized = JSON.stringify(structuredExport(next.formData, next.metadata));
+      if (storageBlocked) { say('请先导出恢复副本并显式清除异常本地数据，再导入；原草稿未更改。'); return; }
+      if (!confirm('确认用所选 JSON 替换当前草稿？可在当前会话撤销。')) return;
+      // Persist first. A rejected/oversized/quota-failed import never changes either draft or storage.
+      localStorage.setItem(DRAFT_KEY, serialized);
+      pushHistory(); ({formData, metadata} = next); renderStep(); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
+    } catch { say('导入失败：仅支持有效、限长的规划 JSON（扁平或分步格式）。原草稿与存储未更改；不支持 .docx。'); }
+    finally { importInput.value = ''; }
+  });
+  function download(filename, content, type) {
+    const blob = new Blob([content], {type}); const url = URL.createObjectURL(blob); const a = el('a', {href: url, download: filename});
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function documentMarkdown() {
+    let text = `# ${metadata.header?.title ?? 'BLM扩展框架战略规划'}\n\n`;
+    for (const [i, s] of steps.entries()) {
+      text += `## ${i + 1}. ${s.title}\n\n${s.description}\n\n`;
+      for (const f of s.fields) {
+        const value = formData[`${s.id}-${f.name}`]; text += `### ${f.name}\n\n`;
+        if (f.type === 'table') {
+          const cell = v => String(v).replace(/\|/g, '\\|').replace(/\r?\n/g, ' / ');
+          text += `| ${f.columns.map(cell).join(' | ')} |\n| ${f.columns.map(() => '---').join(' | ')} |\n`;
+          for (const row of value || []) text += `| ${row.map(cell).join(' | ')} |\n`;
+          text += '\n';
+        } else text += `${value || ''}\n\n`;
+      }
+    }
+    if (metadata.validationReport) text += `## 已保存的校验记录\n\n${metadata.validationReport.content}\n`;
+    return text;
+  }
+  function exportFile(format) {
+    try {
+      const name = `deepblm-${Date.now()}`;
+      if (format === 'json') download(`${name}.json`, JSON.stringify(structuredExport(formData, metadata), null, 2), 'application/json');
+      if (format === 'md') download(`${name}.md`, documentMarkdown(), 'text/markdown;charset=utf-8');
+      if (format === 'doc') {
+        let html = `<h1>${escapeHTML(metadata.header?.title ?? 'BLM扩展框架战略规划')}</h1>`;
+        for (const [i, s] of steps.entries()) {
+          html += `<h2>${i + 1}. ${escapeHTML(s.title)}</h2><p>${escapeHTML(s.description)}</p>`;
+          for (const f of s.fields) {
+            const v = formData[`${s.id}-${f.name}`]; html += `<h3>${escapeHTML(f.name)}</h3>`;
+            if (f.type === 'table') html += `<table><thead><tr>${f.columns.map(c => `<th>${escapeHTML(c)}</th>`).join('')}</tr></thead><tbody>${(v || []).map(row => `<tr>${row.map(c => `<td>${escapeHTML(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+            else html += renderMarkdown(v || '');
+          }
+        }
+        if (metadata.validationReport) html += '<h2>已保存的校验记录</h2>' + renderMarkdown(metadata.validationReport.content);
+        download(`${name}.doc`, `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><title>BLM 战略规划</title></head><body>${sanitizeRichHTML(html)}</body></html>`, 'application/msword');
+      }
+      say('已准备下载；JSON 可用于恢复，Word 兼容 .doc 为 HTML 格式，实际排版请在 Word 中核验。');
+    } catch { say('无法导出：草稿超出支持范围。请缩短字段，或导出恢复副本。'); }
+  }
+  function clearLocal() {
+    if (!confirm('确认删除本工具在本机的草稿、旧版项目、旧版 AI 设置与非秘密偏好？此操作不会清除其他应用数据。请先导出备份。')) return;
+    try {
+      for (const k of TOOL_KEYS) localStorage.removeItem(k);
+      aiEpoch++; controller?.abort(); key.value = ''; consent.checked = false; aiAnswer = ''; aiTarget = null; targetLabel.textContent = '当前目标：规划讨论（不会写入字段）'; aiResult.replaceChildren(); aiApply.hidden = true; question.value = ''; pending = false; aiSend.disabled = false; aiCancel.disabled = true;
+      formData = {}; metadata = {}; currentStep = 0; undo = []; redo = []; recovery.clear(); storageBlocked = false; configBlocked = false; recoveryBox.hidden = true; legacyNotice.hidden = true;
+      config = {provider: 'deepseek', ...PROVIDERS.deepseek}; writeConfig(); renderStep(); updateHistory(); status.textContent = '本工具本地数据已清除；下次编辑才会重新保存。'; say('已清除本工具数据。');
+    } catch { say('清除未完成：浏览器拒绝存储操作，请使用浏览器设置检查；未清除其他应用数据。'); }
+  }
+  async function runAI(target) {
+    if (pending) return;
+    let settings;
+    try {
+      settings = readConfig(); validateEndpoint(settings.endpoint);
+      if (!settings.model || !key.value.trim() || !consent.checked) { say('请填写模型 ID、内存 Key，并明确同意外部处理后再发送。'); return; }
+      // Limit the aggregate context and prompt before any network request.
+      const context = JSON.stringify(structuredExport(formData, metadata));
+      if (context.length + question.value.length > 180000) { say('规划上下文过长，请缩短后发送。'); return; }
+      if (target) aiTarget = target;
+      const epoch = ++aiEpoch;
+      controller = new AbortController(); const requestController = controller; const timer = setTimeout(() => requestController.abort(), 60000);
+      pending = true; aiSend.disabled = true; aiCancel.disabled = false; aiApply.hidden = true; aiAnswer = ''; aiResult.textContent = '请求中；可以取消。';
+      try {
+        const response = await fetch(settings.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key.value.trim()}`}, body: JSON.stringify({model: settings.model, stream: false, messages: [{role: 'system', content: '你是战略规划辅助顾问。区分事实、假设和缺证；不得声称已验证业务结论。只返回 Markdown 文本。若要求表格 JSON 则仅返回二维字符串数组。'}, {role: 'user', content: `规划上下文：\n${context}\n\n目标：${aiTarget ? aiTarget.step.title + ' / ' + aiTarget.field.name : '规划讨论'}\n问题：${question.value}`}]}), signal: requestController.signal});
+        if (epoch !== aiEpoch) return;
+        if (!response.ok) { aiResult.textContent = `AI 请求失败（HTTP ${response.status}）。请检查授权、余额、限额与模型 ID；未展示提供方原始响应。`; return; }
+        // Bound streamed response bytes before parsing to avoid unbounded provider output.
+        const reader = response.body.getReader(), decoder = new TextDecoder(); let raw = '', bytes = 0;
+        while (true) {
+          const {done, value} = await reader.read(); if (done) break;
+          bytes += value.byteLength; if (bytes > LIMITS.bytes) { await reader.cancel(); throw new Error('response-limit'); }
+          raw += decoder.decode(value, {stream: true});
+        }
+        raw += decoder.decode(); const data = parseBoundedJSON(raw);
+        const content = data?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string' || content.length > LIMITS.text) throw new Error('response-format');
+        if (epoch !== aiEpoch) return;
+        aiAnswer = key.value ? content.replaceAll(key.value.trim(), '[Key 已隐藏]') : content; aiResult.innerHTML = renderMarkdown(aiAnswer); aiApply.hidden = !aiTarget;
+        say(aiTarget ? `AI 建议已返回。核验后可主动采用到“${aiTarget.field.name}”；不会自动改写草稿。` : 'AI 回复仅供参考，请自行核验。');
+      } catch {
+        if (epoch === aiEpoch) aiResult.textContent = '请求未完成：网络、CORS、超时、取消或接口格式不兼容。未展示原始响应；草稿未更改。';
+      } finally {
+        clearTimeout(timer);
+        if (epoch === aiEpoch) { pending = false; aiSend.disabled = false; aiCancel.disabled = true; }
+      }
+    } catch { say('AI 设置无效。请检查公共 HTTPS 接口和模型；草稿未更改。'); }
+  }
+  function applyAI() {
+    if (!aiTarget || !aiAnswer) return;
+    try {
+      const {id, field} = aiTarget; let value = aiAnswer;
+      if (field.type === 'table') value = parseBoundedJSON(value.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+      normalizeImport({...formData, [id]: value});
+      if (!confirm(`确认将 AI 建议写入“${field.name}”？请先核验，原内容可撤销。`)) return;
+      if (commitField(id, value, '')) { renderStep(); say('已采用建议，请继续人工核验。'); }
+    } catch { say('AI 内容不符合字段或表格结构，未改写草稿。'); }
+  }
+  load(); host.hidden = false; document.body.classList.add('workspace-ready'); renderStep(); updateHistory();
+  matchMedia('(min-width: 1024px)').addEventListener('change', event => {
+    if (event.matches) requestAnimationFrame(() => editors.forEach(editor => editor.codemirror.refresh()));
+  });
+  document.addEventListener('keydown', event => {
+    if (!(event.ctrlKey || event.metaKey) || !['z', 'y', 's'].includes(event.key.toLowerCase())) return;
+    if (!matchMedia('(min-width: 1024px)').matches) return;
+    const codeMirror = event.target.closest?.('.CodeMirror'); if (codeMirror && event.key.toLowerCase() !== 's') return;
+    if (event.key.toLowerCase() === 's') { event.preventDefault(); save(); }
+    // Native text inputs retain native undo; explicit toolbar provides whole-draft undo/redo.
+  });
+}

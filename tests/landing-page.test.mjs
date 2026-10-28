@@ -34,7 +34,8 @@ test('catalogue, cards, selection and sample definitions share exactly four serv
     assert.match(html, new RegExp(`data-demo="${s.id}"`));
     assert.match(html, new RegExp(`data-service="${s.id}"`));
     assert.match(html, new RegExp(`<option value="${s.id}">`));
-    assert.equal(s.availability, 'concept-demo');
+    assert.equal(s.availability, s.id === 'deep-blm' ? 'web-trial' : 'concept-demo');
+    if (s.id === 'deep-blm') assert.equal(s.web_trial.url, 'apps/deepblm.html');
     assert.equal(s.production_ready, false);
     assert.equal(s.human_contact, 'contact@deeparchi.com.cn');
     assert.ok(s.proposed_input.length && s.proposed_output.length);
@@ -62,12 +63,12 @@ test('homepage keeps four concise sections and discloses A2A details in a closed
   assert.ok([...main.replace(/<[^>]+>/g, '').matchAll(/\p{Script=Han}/gu)].length <= 749 * .65);
   assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]), ['top','capabilities','integrate','contact']);
   assert.doesNotMatch(main, /hero-copy|class="outcome"|预期交付|SERVICE EXPLORATIONS|ALSO HERE TO HELP|a2a-workspace/);
-  const cards = [...main.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)];
+  const cards = [...main.matchAll(/<article class="product" id="([^"]+)"[^>]*>([\s\S]*?)<\/article>/g)];
   assert.equal(cards.length,4);
-  for (const [, card] of cards) {
+  for (const [, id, card] of cards) {
     const paragraphs = [...card.matchAll(/<p\b[^>]*>(.*?)<\/p>/g)];
     assert.equal(paragraphs.length,2);
-    assert.match(paragraphs[0][1], /概念 Demo/);
+    assert.match(paragraphs[0][1], id === 'deep-blm' ? /规划工具 · 试用/ : /概念 Demo/);
     assert.ok([...paragraphs[1][1].matchAll(/\p{Script=Han}/gu)].length <= 24);
     assert.doesNotMatch(card, /<ul|<ol|<details/);
   }
@@ -97,7 +98,7 @@ test('compact consent prompt retains explicit choices, optional scope and access
 
 test('product actions have eight distinct service-specific accessible names', () => {
   const cards = [...html.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)].map(match => match[1]).join('');
-  const actions = [...cards.matchAll(/<button\b[^>]*(?:data-demo=|data-intent="product")[^>]*>/g)];
+  const actions = [...cards.matchAll(/<(?:button|a)\b[^>]*(?:data-demo=|data-intent="product")[^>]*>/g)];
   assert.equal(actions.length,8);
   const names = actions.map(([tag]) => tag.match(/aria-label="([^"]+)"/)?.[1]);
   assert.ok(names.every(Boolean));

@@ -36,3 +36,5 @@ jobs:
         run: node --test tests/*.test.mjs
       - name: Check desktop and mobile browser scenarios
         run: .venv/bin/python tests/visual-smoke.py
+      - name: Check Deep BLM desktop workbench and mobile companion
+        run: .venv/bin/python tests/deepblm-smoke.py
