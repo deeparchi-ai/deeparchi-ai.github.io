@@ -4,12 +4,77 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {steps, LIMITS, normalizeImport, structuredExport, normalizeReport, normalizeConfig, validateEndpoint, TOOL_KEYS, parseBoundedJSON} from '../assets/deepblm-data.mjs';
 import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from '../assets/deepblm-credentials.mjs';
+import {writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages, writingInstructions} from '../assets/deepblm-ui.mjs';
 const read = name => readFile(new URL(`../${name}`, import.meta.url), 'utf8');
 const allFields = Object.fromEntries(steps.flatMap(s => s.fields.map(f => [`${s.id}-${f.name}`, f.type === 'table' ? [f.columns.map((c, i) => `虚构验收 ${c} ${i}`), f.columns.map(() => '')] : `虚构验收：${s.title} / ${f.name}\n**保留内容**`])));
 allFields['strategy-validation-completed'] = 'true';
 allFields['revision-completed'] = false;
 const snapshot = Object.fromEntries(steps.map(s => [s.id, {title: s.title, description: s.description, fields: Object.fromEntries(s.fields.map(f => [f.name, f.type === 'table' ? {type: 'table', columns: f.columns, data: allFields[`${s.id}-${f.name}`]} : {type: f.type, value: allFields[`${s.id}-${f.name}`]}]))}]));
 const metadata = {validationReport: {content: '虚构校验报告 <img src=x onerror=alert(1)>', savedAt: 1, stepData: snapshot}};
+
+test('writing defaults use actual content and only current-step fields; review never applies', () => {
+  assert.deepEqual(writingActions.map(a => a.label), ['起草内容', '完善表达', '检查缺漏']);
+  for (const step of steps) {
+    assert.equal(defaultAITarget(step, {}).field, step.fields[0]);
+    assert.equal(defaultAITarget(step, allFields).field, step.fields[0]);
+    for (const field of step.fields) {
+      const id = `${step.id}-${field.name}`;
+      const data = {...allFields, [id]: field.type === 'table' ? [field.columns.map(() => ' ')] : ' '};
+      const target = defaultAITarget(step, data);
+      assert.equal(target.id, id);
+      assert.equal(defaultWritingAction(data[id]), 'draft');
+      assert.equal(defaultWritingAction(allFields[id]), 'improve');
+      assert.match(writingPlaceholder(target), new RegExp(field.name));
+      assert.equal(canApplyWriting(target, 'draft'), true);
+      assert.equal(canApplyWriting(target, 'improve'), true);
+      assert.equal(canApplyWriting(target, 'inspect'), false);
+      assert.equal(canApplyWriting(target, 'unknown'), false);
+    }
+  }
+  for (const action of writingActions) assert.equal(canApplyWriting(null, action.id), false);
+});
+
+test('blank supplemental input still produces schema-aware tasks with faithful source content and explicit unknowns', () => {
+  for (const step of steps) for (const field of step.fields) {
+    const id = `${step.id}-${field.name}`, target = {id, field, step};
+    for (const {id: action} of writingActions) {
+      const messages = writingMessages({target, action, context: 'explicit-fixture-context\n' + JSON.stringify({[id]: allFields[id]}), question: '  '});
+      assert.deepEqual(messages.map(m => m.role), ['system', 'user']);
+      assert.match(messages[0].content, /不得编造企业名称/);
+      assert.match(messages[0].content, /假设必须标明/);
+      const prompt = messages[1].content;
+      assert.ok(prompt.includes(`${step.title} / ${field.name}`));
+      assert.ok(prompt.includes(step.description));
+      assert.ok(prompt.includes(field.placeholder || field.columns?.join('、') || field.name));
+      assert.ok(prompt.includes(JSON.stringify(allFields[id])));
+      assert.ok(prompt.includes('explicit-fixture-context'));
+      assert.match(prompt, /无；请按上述任务与字段指引处理/);
+      if (action === 'inspect') {
+        assert.match(prompt, /问题清单，不改写字段/);
+        assert.doesNotMatch(prompt, /只返回 JSON/);
+      } else if (field.type === 'table') {
+        assert.ok(prompt.includes(`每行恰好 ${field.columns.length} 列`));
+        assert.match(prompt, /JSON 二维字符串数组，不含表头/);
+        assert.ok(prompt.includes(field.columns.join('、')));
+      } else assert.ok(prompt.includes(`最多 ${field.maxlength ?? LIMITS.text} 字符`));
+    }
+  }
+  const target = defaultAITarget(steps[0], {});
+  const prompt = writingMessages({target, action: 'draft', context: '{}', question: '虚构补充要求：简洁'});
+  assert.ok(prompt[1].content.endsWith('虚构补充要求：简洁'));
+  assert.ok(prompt[1].content.includes(`见规划上下文中的字段 ${target.id}；缺省即未填写。`));
+  assert.match(writingInstructions(null, 'draft'), /不生成用于覆盖字段的内容/);
+  assert.throws(() => writingInstructions(target, 'unknown'));
+});
+
+test('legal long fields are sent once without consuming the context budget twice', () => {
+  const step = steps.find(s => s.id === 'revision'), field = step.fields[0];
+  const id = `${step.id}-${field.name}`, value = 'x'.repeat(95000);
+  const context = JSON.stringify(structuredExport(normalizeImport({[id]: value}).formData, {}));
+  const messages = writingMessages({target: {id, field, step}, action: 'improve', context, question: ''});
+  assert.ok(messages.reduce((sum, m) => sum + m.content.length, 0) < 180000);
+  assert.equal(messages[1].content.split(value).length - 1, 1);
+});
 
 test('both flat and structured exports retain every field in all 15 steps, table cells, flags and report snapshots', () => {
   assert.equal(steps.length, 15);

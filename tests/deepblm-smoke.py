@@ -324,9 +324,9 @@ def check_desktop(browser, base, directory):
     assert 0 <= bounds['y'] and bounds['y'] + bounds['height'] <= 1000
     assert page.locator('#ai-panel').get_attribute('aria-labelledby') == 'ai-heading'
     expect(page.locator('#ai-panel #ai-disclosure, #ai-panel #ai-destination, #ai-panel #ai-consent')).to_have_count(0)
-    # Escape closes and restores focus to the visible field disclosure summary.
+    # Escape closes and restores focus to the direct field AI action.
     page.keyboard.press('Escape'); expect(page.locator('#ai-panel')).not_to_be_visible()
-    expect(field(page, 'strategy-validation-逻辑校验报告').locator('summary')).to_be_focused()
+    expect(field(page, 'strategy-validation-逻辑校验报告').locator('[data-ai-field]')).to_be_focused()
     activate(page, field(page, 'strategy-validation-逻辑校验报告').locator('[data-ai-field]'))
     page.locator('#close-ai').focus(); page.keyboard.press('Shift+Tab')
     assert page.evaluate("document.activeElement.closest('#ai-panel') !== null")
@@ -690,7 +690,7 @@ def check_global_ai(browser, base, directory):
     activate(page, page.locator('[data-ai-field]').first)
     assert not page.locator('#ai-consent').is_checked()
     expect(page.locator('#ai-apply')).not_to_be_visible()
-    expect(page.locator('#ai-result')).to_be_empty()
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'empty')
     page.evaluate('''() => {window.__resolveGlobalFixture(); window.fetch = window.__originalGlobalFixtureFetch;}''')
     expect(page.locator('#ai-result')).not_to_contain_text('fixture-old-global-response')
     request_count = len(requests)
@@ -720,6 +720,331 @@ def check_global_ai(browser, base, directory):
     assert all(KEY_FIXTURE not in u for u in requests + other_requests)
     assert KEY_FIXTURE not in page.locator('body').inner_text()
     assert not errors and not assets and not other_errors and not other_assets, (errors, assets, other_errors, other_assets)
+    context.close()
+
+
+def check_composer_draft_boundaries(browser, base, directory):
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    requests, errors, assets = watch(page, base)
+    page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    write_editor(page, 'company-info-主营业务', '虚构旧业务')
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    page.locator('#ai-open-settings').click(); configure_global(page)
+    page.locator('#close-ai-settings').click()
+    page.locator('#ai-question').fill('虚构旧口径，不应传到新草稿')
+    page.locator('[data-ai-action="inspect"]').click()
+    page.locator('#close-ai').click()
+    incoming = Path(directory) / 'composer-new-draft.json'
+    incoming.write_text(json.dumps({'company-info-主营业务': '虚构新业务'}))
+    page.once('dialog', lambda dialog: dialog.dismiss()); chooser_import(page, incoming)
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    expect(page.locator('#ai-question')).to_have_value('虚构旧口径，不应传到新草稿')
+    expect(page.locator('[data-ai-action="inspect"]')).to_have_attribute('aria-pressed', 'true')
+    page.locator('#close-ai').click()
+    bad = Path(directory) / 'composer-bad-draft.json'; bad.write_text('invalid')
+    chooser_import(page, bad)
+    expect(page.locator('#tool-message')).to_contain_text('导入失败')
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    expect(page.locator('#ai-question')).to_have_value('虚构旧口径，不应传到新草稿')
+    page.locator('#ai-discussion').click()
+    page.locator('#ai-question').fill('虚构旧企业讨论')
+    page.locator('#close-ai').click()
+    page.locator('[data-step="gap"]').click(); page.locator('#open-ai').click()
+    page.locator('#ai-discussion').click(); page.locator('#ai-question').fill('虚构其他步骤要求')
+    page.locator('#close-ai').click(); page.locator('[data-step="company-info"]').click()
+    page.once('dialog', lambda dialog: dialog.dismiss()); activate(page, '#reset-step')
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    expect(page.locator('#ai-question')).to_have_value('虚构旧口径，不应传到新草稿')
+    page.locator('#close-ai').click()
+    page.once('dialog', lambda dialog: dialog.accept()); activate(page, '#reset-step')
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    expect(page.locator('#ai-question')).to_have_value('')
+    expect(page.locator('[data-ai-action="draft"]')).to_have_attribute('aria-pressed', 'true')
+    page.locator('#ai-discussion').click(); expect(page.locator('#ai-question')).to_have_value('')
+    page.locator('#close-ai').click(); page.locator('[data-step="gap"]').click()
+    page.locator('#open-ai').click(); page.locator('#ai-discussion').click()
+    expect(page.locator('#ai-question')).to_have_value('虚构其他步骤要求')
+    page.locator('#close-ai').click(); page.locator('[data-step="company-info"]').click()
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    page.locator('#ai-question').fill('虚构待被导入清除的要求')
+    page.locator('[data-ai-action="inspect"]').click(); page.locator('#close-ai').click()
+    page.once('dialog', lambda dialog: dialog.accept()); chooser_import(page, incoming)
+    field(page, 'company-info-主营业务').locator('[data-ai-field]').click()
+    expect(page.locator('#ai-question')).to_have_value('')
+    expect(page.locator('[data-ai-action="improve"]')).to_have_attribute('aria-pressed', 'true')
+    expect(page.locator('#ai-snapshot-content')).to_have_text('虚构新业务')
+    page.locator('#close-ai').click(); page.locator('[data-step="gap"]').click()
+    page.locator('#open-ai').click(); page.locator('#ai-discussion').click()
+    expect(page.locator('#ai-question')).to_have_value('')
+    page.locator('#close-ai').click()
+    # A legal long source must be included once, not duplicated into the budget.
+    page.locator('[data-step="revision"]').click()
+    long_source = 'x' * 95000
+    write_editor(page, 'revision-修改建议列表', long_source)
+    field(page, 'revision-修改建议列表').locator('[data-ai-field]').click()
+    page.locator('#ai-snapshot summary').click()
+    page.locator('#ai-snapshot-content').focus()
+    expect(page.locator('#ai-snapshot-content')).to_be_focused()
+    page.locator('#ai-snapshot-content').press('End')
+    page.wait_for_function("() => document.querySelector('#ai-snapshot-content').scrollTop > 0")
+    calls = []
+    def fixture(route):
+        if route.request.method == 'OPTIONS':
+            route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type, Authorization'})
+            return
+        calls.append(json.loads(route.request.post_data))
+        route.fulfill(status=200, headers={'access-control-allow-origin': '*'}, content_type='application/json', body=json.dumps({'choices': [{'message': {'content': '虚构长文建议'}}]}))
+    page.route(ENDPOINT_FIXTURE, fixture)
+    page.locator('#ai-send').click(); expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    assert len(calls) == 1
+    payload = '\n'.join(m['content'] for m in calls[0]['messages'])
+    assert payload.count(long_source) == 1
+    assert '虚构旧口径' not in payload and '虚构其他步骤要求' not in payload
+    page.locator('#step-content').evaluate('e => {e.scrollTop = 100;}')
+    saved_scroll = page.locator('#step-content').evaluate('e => e.scrollTop')
+    page.once('dialog', lambda dialog: dialog.accept()); page.locator('#ai-apply').click()
+    geometry = page.locator('#step-content').evaluate('e => ({top:e.scrollTop,max:e.scrollHeight-e.clientHeight})')
+    assert abs(geometry['top'] - min(saved_scroll, geometry['max'])) <= 1
+    page.locator('#close-ai').click()
+    expect(field(page, 'revision-修改建议列表').locator('[data-ai-field]')).to_be_focused()
+    assert field_value(page, 'revision-修改建议列表') == '虚构长文建议'
+    assert not errors and not assets, (errors, assets)
+    page.close()
+
+
+def check_writing_composer(browser, base, directory):
+    context = browser.new_context(viewport={'width': 1440, 'height': 900})
+    page = context.new_page()
+    requests, errors, assets = watch(page, base)
+    calls = []
+    reply = {'content': '虚构改进稿：设备服务的客户依据待补充。'}
+
+    def fixture(route):
+        if route.request.method == 'OPTIONS':
+            route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type, Authorization'})
+            return
+        assert route.request.headers.get('authorization') == 'Bearer ' + KEY_FIXTURE
+        calls.append(json.loads(route.request.post_data))
+        route.fulfill(status=200, headers={'access-control-allow-origin': '*'}, content_type='application/json', body=json.dumps({'choices': [{'message': {'content': reply['content']}}]}))
+
+    page.route(ENDPOINT_FIXTURE, fixture)
+    page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    write_editor(page, 'company-info-企业名称', '虚构写作验收')
+    # Text import is still a separate, genuine native file action.
+    incoming = Path(directory) / 'fixture-writing.txt'
+    original = '虚构设备服务；客户数量待核实。<img src=x onerror=alert(1)>'
+    incoming.write_text(original, encoding='utf-8')
+    business = field(page, 'company-info-主营业务')
+    with page.expect_file_chooser() as chooser:
+        business.get_by_role('button', name='导入文本', exact=True).click()
+    chooser.value.set_files(str(incoming))
+    expect(business.locator('.simple-input')).to_have_value(original)
+    direct = business.locator('[data-ai-field]')
+    expect(direct).to_have_text('AI 帮写')
+    assert direct.locator('xpath=ancestor::details').count() == 0
+    direct.click()
+    expect(page.locator('#ai-open-settings')).to_be_focused()
+    expect(page.locator('#ai-question')).to_have_value('')
+    expect(page.locator('#ai-target')).to_have_text('企业信息 / 主营业务')
+    expect(page.locator('#ai-snapshot-content')).to_have_text(original)
+    assert page.locator('#ai-snapshot-content input, #ai-snapshot-content textarea, #ai-snapshot-content img, #ai-snapshot-content [contenteditable]').count() == 0
+    expect(page.locator('[data-ai-action="improve"]')).to_have_attribute('aria-pressed', 'true')
+    options = page.locator('#ai-target-select option').evaluate_all('(nodes) => nodes.map(n => n.value)')
+    assert options == ['company-info-企业名称', 'company-info-主营业务', 'company-info-行业描述', 'company-info-企业规模', 'company-info-企业现状', 'discussion']
+    # Choosing a shortcut is an explicit non-sending action, with exactly one selection.
+    for action in ('draft', 'improve', 'inspect'):
+        page.locator(f'[data-ai-action="{action}"]').click()
+        expect(page.locator(f'[data-ai-action="{action}"]')).to_have_attribute('aria-pressed', 'true')
+        assert page.locator('.ai-shortcuts [aria-pressed="true"]').count() == 1
+    question = page.locator('#ai-question')
+    question.fill('虚构要求：保留不确定性，不补造数据。')
+    page.locator('#close-ai').click()
+    expect(direct).to_be_focused()
+    direct.click()
+    expect(question).to_have_value('虚构要求：保留不确定性，不补造数据。')
+    expect(page.locator('[data-ai-action="inspect"]')).to_have_attribute('aria-pressed', 'true')
+    page.locator('#ai-open-settings').click()
+    configure_global(page)
+    page.keyboard.press('Escape')
+    expect(question).to_be_focused()
+    expect(question).to_have_value('虚构要求：保留不确定性，不补造数据。')
+    expect(page.locator('#ai-target-select')).to_have_value('company-info-主营业务')
+    expect(page.locator('[data-ai-action="inspect"]')).to_have_attribute('aria-pressed', 'true')
+    assert page.locator('dialog[open]').count() == 1
+    # Repeat with a configured, approved connection so an accidental send is observable.
+    for action in ('draft', 'improve', 'inspect'):
+        page.locator(f'[data-ai-action="{action}"]').click()
+        expect(page.locator(f'[data-ai-action="{action}"]')).to_have_attribute('aria-pressed', 'true')
+    page.locator('#close-ai').click()
+    direct.click()
+    expect(question).to_be_focused()
+    expect(question).to_have_value('虚构要求：保留不确定性，不补造数据。')
+    assert not calls
+    # Target switching clears results, selects a useful default, and isolates user text.
+    page.locator('#ai-target-select').select_option('company-info-行业描述')
+    expect(question).to_have_value('')
+    expect(question).to_have_attribute('placeholder', '对“行业描述”还有什么要求？例如范围、语气或需保留的内容。')
+    expect(page.locator('[data-ai-action="draft"]')).to_have_attribute('aria-pressed', 'true')
+    expect(page.locator('#ai-snapshot')).to_contain_text('尚未填写')
+    assert not calls
+    page.locator('#close-ai').click()
+    page.locator('#open-ai').click()
+    expect(page.locator('#ai-target-select')).to_have_value('company-info-行业描述')
+    expect(question).to_be_focused()
+    # An empty supplemental box still sends a meaningful schema-aware request.
+    before = current_draft(page)
+    question.press('Control+Enter')
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    assert len(calls) == 1
+    payload = calls[-1]['messages']
+    assert '目标：企业信息 / 行业描述' in payload[1]['content']
+    assert '起草可直接填入此字段' in payload[1]['content']
+    assert '描述所属行业' in payload[1]['content']
+    assert '无；请按上述任务与字段指引处理' in payload[1]['content']
+    assert original in json.loads(payload[1]['content'].split('规划上下文：\n', 1)[1].split('\n\n补充要求', 1)[0])['steps'][0]['data']['主营业务']
+    assert '不得编造' in payload[0]['content']
+    assert current_draft(page) == before
+    expect(page.locator('#ai-apply')).to_be_visible()
+    page.locator('#ai-target-select').select_option('company-info-主营业务')
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'empty')
+    expect(page.locator('#ai-apply')).not_to_be_visible()
+    expect(question).to_have_value('虚构要求：保留不确定性，不补造数据。')
+    # Critique and discussion responses are visible but never offered as replacement drafts.
+    page.locator('#ai-send').click()
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    assert '问题清单，不改写字段' in calls[-1]['messages'][1]['content']
+    expect(page.locator('#ai-apply')).not_to_be_visible()
+    assert current_draft(page) == before
+    page.locator('#ai-discussion').click()
+    expect(page.locator('#ai-target-select')).to_have_value('discussion')
+    expect(page.locator('#ai-snapshot')).not_to_be_visible()
+    expect(page.locator('#ai-discussion')).to_have_attribute('aria-pressed', 'true')
+    assert len(calls) == 2
+    page.locator('#ai-send').click()
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    expect(page.locator('#ai-apply')).not_to_be_visible()
+    assert '规划讨论' in calls[-1]['messages'][1]['content']
+    assert current_draft(page) == before
+    # Plain Enter inserts a newline; IME composition cannot submit either shortcut.
+    question.fill('虚构第一行'); question.press('End'); question.press('Enter')
+    expect(question).to_have_value('虚构第一行\n')
+    count = len(calls)
+    question.dispatch_event('compositionstart', {'data': '测'})
+    question.press('Control+Enter')
+    question.dispatch_event('compositionend', {'data': '测'})
+    question.dispatch_event('keydown', {'key': 'Enter', 'metaKey': True, 'isComposing': True})
+    question.dispatch_event('keydown', {'key': 'Enter', 'ctrlKey': True, 'keyCode': 229})
+    assert len(calls) == count
+    question.press('Meta+Enter')
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    assert len(calls) == count + 1
+    page.locator('#close-ai').click()
+    for name in ('行业描述', '企业规模', '企业现状'):
+        write_editor(page, 'company-info-' + name, '虚构已填写：' + name)
+    page.locator('#open-ai').click()
+    expect(page.locator('#ai-target-select')).to_have_value('company-info-企业名称')
+    page.keyboard.press('Escape')
+    expect(page.locator('#open-ai')).to_be_focused()
+    # A fixture ignoring abort proves duplicate protection, cancel and target-switch rejection.
+    page.locator('[data-step="gap"]').click()
+    page.locator('[data-ai-field="gap-业绩差距"]').click()
+    expect(page.locator('#ai-snapshot-content th')).to_have_count(5)
+    expect(page.locator('#ai-snapshot-content')).to_contain_text('关键指标类别')
+    page.evaluate("""endpoint => {
+        window.__composerFetch = window.fetch; window.__composerCalls = 0;
+        window.fetch = (url, options) => {
+            if (url !== endpoint) return window.__composerFetch(url, options);
+            window.__composerCalls++;
+            options.signal.addEventListener('abort', () => {window.__composerAborted = true;});
+            return new Promise(resolve => {window.__composerResolve = () => resolve(new Response(
+                JSON.stringify({choices:[{message:{content:'fixture-stale-composer-result'}}]}),
+                {status:200, headers:{'Content-Type':'application/json'}}));});
+        };
+    }""", ENDPOINT_FIXTURE)
+    for ending in ('cancel', 'switch'):
+        page.evaluate('window.__composerAborted = false')
+        page.locator('#ai-send').click()
+        expect(page.locator('#ai-send')).to_have_text('生成中…')
+        expect(page.locator('#ai-send')).to_be_disabled()
+        expect(page.locator('#ai-cancel')).to_be_visible()
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'loading')
+        pending_count = page.evaluate('window.__composerCalls')
+        question.press('Control+Enter'); question.press('Meta+Enter')
+        assert page.evaluate('window.__composerCalls') == pending_count
+        if ending == 'cancel':
+            page.locator('#ai-cancel').click()
+            expect(page.locator('#ai-result')).to_contain_text('已停止等待；已发送内容无法撤回')
+        else:
+            page.locator('#ai-target-select').select_option('gap-机会差距')
+        assert page.evaluate('window.__composerAborted === true')
+        expect(page.locator('#ai-cancel')).not_to_be_visible()
+        expect(page.locator('#ai-send')).to_have_text('生成建议')
+        page.evaluate('''async () => {
+            window.__composerResolve();
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }''')
+        expect(page.locator('#ai-result')).not_to_contain_text('fixture-stale-composer-result')
+        expect(page.locator('#ai-apply')).not_to_be_visible()
+    page.evaluate('() => { window.fetch = window.__composerFetch; }')
+    page.locator('#ai-target-select').select_option('gap-业绩差距')
+    # Invalid table output is rejected atomically before confirmation/application.
+    table_before = current_draft(page)
+    reply['content'] = '[["错误列数"]]'
+    page.locator('#ai-send').click()
+    expect(page.locator('#ai-apply')).to_be_visible()
+    page.locator('#ai-apply').click()
+    expect(page.locator('#ai-message')).to_contain_text('不符合字段或表格结构')
+    assert current_draft(page) == table_before
+    rows = [['虚构指标类别', '虚构指标', '待核实', '待确认', '待计算']]
+    reply['content'] = json.dumps(rows, ensure_ascii=False)
+    page.locator('#ai-send').click()
+    expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+    prompt = calls[-1]['messages'][1]['content']
+    assert 'JSON 二维字符串数组' in prompt and '每行恰好 5 列' in prompt
+    assert '关键指标类别、指标、现状、目标、差距' in prompt
+    page.once('dialog', lambda dialog: dialog.dismiss())
+    page.locator('#ai-apply').click()
+    assert current_draft(page) == table_before
+    page.once('dialog', lambda dialog: dialog.accept())
+    page.locator('#ai-apply').click()
+    expect(page.locator('#ai-snapshot-content td').first).to_have_text(rows[0][0])
+    assert field(page, 'gap-业绩差距').locator('textarea[data-column="0"]').input_value() == rows[0][0]
+    page.locator('#close-ai').click()
+    activate(page, '#undo')
+    assert field(page, 'gap-业绩差距').locator('textarea[data-column="0"]').input_value() == ''
+    # Long sources and actual results stay within a bounded viewport at both desktop widths.
+    for width in (1024, 1440):
+        page.set_viewport_size({'width': width, 'height': 800})
+        page.locator('[data-step="company-info"]').click()
+        long_source = ('虚构原文，待核实。\n' * 60)
+        write_editor(page, 'company-info-企业现状', long_source)
+        page.locator('[data-ai-field="company-info-企业现状"]').click()
+        assert page.locator('#ai-snapshot').get_attribute('open') is None
+        page.locator('#ai-snapshot summary').click()
+        expect(page.locator('#ai-snapshot-content')).to_have_text(long_source.strip())
+        reply['content'] = ('虚构改进结果，数据待核实。\n\n' * 60)
+        page.locator('#ai-send').click()
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+        bounds = page.locator('#ai-panel').bounding_box()
+        assert bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= width
+        assert bounds['y'] >= 0 and bounds['y'] + bounds['height'] <= 800
+        assert page.locator('.ai-scroll').evaluate('n => n.scrollHeight > n.clientHeight')
+        question.scroll_into_view_if_needed()
+        screenshot(page, f'writing-composer-{width}.png')
+        page.locator('#ai-apply').scroll_into_view_if_needed()
+        screenshot(page, f'writing-result-{width}.png')
+        page.keyboard.press('Escape')
+        expect(page.locator('[data-ai-field="company-info-企业现状"]')).to_be_focused()
+        no_overflow(page)
+    # No supplemental prompts enter any persistent storage, and reload never sends.
+    assert '虚构要求：保留不确定性' not in page.evaluate('JSON.stringify(localStorage)')
+    count = len(calls)
+    page.reload(wait_until='networkidle')
+    page.locator('[data-ai-field="company-info-主营业务"]').click()
+    expect(question).to_have_value('')
+    assert len(calls) == count
+    assert not errors and not assets, (errors, assets)
+    assert all(urlsplit(u).netloc == urlsplit(base).netloc or u == ENDPOINT_FIXTURE for u in requests)
     context.close()
 
 
@@ -985,6 +1310,10 @@ if __name__ == '__main__':
                 print('PASS: import/reset start a fresh review; cancelled import preserves active review', flush=True)
                 check_save_failure(browser, base, directory)
                 print('PASS: quota failure stays truthful, memory export survives, failed import is atomic', flush=True)
+                check_writing_composer(browser, base, directory)
+                check_composer_draft_boundaries(browser, base, directory)
+                print('PASS: composer resets on successful import/scoped reset, cancelled/invalid import preserves input, 95k source sent once and snapshot keyboard scroll', flush=True)
+                print('PASS: direct composer, snapshots/targets, shortcuts, keyboard/IME, memory-only requirements, critique/discussion, cancellation/stale rejection and confirmed table apply/undo', flush=True)
                 check_global_ai(browser, base, directory)
                 print('PASS: global config across 15 steps, opt-in persistence/reload, consent, destination invalidation, dialogs and scoped forget', flush=True)
                 check_credential_storage_failures(browser, base, directory)
