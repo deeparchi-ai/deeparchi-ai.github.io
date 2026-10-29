@@ -319,20 +319,26 @@ def check_insight_services(browser):
                     for dismiss in ('escape', 'button', 'outside'):
                         if not dialog.is_visible():
                             opener.click()
+                        # Native focus may restore before the queued close event runs.
+                        # Wait for the real event, not just an already-true focus snapshot.
+                        page.evaluate("""() => {
+                            window.__insightClosed = false;
+                            document.querySelector('#insight-dialog').addEventListener('close',
+                                () => {window.__insightClosed = true;}, {once:true});
+                        }""")
                         if dismiss == 'escape':
                             page.keyboard.press('Escape')
                         elif dismiss == 'button':
                             dialog.locator('[data-close]').click()
                         else:
                             page.mouse.click(2, 2)
-                        page.wait_for_function("!document.querySelector('#insight-dialog').open && document.activeElement.id === 'open-insight'")
+                        page.wait_for_function("() => window.__insightClosed && !document.querySelector('#insight-dialog').open && document.activeElement.id === 'open-insight'")
                     for selector in ('#insight-card-consulting', '#insight-consulting'):
                         if selector == '#insight-consulting':
                             opener.click()
                         cta = page.locator(selector)
                         assert cta.get_attribute('data-service') is None
-                        cta.focus()
-                        page.keyboard.press('Enter')
+                        cta.press('Enter')
                         page.locator('#demand-dialog').wait_for(state='visible')
                         assert page.locator('#demand-dialog').is_visible()
                         assert page.locator('dialog[open]').count() == 1
@@ -341,9 +347,14 @@ def check_insight_services(browser):
                         page.locator('#demand-form button[type="submit"]').click()
                         assert '咨询服务' in page.locator('#draft-text').inner_text()
                         assert 'Tech M&A' not in page.locator('#draft-text').inner_text()
+                        page.evaluate("""() => {
+                            window.__demandClosed = false;
+                            document.querySelector('#demand-dialog').addEventListener('close',
+                                () => {window.__demandClosed = true;}, {once:true});
+                        }""")
                         page.keyboard.press('Escape')
                         target = 'open-insight' if selector == '#insight-consulting' else 'insight-card-consulting'
-                        page.wait_for_function('(id) => document.activeElement.id === id', arg=target)
+                        page.wait_for_function('(id) => window.__demandClosed && document.activeElement.id === id', arg=target)
                 else:
                     fallback.locator('summary').click()
                     assert not fallback.evaluate('el => el.open')
