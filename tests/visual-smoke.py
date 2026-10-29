@@ -333,6 +333,7 @@ def check_insight_services(browser):
                         assert cta.get_attribute('data-service') is None
                         cta.focus()
                         page.keyboard.press('Enter')
+                        page.locator('#demand-dialog').wait_for(state='visible')
                         assert page.locator('#demand-dialog').is_visible()
                         assert page.locator('dialog[open]').count() == 1
                         assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
