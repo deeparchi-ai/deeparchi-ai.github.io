@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>制裁与出口管制速查</title>
+<meta name="description" content="输入企业名称，对照 OFAC、BIS、DoD 1260H 等官方清单，看是否在列。">
+<meta property="og:title" content="制裁与出口管制速查">
+<meta property="og:description" content="输入企业名称，对照 OFAC、BIS、DoD 1260H 等官方清单，看是否在列。">
+<meta property="og:type" content="website">
+<style>
+/* DeepArchi 应用设计系统 v1.0
+   基调: 白底极简 + 靛蓝强调，短句、大留白、无营销腔
+   所有工厂应用共用此文件，改这里=全局改版 */
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --ink: #111111;
+  --ink-2: #4B4B4B;
+  --muted: #86868B;
+  --line: #E6E6E6;
+  --accent: #4F46E5;
+  --accent-soft: #EEF0FF;
+  --ok: #16794C;
+  --warn: #B45309;
+  --bad: #B42318;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px 64px;
+}
+
+/* ── 头部 ── */
+header { padding: 52px 0 28px; }
+.brand {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+h1 { font-size: 30px; line-height: 1.25; font-weight: 700; letter-spacing: -.02em; }
+.lede { margin-top: 14px; font-size: 16px; color: var(--ink-2); max-width: 34em; }
+
+/* ── 卡片 ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+/* ── 表单 ── */
+.field { margin-bottom: 18px; }
+label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 7px; }
+.hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+input[type=text], input[type=number], select, textarea {
+  width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 选项（单选/多选） */
+.options { display: grid; gap: 8px; }
+.opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+  cursor: pointer; font-size: 14px; background: #fff; transition: all .12s;
+}
+.opt:hover { border-color: #C9C9C9; }
+.opt input { margin-top: 3px; accent-color: var(--accent); }
+.opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ── 按钮 ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; padding: 14px 20px; font-size: 15px; font-weight: 600;
+  font-family: inherit; border: 0; border-radius: 11px;
+  background: var(--ink); color: #fff; cursor: pointer;
+  transition: opacity .15s, transform .1s;
+}
+.btn:hover { opacity: .88; }
+.btn:active { transform: scale(.995); }
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
+.btn.accent { background: var(--accent); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+
+/* ── 结果 ── */
+.score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.score { font-size: 46px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+.score-unit { font-size: 14px; color: var(--muted); }
+.verdict { font-size: 19px; font-weight: 600; margin: 10px 0 6px; }
+
+.bar { height: 8px; background: #EFEFEF; border-radius: 99px; overflow: hidden; margin: 10px 0; }
+.bar > i { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .5s ease; }
+.bar.ok > i { background: var(--ok); }
+.bar.warn > i { background: var(--warn); }
+.bar.bad > i { background: var(--bad); }
+
+.dims { display: grid; gap: 12px; margin-top: 18px; }
+.dim { font-size: 13px; }
+.dim-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.dim-head b { font-weight: 600; }
+
+ul.findings { list-style: none; margin-top: 14px; display: grid; gap: 10px; }
+ul.findings li {
+  font-size: 14px; padding-left: 22px; position: relative; color: var(--ink-2);
+}
+ul.findings li::before {
+  content: "—"; position: absolute; left: 0; color: var(--muted);
+}
+
+.cta { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 20px; }
+.cta p { font-size: 14px; color: var(--ink-2); margin-bottom: 12px; }
+
+footer {
+  margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px;
+}
+
+.hidden { display: none !important; }
+
+@media (max-width: 420px) {
+  h1 { font-size: 25px; }
+  .card { padding: 18px; }
+  body { padding: 0 16px 48px; }
+}
+
+</style>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234F46E5'/></svg>">
+</head>
+<body>
+
+<header>
+  <div class="brand" id="brand">深度架构 · DeepArchi</div>
+  <h1 id="title">制裁与出口管制速查</h1>
+  <p class="lede" id="lede">输入企业名称，对照 OFAC、BIS、DoD 1260H 等官方清单，看是否在列。</p>
+</header>
+
+<main>
+  <form id="form" novalidate></form>
+  <section id="result" class="hidden" aria-live="polite"></section>
+</main>
+
+<footer>
+  <span id="footer-left">深度架构 DeepArchi</span>
+  <span id="footer-right"></span>
+</footer>
+
+<script>
+/* 制裁与出口管制速查 · 配置
+ * 数据来源: SanctionsSight ledger-fast API（本地台账机器比对，不调 AI）
+ * 对外展示铁律:
+ *   1. 带 license_warning 的数据源（tier C / CC BY-NC）不进公开结果
+ *   2. 必须显示数据截止时间与覆盖说明
+ *   3. 必须写明"不构成法律意见"
+ */
+window.APP_CONFIG = {
+  id: "sanctions-quickcheck",
+  mode: "screen",
+  brand: "深度架构 · DeepArchi",
+  title: "制裁与出口管制速查",
+  lede: "输入企业名称，对照 OFAC SDN、BIS 实体清单、DoD 1260H 等官方清单。机器比对，不调 AI，不解释，只给命中事实。",
+
+  api: {
+    base: "https://sanctions-sight-272499-9-1445250546.sh.run.tcloudbase.com",
+    path: "/api/screen/quick",
+    timeout_ms: 40000,
+  },
+
+  // 公开结果里可以出现的清单（官方一手源）。其余一律只在内部报告出现。
+  public_lists: [
+    "OFAC SDN",
+    "OFAC Non-SDN Consolidated",
+    "BIS CSL",
+    "BIS Entity List",
+    "BIS Denied Persons",
+    "BIS Unverified",
+    "DoD 1260H",
+    "UN SC Consolidated",
+    "EU FSF",
+    "EU Council OJ",
+    "FCC Covered List",
+    "GSA SAM",
+    "UFLPA",
+    "China Countermeasures",
+  ],
+
+  cta: {
+    title: "命中之后怎么办",
+    text: "命中只说明名称与清单条目一致，是否受限要看交易标的、最终用途和适用管辖。需要逐条判断时，做一次完整筛查。",
+    button: "申请完整筛查报告",
+    href: "mailto:contact@deeparchi.com.cn?subject=制裁筛查咨询",
+  },
+
+  footer: "本结果不构成法律意见 · 数据来自公开官方清单",
+};
+
+</script>
+<script>
+/* 制裁速查引擎 —— 专用，不复用通用问卷引擎。
+ * 只做三件事：查、分组、如实呈现。
+ */
+(function () {
+  "use strict";
+  const CFG = window.APP_CONFIG;
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) =>
+    String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+
+  function el(tag, cls, html) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+
+  function paintHeader() {
+    if (CFG.brand) $("#brand").textContent = CFG.brand;
+    if (CFG.title) { $("#title").textContent = CFG.title; document.title = CFG.title; }
+    if (CFG.lede) $("#lede").textContent = CFG.lede;
+    if (CFG.footer) $("#footer-left").textContent = CFG.footer;
+    $("#footer-right").textContent = new Date().getFullYear() + " · 深度架构";
+  }
+
+  function renderForm() {
+    const form = $("#form");
+    form.innerHTML = "";
+
+    const card = el("div", "card");
+    card.appendChild(el("label", null, "企业名称"));
+    card.appendChild(el("div", "hint", "官方清单按英文登记名/别名收录，请优先用英文全称查询；中文名常常查不到，查不到不等于不在名单上。"));
+    const inp = el("input");
+    inp.type = "text";
+    inp.id = "companyName";
+    inp.placeholder = "例如：Huawei / 华为 / Semiconductor Manufacturing International";
+    inp.autocomplete = "off";
+    card.appendChild(inp);
+
+    const btn = el("button", "btn accent", "开始速查");
+    btn.type = "submit";
+    btn.id = "submitBtn";
+    btn.style.marginTop = "18px";
+    card.appendChild(btn);
+    form.appendChild(card);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = inp.value.trim();
+      if (name) search(name, btn);
+    });
+
+    // 示例，降低首次使用门槛
+    const demo = el("div", "card");
+    demo.appendChild(el("div", "hint", "试试这些："));
+    const row = el("div");
+    row.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px";
+    ["Huawei", "SMIC", "DJI", "Alibaba"].forEach((n) => {
+      const b = el("button", "btn ghost", esc(n));
+      b.type = "button";
+      b.style.cssText = "width:auto;padding:7px 14px;font-size:13px";
+      b.addEventListener("click", () => {
+        inp.value = n;
+        search(n, btn);
+      });
+      row.appendChild(b);
+    });
+    demo.appendChild(row);
+    form.appendChild(demo);
+  }
+
+  async function search(name, btn) {
+    const res = $("#result");
+    res.classList.remove("hidden");
+    res.innerHTML = "";
+    const loading = el("div", "card");
+    loading.appendChild(el("div", "verdict", "查询中…"));
+    loading.appendChild(el("p", "hint", "首次查询可能需要 20-40 秒（服务冷启动），请稍等。"));
+    res.appendChild(loading);
+    res.scrollIntoView({ behavior: "smooth", block: "start" });
+    btn.disabled = true;
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), CFG.api.timeout_ms);
+    const t0 = Date.now();
+
+    try {
+      const url =
+        CFG.api.base + CFG.api.path +
+        "?name=" + encodeURIComponent(name) + "&fast=1";
+      const r = await fetch(url, { signal: ctrl.signal, headers: { Accept: "application/json" } });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const d = await r.json();
+      render(name, d, Date.now() - t0);
+    } catch (err) {
+      clearTimeout(timer);
+      renderError(name, err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function pickPublic(hits) {
+    const allow = new Set((CFG.public_lists || []).map((s) => s.toLowerCase()));
+    const shown = [];
+    let hidden = 0;
+    (hits || []).forEach((h) => {
+      const ln = String(h.list_name || "").toLowerCase();
+      const bad = !!h.license_warning || (allow.size && ![...allow].some((a) => ln.includes(a)));
+      if (bad) hidden += 1;
+      else shown.push(h);
+    });
+    return { shown, hidden };
+  }
+
+  function render(name, d, ms) {
+    const res = $("#result");
+    res.innerHTML = "";
+
+    const card = el("div", "card");
+    const { shown, hidden } = pickPublic(d.hits);
+    const count = shown.length;
+
+    const tone = count === 0 ? "ok" : "warn";
+    card.appendChild(
+      el("div", "score-row",
+        `<span class="score" style="font-size:38px">${count}</span>
+         <span class="score-unit">条公开清单命中</span>`)
+    );
+    card.appendChild(
+      el("div", "verdict",
+        count === 0
+          ? "在上述清单中未发现名称一致条目"
+          : "发现同名或别名一致的清单条目")
+    );
+
+    // 按清单分组
+    if (count) {
+      const groups = {};
+      shown.forEach((h) => {
+        const k = h.list_name || "未知清单";
+        (groups[k] = groups[k] || []).push(h);
+      });
+      const wrap = el("div", "dims");
+      Object.keys(groups).forEach((k) => {
+        const g = el("div");
+        g.appendChild(el("div", "dim-head", `<b>${esc(k)}</b><span>${groups[k].length}</span>`));
+        const ul = el("ul", "findings");
+        const seen = new Set();
+        groups[k].forEach((h) => {
+          const key = (h.matched_name || "") + "|" + (h.program || "");
+          if (seen.has(key)) return;
+          seen.add(key);
+          const MT = { exact: "精确匹配", core_equal: "主体一致", alias: "别名匹配", fuzzy: "模糊匹配" };
+          const meta = [h.entity_type, h.program, MT[h.match_type] || h.match_type]
+            .filter(Boolean).join(" · ");
+          ul.appendChild(el("li", null,
+            `<b>${esc(h.matched_name || "（无名称）")}</b><br>
+             <span style="color:#86868B;font-size:12px">${esc(meta)}</span>`));
+        });
+        g.appendChild(ul);
+        wrap.appendChild(g);
+      });
+      card.appendChild(wrap);
+    }
+
+    if (hidden) {
+      card.appendChild(el("p", "hint",
+        `另有 ${hidden} 条来自商用受限数据源的记录，未在此公开展示。完整筛查报告会包含并标注来源许可。`));
+    }
+
+    // 事实与边界
+    const facts = [];
+    if (d.as_of) facts.push(`数据截止：${new Date(d.as_of).toLocaleString("zh-CN")}`);
+    if (d.engine) facts.push(`比对引擎：${d.engine}`);
+    facts.push(`耗时：${ms}ms`);
+    card.appendChild(el("p", "hint", esc(facts.join(" · "))));
+
+    if (d.coverage_note) {
+      card.appendChild(el("p", "hint", esc(d.coverage_note)));
+    }
+    if (d.disclaimer) {
+      card.appendChild(el("p", "hint", esc(d.disclaimer)));
+    }
+
+    const cta = el("div", "cta");
+    cta.appendChild(el("p", null, esc(CFG.cta.text)));
+    const a = el("a", "btn accent", esc(CFG.cta.button));
+    a.href = CFG.cta.href;
+    cta.appendChild(a);
+    card.appendChild(cta);
+
+    res.appendChild(card);
+
+    const again = el("button", "btn ghost", "再查一个");
+    again.addEventListener("click", () => {
+      res.classList.add("hidden");
+      $("#companyName").value = "";
+      $("#companyName").focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    res.appendChild(again);
+
+    res.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function renderError(name, err) {
+    const res = $("#result");
+    res.innerHTML = "";
+    const card = el("div", "card");
+    card.appendChild(el("div", "verdict", "查询失败"));
+    card.appendChild(el("p", "hint",
+      `服务暂时不可达（${esc(err.name === "AbortError" ? "超时" : err.message)}）。` +
+      `这不代表「没有命中」——请稍后重试，或直接邮件联系做人工核查。`));
+    const a = el("a", "btn ghost", "邮件联系");
+    a.href = "mailto:contact@deeparchi.com.cn?subject=制裁筛查咨询";
+    card.appendChild(a);
+    res.appendChild(card);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    paintHeader();
+    renderForm();
+  });
+})();
+
+</script>
+</body>
+</html>
