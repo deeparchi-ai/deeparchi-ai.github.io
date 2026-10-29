@@ -3,6 +3,7 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {steps, LIMITS, normalizeImport, structuredExport, normalizeReport, normalizeConfig, validateEndpoint, TOOL_KEYS, parseBoundedJSON} from '../assets/deepblm-data.mjs';
+import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from '../assets/deepblm-credentials.mjs';
 const read = name => readFile(new URL(`../${name}`, import.meta.url), 'utf8');
 const allFields = Object.fromEntries(steps.flatMap(s => s.fields.map(f => [`${s.id}-${f.name}`, f.type === 'table' ? [f.columns.map((c, i) => `虚构验收 ${c} ${i}`), f.columns.map(() => '')] : `虚构验收：${s.title} / ${f.name}\n**保留内容**`])));
 allFields['strategy-validation-completed'] = 'true';
@@ -49,13 +50,41 @@ test('company short-field limit is retained in both import formats', () => {
   assert.throws(() => normalizeImport(exported));
 });
 
-test('only nonsecret provider configuration persists; custom endpoints reject credentials and local/private literals', () => {
+test('preferences accept only nonsecret configuration; endpoints reject credentials and local/private literals', () => {
   const config = {provider: 'custom', endpoint: 'https://api.fixture-provider.example.org/v1/chat/completions', model: 'fixture-model-not-live'};
   assert.deepEqual(normalizeConfig(JSON.stringify(config)), config);
   for (const secret of ['apiKey', 'key', 'token', '__proto__']) assert.throws(() => normalizeConfig(JSON.parse(`{"provider":"custom","endpoint":"","model":"x","${secret}":"fixture-only"}`)));
   for (const url of ['http://api.fixture-provider.example.org', 'https://user:fixture@example.org', 'https://localhost', 'https://localhost.', 'https://api.local.', 'https://127.0.0.1', 'https://10.1.2.3', 'https://169.254.169.254', 'https://2130706433', 'https://[::1]', 'https://[::ffff:127.0.0.1]', 'https://api.local', 'https://api.internal', 'https://api.localhost', 'https://api.localdomain', 'https://api.home.arpa', 'https://127.0.0.1.nip.io', 'https://api.lvh.me', 'https://api.fixture-provider.example.org/?key=fixture', 'https://api.fixture-provider.example.org/#fragment', 'https://api.fixture-provider.example.org:8443']) assert.throws(() => validateEndpoint(url), url);
   assert.equal(validateEndpoint(config.endpoint), config.endpoint);
   assert.ok(!TOOL_KEYS.some(k => k.startsWith('da-')));
+});
+
+test('remembered credentials require explicit versioned opt-in, strict bounded shape and exact canonical destination', () => {
+  const config = {provider: 'custom', endpoint: 'https://api.fixture-provider.example.org/v1/chat/completions', model: 'fixture-only'};
+  const key = 'fixture-only-not-real';
+  const record = rememberedRecord(key, config);
+  assert.deepEqual(restoreRemembered(JSON.stringify(record), config), record);
+  assert.deepEqual(canonicalConfig({...config, endpoint: config.endpoint + '/'}), config);
+  assert.equal(matchesDestination(record, {...config, model: 'another-fixture-model'}), true);
+  assert.equal(matchesDestination(record, {...config, provider: 'openai'}), false);
+  assert.equal(matchesDestination(record, {...config, endpoint: config.endpoint + '/other'}), false);
+  assert.ok(TOOL_KEYS.includes(REMEMBERED_KEY));
+  for (const value of ['', ' ', 'a\nb', 'a\rb', 'x'.repeat(4097), null, 1]) assert.equal(validKey(value), false);
+  for (const value of [null, [], {}, {...record, version: 2}, {...record, remembered: false}, {...record, remembered: 'true'},
+    {...record, key: ''}, {...record, key: 'x'.repeat(4097)}, {...record, key: 'a\nb'}, {...record, key: {}},
+    {...record, endpoint: config.endpoint + '/'}, {...record, provider: 'openai'}, {...record, endpoint: config.endpoint + '/other'},
+    {...record, endpoint: 'https://localhost'}, {...record, consent: true}, {...record, extra: 'rejected'}, {apiKey: key}]) {
+    assert.throws(() => restoreRemembered(JSON.stringify(value), config));
+  }
+  for (const raw of ['{broken', ' '.repeat(32769), JSON.stringify(record).replace('"version":1', '"__proto__":{},"version":1')]) {
+    assert.throws(() => restoreRemembered(raw, config));
+  }
+  // HTML-like fixture secrets remain data. Even a valid credential cannot enter draft formats.
+  const htmlRecord = rememberedRecord('<img/src=x/onerror=alert(1)>', config);
+  assert.equal(restoreRemembered(JSON.stringify(htmlRecord), config).key, htmlRecord.key);
+  assert.throws(() => normalizeImport(record));
+  assert.throws(() => normalizeConfig(record));
+  assert.doesNotMatch(JSON.stringify(structuredExport({})), /fixture-only-not-real|remembered-key/);
 });
 
 test('pinned local vendor assets match every manifest hash and byte count', async () => {

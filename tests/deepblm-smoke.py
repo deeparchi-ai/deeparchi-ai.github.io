@@ -16,6 +16,8 @@ spec.loader.exec_module(shared)
 from playwright.sync_api import sync_playwright, expect
 
 DRAFT = "deepblm-draft-v1"
+REMEMBERED = "deepblm-remembered-key-v1"
+PREFERENCES = "deepblm-preferences-v1"
 KEY_FIXTURE = "fixture-only-not-a-real-api-key-DO-NOT-USE"
 ENDPOINT_FIXTURE = "https://api.fixture-provider.example.org/v1/chat/completions"
 XSS = '''虚构验收 **内容** </textarea><img src="https://leak.fixture-provider.example.org/pixel" onerror="window.__deepblmXSS=1"><svg onload="window.__deepblmXSS=2"></svg><iframe src="https://leak.fixture-provider.example.org"></iframe><style>@import 'https://leak.fixture-provider.example.org/style';</style><script>window.__deepblmXSS=3</script>\n[危险链接](javascript:alert(1)) [安全链接](https://www.deeparchi.com.cn/)'''
@@ -121,7 +123,7 @@ def check_mobile(browser, base):
         expect(page.get_by_role('link', name='咨询规划需求')).to_be_visible()
         expect(page.get_by_role('link', name='返回官网服务')).to_be_visible()
         assert page.locator('#ai-key, .CodeMirror, #ai-panel').count() == 0
-        assert not any('/vendor/' in u or 'deepblm-workspace' in u or 'deepblm-data' in u or 'deepblm-ui' in u or 'deepblm-security' in u or 'signals.mjs' in u or 'analytics-config' in u for u in requests), requests
+        assert not any('/vendor/' in u or 'deepblm-workspace' in u or 'deepblm-data' in u or 'deepblm-ui' in u or 'deepblm-security' in u or 'deepblm-credentials' in u or 'signals.mjs' in u or 'analytics-config' in u for u in requests), requests
         assert all(urlsplit(u).netloc == urlsplit(base).netloc for u in requests), requests
         assert page.locator('.brand-logo').evaluate('e => e.complete && e.naturalWidth === 498 && getComputedStyle(e).height === "88px"')
         no_overflow(page)
@@ -327,11 +329,19 @@ def check_desktop(browser, base, directory):
     assert page.evaluate("document.activeElement.closest('#ai-panel') !== null")
     page.keyboard.press('Tab')
     assert page.evaluate("document.activeElement.closest('#ai-panel') !== null")
+    page.locator('#ai-open-settings').click()
+    expect(page.locator('#ai-panel')).not_to_be_visible()
+    expect(page.locator('#ai-settings')).to_be_visible()
+    assert page.locator('dialog[open]').count() == 1
     page.locator('#ai-provider').select_option('custom')
     page.locator('#ai-endpoint').fill(ENDPOINT_FIXTURE)
     page.locator('#ai-model').fill('fixture-model-not-live')
     page.locator('#ai-key').fill(KEY_FIXTURE)
+    assert not page.locator('#ai-remember-key').is_checked()
     page.locator('#save-ai-preferences').click()
+    page.locator('#close-ai-settings').click()
+    expect(page.locator('#ai-panel')).to_be_visible()
+    assert page.locator('#ai-panel #ai-key, #ai-panel #ai-provider, #ai-panel #ai-endpoint, #ai-panel #ai-model').count() == 0
     calls = []
     def fixture(route):
         if route.request.method == 'OPTIONS':
@@ -459,13 +469,335 @@ def check_desktop(browser, base, directory):
     page.reload(wait_until='networkidle')
     expect(page.locator('#workspace')).to_be_visible()
     page.locator('#open-ai').click()
-    assert page.locator('#ai-key').input_value() == ''
     assert not page.locator('#ai-consent').is_checked()
+    page.locator('#ai-open-settings').click()
+    assert page.locator('#ai-key').input_value() == ''
     assert page.locator('#ai-endpoint').input_value() == ENDPOINT_FIXTURE
     assert sum(u == ENDPOINT_FIXTURE for u in requests) == ai_requests_before_reload
     assert all(urlsplit(u).netloc == urlsplit(base).netloc or u == ENDPOINT_FIXTURE for u in requests), requests
     assert not errors and not assets, (errors, assets)
     page.close()
+
+
+def configure_global(page, remember=False):
+    # Call with the visible global dialog. Only explicit fake credentials are used.
+    page.locator('#ai-provider').select_option('custom')
+    page.locator('#ai-endpoint').fill(ENDPOINT_FIXTURE)
+    page.locator('#ai-model').fill('fixture-model-not-live')
+    page.locator('#ai-key').fill(KEY_FIXTURE)
+    page.locator('#ai-remember-key').set_checked(remember)
+    page.locator('#save-ai-preferences').click()
+
+
+def remembered_raw(page):
+    return page.evaluate('(key) => localStorage.getItem(key)', REMEMBERED)
+
+
+def check_global_ai(browser, base, directory):
+    context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+    page = context.new_page()
+    requests, errors, assets = watch(page, base)
+    calls = []
+    def fixture(route):
+        if route.request.method == 'OPTIONS':
+            route.fulfill(status=204, headers={'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type, Authorization'})
+            return
+        assert route.request.headers.get('authorization') == 'Bearer ' + KEY_FIXTURE
+        assert KEY_FIXTURE not in route.request.url and KEY_FIXTURE not in route.request.post_data
+        assert len(json.loads(route.request.post_data)['messages']) == 2
+        calls.append(route.request)
+        route.fulfill(status=200, headers={'access-control-allow-origin': '*'}, content_type='application/json', body=json.dumps({'choices': [{'message': {'content': '虚构全局建议 ' + KEY_FIXTURE}}]}))
+    page.route(ENDPOINT_FIXTURE, fixture)
+    page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    expect(page.locator('#open-ai-settings')).to_have_text('AI 设置 · 未配置')
+    page.locator('#open-ai-settings').click()
+    assert not page.locator('#ai-remember-key').is_checked()
+    assert page.locator('#ai-key').get_attribute('type') == 'password'
+    expect(page.locator('#ai-storage-disclosure')).to_contain_text('明文')
+    bounds = page.locator('#ai-settings').bounding_box()
+    assert 0 <= bounds['y'] and bounds['y'] + bounds['height'] <= 1000
+    page.locator('#close-ai-settings').focus(); page.keyboard.press('Shift+Tab')
+    assert page.evaluate("document.activeElement.closest('#ai-settings') !== null")
+    page.keyboard.press('Tab')
+    expect(page.locator('#close-ai-settings')).to_be_focused()
+    page.keyboard.press('Escape')
+    expect(page.locator('#open-ai-settings')).to_be_focused()
+    expect(page.locator('dialog[open]')).to_have_count(0)
+    page.locator('#open-ai-settings').click()
+    configure_global(page)
+    assert remembered_raw(page) is None
+    assert KEY_FIXTURE not in page.evaluate('JSON.stringify(localStorage)')
+    assert not calls
+    page.locator('#close-ai-settings').click()
+    expect(page.locator('#open-ai-settings')).to_have_text('AI 设置 · 已配置')
+    # Configure once, then use the real field action in every one of the 15 steps.
+    steps = page.locator('#step-nav button').count()
+    assert steps == 15
+    for i in range(steps):
+        page.locator('#step-nav button').nth(i).click()
+        activate(page, page.locator('[data-ai-field]').first)
+        assert page.locator('#ai-panel #ai-key, #ai-panel #ai-provider, #ai-panel #ai-endpoint, #ai-panel #ai-model, #ai-panel #save-ai-preferences').count() == 0
+        expect(page.locator('#ai-config-status')).to_contain_text('已配置')
+        expect(page.locator('#ai-destination')).to_contain_text(ENDPOINT_FIXTURE)
+        if i == 0:
+            page.locator('#ai-send').click()
+            assert not calls
+            page.locator('#ai-consent').check()
+        page.locator('#ai-send').click()
+        expect(page.locator('#ai-apply')).to_be_visible()
+        expect(page.locator('#ai-result')).to_contain_text('虚构全局建议')
+        assert KEY_FIXTURE not in page.locator('#ai-result').inner_text()
+        assert len(calls) == i + 1
+        page.locator('#close-ai').click()
+    # Safe default memory mode loses only its Key at reload, not the global config.
+    page.reload(wait_until='networkidle')
+    assert len(calls) == 15
+    page.locator('#open-ai-settings').click()
+    assert page.locator('#ai-key').input_value() == ''
+    assert not page.locator('#ai-remember-key').is_checked()
+    assert page.locator('#ai-endpoint').input_value() == ENDPOINT_FIXTURE
+    page.locator('#ai-key').fill(KEY_FIXTURE)
+    page.locator('#ai-remember-key').check()
+    page.locator('#save-ai-preferences').click()
+    record = json.loads(remembered_raw(page))
+    assert record == {'version': 1, 'remembered': True, 'provider': 'custom', 'endpoint': ENDPOINT_FIXTURE, 'key': KEY_FIXTURE}
+    assert 'consent' not in page.evaluate('JSON.stringify(localStorage)')
+    expect(page.locator('#ai-remember-status')).to_contain_text('已在此浏览器记住')
+    page.locator('#close-ai-settings').click()
+    # Import and step reset do not erase global settings.
+    incoming = Path(directory) / 'global-settings-draft.json'
+    incoming.write_text(json.dumps({'company-info-企业名称': '虚构全局配置验收企业'}))
+    before = remembered_raw(page)
+    page.once('dialog', lambda dialog: dialog.accept())
+    chooser_import(page, incoming)
+    page.once('dialog', lambda dialog: dialog.accept())
+    activate(page, '#reset-step')
+    assert remembered_raw(page) == before
+    for selector in ('#export-json', '#export-markdown', '#export-word'):
+        assert KEY_FIXTURE not in exported(page, selector, directory).read_text()
+    page.reload(wait_until='networkidle')
+    page.locator('#open-ai').click()
+    assert not page.locator('#ai-consent').is_checked()
+    page.locator('#ai-send').click(); assert len(calls) == 15
+    page.locator('#ai-open-settings').click()
+    assert page.locator('#ai-key').input_value() == KEY_FIXTURE
+    assert page.locator('#ai-provider').input_value() == 'custom'
+    assert page.locator('#ai-remember-key').is_checked()
+    page.locator('#close-ai-settings').click()
+    page.locator('#close-ai').click()
+    # A new page in the same browser context restores the explicit record, never consent.
+    other = context.new_page()
+    other_requests, other_errors, other_assets = watch(other, base)
+    other.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    other.locator('#open-ai').click()
+    assert not other.locator('#ai-consent').is_checked()
+    other.locator('#ai-open-settings').click()
+    assert other.locator('#ai-key').input_value() == KEY_FIXTURE
+    assert not any(u == ENDPOINT_FIXTURE for u in other_requests)
+    # A different tab changes only the saved endpoint, leaving a stale secret record.
+    # Current credentials are dropped and reload cannot bind that secret to the new URL.
+    other.evaluate('''({key, endpoint}) => {
+        const config = JSON.parse(localStorage.getItem(key));
+        config.endpoint = endpoint; localStorage.setItem(key, JSON.stringify(config));
+    }''', {'key': PREFERENCES, 'endpoint': ENDPOINT_FIXTURE + '/another-destination'})
+    expect(page.locator('#open-ai-settings')).to_have_text('AI 设置 · 未配置')
+    other.reload(wait_until='networkidle')
+    other.locator('#open-ai-settings').click()
+    assert other.locator('#ai-key').input_value() == ''
+    assert not other.locator('#ai-remember-key').is_checked()
+    configure_global(other, remember=True)
+    # Uncheck + save removes the actual secret record and invalidates other-tab credentials.
+    other.locator('#ai-remember-key').uncheck()
+    other.locator('#save-ai-preferences').click()
+    assert remembered_raw(other) is None
+    expect(page.locator('#open-ai-settings')).to_have_text('AI 设置 · 未配置')
+    other.reload(wait_until='networkidle')
+    other.locator('#open-ai-settings').click()
+    assert other.locator('#ai-key').input_value() == ''
+    configure_global(other, remember=True)
+    other.locator('#forget-key').click()
+    assert remembered_raw(other) is None and other.locator('#ai-key').input_value() == ''
+    other.reload(wait_until='networkidle')
+    other.locator('#open-ai-settings').click()
+    assert other.locator('#ai-key').input_value() == ''
+    configure_global(other, remember=True)
+    other.locator('#close-ai-settings').click()
+    other.evaluate("localStorage.setItem('sibling-app-fixture', 'keep'); localStorage.setItem('da-ai-config', 'sibling-fixture-never-read')")
+    other.once('dialog', lambda dialog: dialog.accept())
+    activate(other, '#clear-local')
+    assert remembered_raw(other) is None
+    assert other.evaluate("localStorage.getItem('sibling-app-fixture')") == 'keep'
+    assert other.evaluate("localStorage.getItem('da-ai-config')") == 'sibling-fixture-never-read'
+    other.locator('#open-ai-settings').click()
+    assert other.locator('#ai-key').input_value() == ''
+    other.locator('#close-ai-settings').click()
+    # Transition preserves target/question; destination changes cannot reuse an old Key/result.
+    page.locator('#step-nav button').first.click()
+    activate(page, page.locator('[data-ai-field]').first)
+    page.locator('#ai-question').fill('虚构需要保留的问题')
+    target = page.locator('#ai-target').inner_text()
+    page.locator('#ai-open-settings').click()
+    configure_global(page)
+    page.keyboard.press('Escape')
+    expect(page.locator('#ai-open-settings')).to_be_focused()
+    assert page.locator('#ai-target').inner_text() == target
+    assert page.locator('#ai-question').input_value() == '虚构需要保留的问题'
+    assert page.locator('dialog[open]').count() == 1
+    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    expect(page.locator('#ai-apply')).to_be_visible()
+    count = len(calls)
+    # Opening global settings cancels an in-flight request; even a fixture that
+    # ignores AbortSignal cannot resurrect its result after configuration changes.
+    page.evaluate('''endpoint => {
+        window.__originalGlobalFixtureFetch = window.fetch;
+        window.fetch = (url, options) => {
+            if (url !== endpoint) return window.__originalGlobalFixtureFetch(url, options);
+            options.signal.addEventListener('abort', () => {window.__globalFixtureAborted = true;});
+            return new Promise(resolve => {window.__resolveGlobalFixture = () => resolve(new Response(
+                JSON.stringify({choices:[{message:{content:'fixture-old-global-response'}}]}),
+                {status:200, headers:{'Content-Type':'application/json'}}));});
+        };
+    }''', ENDPOINT_FIXTURE)
+    page.locator('#ai-send').click()
+    expect(page.locator('#ai-cancel')).to_be_enabled()
+    page.locator('#ai-open-settings').click()
+    assert page.evaluate('window.__globalFixtureAborted === true')
+    page.locator('#ai-endpoint').fill(ENDPOINT_FIXTURE + '/changed')
+    assert page.locator('#ai-key').input_value() == ''
+    page.locator('#save-ai-preferences').click()
+    page.locator('#close-ai-settings').click()
+    assert not page.locator('#ai-consent').is_checked()
+    expect(page.locator('#ai-apply')).not_to_be_visible()
+    expect(page.locator('#ai-result')).to_be_empty()
+    page.evaluate('''() => {window.__resolveGlobalFixture(); window.fetch = window.__originalGlobalFixtureFetch;}''')
+    expect(page.locator('#ai-result')).not_to_contain_text('fixture-old-global-response')
+    request_count = len(requests)
+    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    expect(page.locator('#ai-message')).to_contain_text('请在全局设置中保存')
+    assert len(calls) == count and len(requests) == request_count
+    page.locator('#ai-open-settings').click()
+    page.locator('#ai-key').fill(KEY_FIXTURE)
+    page.locator('#ai-provider').select_option('openai')
+    assert page.locator('#ai-key').input_value() == ''
+    page.locator('#ai-model').fill('fixture-model-not-live')
+    page.locator('#save-ai-preferences').click()
+    page.locator('#close-ai-settings').click()
+    assert not page.locator('#ai-consent').is_checked()
+    expect(page.locator('#ai-apply')).not_to_be_visible()
+    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    expect(page.locator('#ai-message')).to_contain_text('请在全局设置中保存')
+    assert len(calls) == count and len(requests) == request_count
+    page.locator('#ai-open-settings').click()
+    # Both dialogs close on mobile resize, without a hidden stacked modal.
+    page.set_viewport_size({'width': 390, 'height': 900})
+    expect(page.locator('dialog[open]')).to_have_count(0)
+    page.set_viewport_size({'width': 1440, 'height': 1000})
+    page.locator('#open-ai').click()
+    page.set_viewport_size({'width': 390, 'height': 900})
+    expect(page.locator('dialog[open]')).to_have_count(0)
+    assert all(KEY_FIXTURE not in u for u in requests + other_requests)
+    assert KEY_FIXTURE not in page.locator('body').inner_text()
+    assert not errors and not assets and not other_errors and not other_assets, (errors, assets, other_errors, other_assets)
+    context.close()
+
+
+def check_credential_storage_failures(browser, base, directory):
+    config = {'provider': 'custom', 'endpoint': ENDPOINT_FIXTURE, 'model': 'fixture-model-not-live'}
+    valid = {'version': 1, 'remembered': True, 'provider': 'custom', 'endpoint': ENDPOINT_FIXTURE, 'key': KEY_FIXTURE}
+    bad_records = ['{broken', ' ' * 32769, 'null', json.dumps({'apiKey': KEY_FIXTURE}),
+                   json.dumps({**valid, 'remembered': False}), json.dumps({**valid, 'extra': XSS}),
+                   json.dumps({**valid, 'endpoint': ENDPOINT_FIXTURE + '/other'}),
+                   json.dumps({**valid, 'provider': 'openai'}), json.dumps({**valid, '__proto__': {'polluted': True}})]
+    for raw in bad_records:
+        context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+        page = context.new_page()
+        requests, errors, assets = watch(page, base)
+        page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+        page.evaluate('''({raw, config, remembered, preferences}) => {
+            localStorage.setItem(remembered, raw); localStorage.setItem(preferences, JSON.stringify(config));
+        }''', {'raw': raw, 'config': config, 'remembered': REMEMBERED, 'preferences': PREFERENCES})
+        page.reload(wait_until='networkidle')
+        expect(page.locator('#tool-message')).to_contain_text('记忆 Key 无法读取')
+        page.locator('#open-ai-settings').click()
+        assert page.locator('#ai-key').input_value() == ''
+        assert not page.locator('#ai-remember-key').is_checked()
+        page.locator('#close-ai-settings').click()
+        write_editor(page, 'company-info-企业名称', '虚构异常记忆仍可编辑')
+        assert '虚构异常记忆仍可编辑' in current_draft(page)
+        assert KEY_FIXTURE not in exported(page, '#export-json', directory).read_text()
+        assert remembered_raw(page) == raw  # Invalid records are neither migrated nor overwritten.
+        safe_preview(page)
+        assert all(urlsplit(u).netloc == urlsplit(base).netloc for u in requests)
+        assert not errors and not assets, (errors, assets)
+        context.close()
+    # Even a valid-looking HTML fixture secret is only a password value, never DOM markup.
+    context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+    page = context.new_page(); requests, errors, assets = watch(page, base)
+    page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    html_key = '<img/src=x/onerror=window.__deepblmXSS=1>'
+    page.evaluate('''({record, config, remembered, preferences, draft}) => {
+        localStorage.setItem(remembered, JSON.stringify(record)); localStorage.setItem(preferences, JSON.stringify(config));
+        localStorage.setItem(draft, '{broken');
+    }''', {'record': {**valid, 'key': html_key}, 'config': config, 'remembered': REMEMBERED, 'preferences': PREFERENCES, 'draft': DRAFT})
+    page.reload(wait_until='networkidle')
+    recovery = exported(page, '#export-recovery', directory).read_text()
+    assert REMEMBERED not in recovery and html_key not in recovery and KEY_FIXTURE not in recovery
+    page.locator('#open-ai-settings').click()
+    assert page.locator('#ai-key').input_value() == html_key
+    assert html_key not in page.locator('body').inner_text()
+    safe_preview(page)
+    assert not errors and not assets, (errors, assets)
+    context.close()
+    # Failed writes/deletes must not forge a remembered/forgotten indicator.
+    for mode in ('denied', 'quota', 'delete'):
+        context = browser.new_context(viewport={'width': 1440, 'height': 1000})
+        if mode == 'denied':
+            context.add_init_script("Object.defineProperty(window, 'localStorage', {get() {throw new DOMException('fixture-only denied', 'SecurityError');}})")
+        page = context.new_page(); requests, errors, assets = watch(page, base)
+        page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+        page.locator('#open-ai-settings').click()
+        if mode == 'delete':
+            configure_global(page, remember=True)
+            page.evaluate('''key => {
+                const original = Storage.prototype.removeItem;
+                Storage.prototype.removeItem = function(k) {
+                    if (k === key) throw new DOMException('fixture-only denied delete', 'SecurityError');
+                    return original.call(this, k);
+                };
+            }''', REMEMBERED)
+            page.locator('#ai-remember-key').uncheck(); page.locator('#save-ai-preferences').click()
+            expect(page.locator('#ai-settings-message')).to_contain_text('未确认已忘记')
+            assert remembered_raw(page) is not None
+            page.locator('#forget-key').click()
+            expect(page.locator('#ai-settings-message')).to_contain_text('未确认已忘记')
+            assert page.locator('#ai-key').input_value() == ''
+        else:
+            if mode == 'quota':
+                page.evaluate('''key => {
+                    const original = Storage.prototype.setItem;
+                    Storage.prototype.setItem = function(k, v) {
+                        if (k === key) throw new DOMException('fixture-only quota', 'QuotaExceededError');
+                        return original.call(this, k, v);
+                    };
+                }''', REMEMBERED)
+            if mode == 'denied': page.once('dialog', lambda dialog: dialog.accept())
+            configure_global(page, remember=True)
+            expect(page.locator('#ai-settings-message')).to_contain_text('浏览器')
+            assert not page.locator('#ai-remember-key').is_checked()
+            expect(page.locator('#ai-remember-status')).not_to_contain_text('已在此浏览器记住')
+            if mode == 'quota': assert remembered_raw(page) is None
+        page.locator('#close-ai-settings').click()
+        write_editor(page, 'company-info-企业名称', '虚构存储失败内存草稿')
+        output = exported(page, '#export-json', directory).read_text()
+        assert '虚构存储失败内存草稿' in output and KEY_FIXTURE not in output
+        if mode == 'delete':
+            page.once('dialog', lambda dialog: dialog.accept())
+            activate(page, '#clear-local')
+            expect(page.locator('#tool-message')).to_contain_text('未确认全部删除')
+            assert remembered_raw(page) is not None
+        assert all(urlsplit(u).netloc == urlsplit(base).netloc for u in requests)
+        assert not errors and not assets, (errors, assets)
+        context.close()
 
 
 def check_storage(browser, base, directory):
@@ -485,10 +817,10 @@ def check_storage(browser, base, directory):
         }''', {'storage_key': storage_key, 'raw': raw})
         page.reload(wait_until='networkidle')
         expect(page.locator('#workspace')).to_be_visible()
-        page.locator('#open-ai').click()
+        page.locator('#open-ai-settings').click()
         assert page.locator('#ai-key').input_value() == ''
         expect(page.locator('#legacy-settings')).to_be_visible()
-        page.locator('#close-ai').click()
+        page.locator('#close-ai-settings').click()
         if raw in ('', '{broken', '{malformed-new'):
             expect(page.locator('#storage-recovery')).to_be_visible()
             write_editor(page, 'company-info-主营业务', '内存恢复草稿')
@@ -506,12 +838,12 @@ def check_storage(browser, base, directory):
         page.once('dialog', lambda dialog: dialog.dismiss())
         activate(page, '#clear-local')
         assert page.evaluate('JSON.stringify(localStorage)') == before
-        page.locator('#open-ai').click()
+        page.locator('#open-ai-settings').click()
         page.once('dialog', lambda dialog: dialog.accept())
         page.locator('#clear-legacy-settings').click()
         assert page.evaluate('localStorage.getItem("blm-ai-config")') is None
         assert page.evaluate('localStorage.getItem("da-ai-config")') is not None
-        page.locator('#close-ai').click()
+        page.locator('#close-ai-settings').click()
         page.once('dialog', lambda dialog: dialog.accept())
         activate(page, '#clear-local')
         assert current_draft(page) is None
@@ -631,7 +963,11 @@ if __name__ == '__main__':
                 print('PASS: import/reset start a fresh review; cancelled import preserves active review', flush=True)
                 check_save_failure(browser, base, directory)
                 print('PASS: quota failure stays truthful, memory export survives, failed import is atomic', flush=True)
+                check_global_ai(browser, base, directory)
+                print('PASS: global config across 15 steps, opt-in persistence/reload, consent, destination invalidation, dialogs and scoped forget', flush=True)
+                check_credential_storage_failures(browser, base, directory)
+                print('PASS: strict/malicious credential records, recovery isolation, truthful denied/quota/delete failures', flush=True)
                 check_storage(browser, base, directory)
-                print('PASS: fresh/legacy/malformed storage, recovery, memory-only Key, explicit scoped cleanup', flush=True)
+                print('PASS: fresh/legacy/malformed storage, recovery, legacy secrets ignored, explicit scoped cleanup', flush=True)
             finally:
                 browser.close()

@@ -92,9 +92,9 @@
 #step-tools{margin-top:28px}#step-tools .menu-items{position:static;width:100%;box-shadow:none;border:0}
 .notice{padding:12px 20px;border:1px solid var(--line);background:#f5f8fc;margin:0;font-size:14px;flex:none}.notice p{margin:6px 0}.notice.warning{border-color:#bd8a3e;background:#fff9ee}
 .workbench .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:16px 0}
-#ai-panel{position:fixed;inset:0;margin:auto;width:min(700px,calc(100vw - 48px));max-height:calc(100dvh - 48px);padding:24px 28px;border:1px solid var(--line);border-radius:6px;color:var(--ink);overflow:auto;box-shadow:0 12px 48px #10244730}
-#ai-panel::backdrop{background:#13274660}#close-ai{float:right}#ai-panel h2{margin-top:0}#ai-panel p{font-size:13px;line-height:1.7}#ai-panel label{font-size:14px}
-#ai-connection{border:1px solid var(--line);padding:10px 16px;border-radius:5px;margin:20px 0}.ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-block:16px}.ai-grid label span{display:block;margin-bottom:6px}
+:is(#ai-panel,#ai-settings){position:fixed;inset:0;margin:auto;width:min(700px,calc(100vw - 48px));max-height:calc(100dvh - 48px);padding:24px 28px;border:1px solid var(--line);border-radius:6px;color:var(--ink);overflow:auto;box-shadow:0 12px 48px #10244730}
+:is(#ai-panel,#ai-settings)::backdrop{background:#13274660}:is(#close-ai,#close-ai-settings){float:right}:is(#ai-panel,#ai-settings) h2{margin-top:0}:is(#ai-panel,#ai-settings) p{font-size:13px;line-height:1.7}:is(#ai-panel,#ai-settings) label{font-size:14px}
+.ai-checkbox{display:flex;gap:8px;align-items:center}.workbench #open-ai-settings{white-space:nowrap;font-size:13px;flex:none}.ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-block:16px}.ai-grid label span{display:block;margin-bottom:6px}
 #ai-target{border-top:1px solid var(--line);padding-top:16px;font-weight:600}.ai-result{margin-top:12px}
 .workbench .CodeMirror{font-family:var(--sans);font-size:15px;line-height:1.7;min-height:140px;height:auto;border-color:#cbd4e3;border-radius:5px;padding:10px}
 .workbench .CodeMirror-scroll{min-height:140px;max-height:430px}.company-step .CodeMirror,.company-step .CodeMirror-scroll{min-height:100px}.workbench .EasyMDEContainer{min-width:0}.workbench .editor-statusbar{display:none}.workbench .CodeMirror-code{overflow-wrap:anywhere}
