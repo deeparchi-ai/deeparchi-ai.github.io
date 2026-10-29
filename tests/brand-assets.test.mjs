@@ -46,3 +46,12 @@ test('all three pages bind CSS and entry module cache versions to their actual b
     }
   }
 });
+
+
+test('homepage-only consulting CSS is cache versioned from its bytes', async () => {
+  const asset = 'assets/insight-services.css';
+  const version = createHash('sha256').update(await read(asset)).digest('hex').slice(0,12);
+  const home = pages.find(([path]) => path === 'index.html')[1];
+  assert.ok(home.includes(`href="${asset}?v=${version}"`));
+  for (const [path, html] of pages.filter(([path]) => path !== 'index.html')) assert.ok(!html.includes(asset), path);
+});

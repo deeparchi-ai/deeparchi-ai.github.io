@@ -3,9 +3,11 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 
 const read = file => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
-const [html, css, developers, privacy] = await Promise.all(
-  ['index.html', 'assets/insight-services.css', 'developers.html', 'privacy.html'].map(read));
-const section = html.match(/<section\b[^>]*id="insight-services"[^>]*>([\s\S]*?)<\/section>/);
+const [html, css, developers, privacy, js] = await Promise.all(
+  ['index.html', 'assets/insight-services.css', 'developers.html', 'privacy.html', 'assets/site.mjs'].map(read));
+const details = html.match(/<details id="insight-details"([^>]*)>([\s\S]*?)<\/details>/);
+const dialog = html.match(/<dialog id="insight-dialog"([^>]*)>([\s\S]*?)<\/dialog>/);
+const section = [details[0], details[2]];
 const services = [
   {
     name: '持续洞察与技术雷达服务', mode: '标准订阅', focus: '持续跟踪 · 趋势洞察',
@@ -24,17 +26,39 @@ const services = [
   }
 ];
 
-test('consulting is a labelled static section between hero and concept demos with its own nav link', () => {
-  assert.ok(section);
-  assert.match(section[0], /aria-labelledby="insight-services-title"/);
-  assert.match(section[1], /<h2 id="insight-services-title">技术与竞争洞察服务<\/h2>/);
-  assert.match(section[1], /AI 驱动研究 · 专家专业判断/);
-  assert.match(section[1], /持续洞察变化，支持科学决策，推动业务创新/);
-  assert.match(section[1], /依托 AI 驱动的持续研究能力与专家经验，为企业提供从趋势洞察、深度分析到专项决策与行动支持的系列服务，帮助企业识别机会、把握技术方向、优化竞争策略。/);
-  assert.ok(html.indexOf('id="top"') < section.index);
-  assert.ok(section.index < html.indexOf('id="capabilities"'));
-  assert.match(html, /<div class="nav-links"[^>]*>[\s\S]*?<a href="#insight-services">洞察服务<\/a>/);
+test('only fourth card is replaced, with honest badge and concise actions in original layout', () => {
+  const main = html.match(/<main[^>]*>([\s\S]*?)<\/main>/)[1];
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*id="([^"]+)"/g)].map(m => m[1]), ['top', 'capabilities', 'integrate', 'contact']);
+  assert.doesNotMatch(html, /id="insight-services"|href="#insight-services"|tech-ma|Tech M(?:&amp;|&)A/);
+  const cards = [...main.matchAll(/<article class="product" id="([^"]+)">([\s\S]*?)<\/article>/g)];
+  assert.deepEqual(cards.map(m => m[1]), ['ip-guard', 'deep-blm', 'architecture', 'tech-insight']);
+  const card = cards[3][2];
+  assert.match(card, /<p class="badge">订阅 \/ 定制服务<\/p>/);
+  assert.match(card, /<h3>技术与竞争洞察服务<\/h3>/);
+  assert.match(card, /href="#insight-details"[^>]*>了解服务<\/a>/);
+  assert.match(card, /data-intent="consulting" data-surface="cards"[^>]*>咨询服务<\/button>/);
+  assert.doesNotMatch(card, /概念 Demo|data-demo|data-service|<ul|<details/);
   assert.match(html, /<meta name="description" content="[^"]*技术与竞争洞察服务[^"]*概念 Demo[^"]*">/);
+});
+
+test('single canonical full text progressively moves from no-JS details into accessible native dialog', () => {
+  assert.ok(dialog);
+  assert.doesNotMatch(dialog[1] + details[1], /\bopen\b/);
+  assert.match(dialog[1], /aria-labelledby="insight-title" aria-describedby="insight-intro"/);
+  assert.match(dialog[2], /data-close aria-label="关闭服务详情" autofocus/);
+  assert.match(details[0], /<summary>技术与竞争洞察服务：完整服务详情<\/summary>/);
+  assert.equal((html.match(/id="insight-content"/g) || []).length, 1);
+  assert.match(js, /insight.append\(\$\('#insight-content'\)\)/);
+  assert.match(js, /\$\('#insight-details'\).hidden = true/);
+  assert.match(js, /insight.showModal\(\)/);
+  assert.match(js, /insight.addEventListener\('close',.*insightTrigger.focus\(\)/);
+  assert.match(js, /if \(insight.open\) insight.close\(\)/);
+  assert.match(js, /insight.open \? insightTrigger : button/);
+  assert.doesNotMatch(html, /\son(?:click|keydown|load)=/);
+  for (const copy of [
+    'AI 驱动研究 · 专家专业判断', '持续洞察变化，支持科学决策，推动业务创新',
+    '依托 AI 驱动的持续研究能力与专家经验，为企业提供从趋势洞察、深度分析到专项决策与行动支持的系列服务，帮助企业识别机会、把握技术方向、优化竞争策略。'
+  ]) assert.ok(section[1].includes(copy), copy);
 });
 
 test('all three services retain authoritative names, descriptions, modes and exact deliverable lists', () => {
@@ -50,19 +74,25 @@ test('all three services retain authoritative names, descriptions, modes and exa
   }
   assert.match(section[1], /P1、P2采用持续订阅模式；P3根据具体项目需求定制。具体服务范围、交付周期与成果形式以双方约定为准。/);
   for (const copy of ['持续跟踪', '动态更新，而非一次性研究', 'AI＋专家', '智能研究与专业判断结合', '业务导向', '从趋势洞察到可执行建议']) assert.ok(section[1].includes(copy));
-  assert.doesNotMatch(section[0], /<script|<details|\bhidden\b(?!>咨询洞察服务)|data-demo|data-service|data-analytics|概念 Demo|招募试点|已上线|认证|保证|自动执行|\d+\s*元/);
+  assert.doesNotMatch(section[0], /<script|data-demo|data-service|data-analytics|概念 Demo|招募试点|已上线|认证|保证|自动执行|\d+\s*元/);
 });
 
-test('one generic consulting CTA reuses allowed routing and a visible static email fallback', () => {
-  const buttons = [...section[1].matchAll(/<button\b[^>]*>[^<]*<\/button>/g)];
-  assert.equal(buttons.length, 1);
-  assert.match(buttons[0][0], /id="insight-consulting" data-intent="consulting" data-surface="support" data-js hidden>咨询洞察服务/);
-  assert.doesNotMatch(buttons[0][0], /data-service/);
+test('both consulting CTAs keep generic service=null routing and static email fallback', () => {
+  for (const id of ['insight-card-consulting', 'insight-consulting']) {
+    const button = html.match(new RegExp(`<button[^>]*id="${id}"[^>]*>`))[0];
+    assert.match(button, /data-intent="consulting"/);
+    assert.match(button, /data-surface="(?:cards|support)"/);
+    assert.doesNotMatch(button, /data-service|tech-ma|tech-insight/);
+  }
   assert.match(section[1], /<a href="mailto:contact@deeparchi.com.cn">邮件咨询：contact@deeparchi.com.cn<\/a>/);
+  // Both consent-time measurement and observer registration must ignore consulting cards.
+  assert.match(js, /if \(!Object.hasOwn\(PRODUCTS, card.id\)\) return/);
+  assert.match(js, /if \(Object.hasOwn\(PRODUCTS, card.id\)\) observer.observe\(card\)/);
+  assert.doesNotMatch(js, /track\([^\n]*(?:tech-insight|tech-ma)/);
 });
 
-test('homepage-only responsive styles use local system typography and readable static content', () => {
-  assert.match(html, /<link rel="stylesheet" href="assets\/insight-services.css">/);
+test('service CSS is scoped to fourth card/dialog/disclosure and maintains responsive readable content', () => {
+  assert.match(html, /<link rel="stylesheet" href="assets\/insight-services.css\?v=[a-f0-9]{12}">/);
   assert.doesNotMatch(developers + privacy, /insight-services.css/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(css, /@media\(max-width:1100px\)[\s\S]*?\.insight-grid\{grid-template-columns:1fr\}/);
@@ -70,5 +100,8 @@ test('homepage-only responsive styles use local system typography and readable s
   assert.match(css, /font-size:16px;line-height:1.85/);
   assert.match(css, /min-width:0/);
   assert.match(css, /overflow-wrap:anywhere/);
-  assert.doesNotMatch(css, /@import|url\(|font-family:|display:none|overflow:hidden|line-clamp|[;{]height:\d/);
+  for (const line of css.split('\n').map(line => line.trim()).filter(line => line.includes('{') && !line.startsWith('@'))) {
+    assert.match(line, /^(?:#tech-insight|#insight-dialog|#insight-details|:is\(#insight-dialog,#insight-details\))/);
+  }
+  assert.doesNotMatch(css, /@import|url\(|font-family:|overflow:hidden|line-clamp|[;{]height:\d/);
 });

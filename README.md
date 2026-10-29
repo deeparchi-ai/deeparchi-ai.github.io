@@ -1,13 +1,13 @@
 # DeepArchi 需求验证 Demo
 
-无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页新增技术与竞争洞察咨询服务；另围绕 IP 守护、Deep BLM、技术架构规划、Tech M&A 了解需求，Deep BLM 提供桌面规划工具试用。无框架、外部字体、永久服务器或新增付费服务；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
+无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页第四张产品卡为技术与竞争洞察咨询服务；前三张为 IP 守护、Deep BLM、技术架构规划，Deep BLM 提供桌面规划工具试用。无框架、外部字体或永久服务器；不新增付费第三方依赖或基础设施；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
 
 ## 文件
 
-- `index.html`：首页、技术与竞争洞察服务、四个产品卡、本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
-- `assets/insight-services.css`：仅首页使用的洞察服务样式；三档服务、完整交付项与模式边界静态可读，适配 320/390/820/1440 宽度。
+- `index.html`：首页原四个主区块、四张产品卡、洞察服务详情弹窗、三个本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
+- `assets/insight-services.css`：仅作用于首页第四卡、详情弹窗及无 JS 原生折叠详情的样式；服务全文只存一份，JS 将其移入原生 dialog，适配 320/390/820/1440 宽度。
 - `assets/site.css`：共用视觉、移动导航、dialog 和减少动态效果设置。
-- `assets/site.mjs`：四个虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
+- `assets/site.mjs`：三个虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
 - `assets/signals.mjs`：纯配置/事件校验、RFC6068 草稿编码、默认拒绝的匿名事件适配器。
 - `service-catalog.json`：四项服务的同源机器目录；不是可运行的 Agent Card。
 - `analytics-config.json`：已配置经授权的 CloudBase HTTPS 接收端，`enabled=true`、`consent_required=true`；访客仍默认不发送，须逐页主动同意。
@@ -19,11 +19,11 @@
 
 ## 概念边界
 
-首页 `#insight-services` 独立介绍技术与竞争洞察咨询服务，与下方四个概念方向及工具试用分开。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。共用咨询入口沿用 `consulting` / `support` 和通用需求草稿，不记录档位归属；静态邮箱在无 JS 时仍可使用。
+首页保留 hero、capabilities、integrate、contact 四个主区块和原 2×2 产品卡网格，仅将第四张 Tech M&A 替换为 `tech-insight` 技术与竞争洞察服务，标识为“订阅 / 定制服务”。“了解服务”打开默认关闭的原生 dialog，支持关闭、Escape、焦点约束与恢复；无 JS 时链接到原生 details，展开即可阅读同一份全文并邮件联系，无重复服务文案或独立大型主区块。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。不提供自动在线订阅、支付或 A2A。咨询入口沿用通用 `consulting` 和 `cards` / `support`，`service=null`，不记录产品或档位归属；详情打开不发产品事件。
 
 下方概念 Demo 样例均为虚构场景与拟议交付结构，Deep BLM 另提供规划工具试用。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
 
-A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录中 Deep BLM 为 `availability=web-trial`，其余为 `concept-demo`；全部保持 `production_ready=false`、`a2a.available=false`、`a2a.endpoint=null`。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
+A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录共四项：Deep BLM 为 `availability=web-trial`，IP 守护和技术架构规划为 `concept-demo`，洞察服务为 `manual-contact`，通过邮件人工洽谈；全部保持 `production_ready=false`、`a2a.available=false`、`a2a.endpoint=null`。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
 
 需求表单只要求业务问题，期望结果与约束可选，不收集个人邮箱或电话。不要输入敏感数据、密码或密钥。打开/准备草稿都不发信、不上传；用户必须主动点邮件链接，并在本机邮件客户端确认发送。mailto 使用 RFC6068 百分号编码，空格为 `%20`，不是 `+`。复制失败时可手动复制；关闭窗口清空字段与草稿；不依赖 localStorage。文本通过 `textContent` 显示，不插入用户 HTML。短草稿仅在用户主动打开的本机 mailto 中携带正文；编码 URI 超过 1800 字符时保留完整可复制文本，邮件链接不带正文，并提示先复制再粘贴，避免客户端截断。统计和目录不包含正文。
 
@@ -41,7 +41,7 @@ A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与�
 | --- | --- |
 | `version` | `"1"` |
 | `event` | `product_view`, `demo_open`, `demo_complete`, `intent_open`, `mail_draft_ready`, `mailto_click`, `a2a_step`, `a2a_interest` |
-| `service` | `ip-guard`, `deep-blm`, `architecture`, `tech-ma` 或非产品入口的 `null` |
+| `service` | `ip-guard`, `deep-blm`, `architecture`；旧 `tech-ma` 仅保留为兼容枚举，实时 UI 不发送；通用入口及新洞察咨询为 `null` |
 | `category` | `product`, `a2a`, `consulting`, `integration`, `general`, `partnership` |
 | `surface` | `cards`, `demo`, `a2a`, `support`, `contact`, `demand` |
 | `audience` | `"browser_interaction"`（浏览器交互，无法据此核验自然人或自动化） |
@@ -49,7 +49,7 @@ A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与�
 | `session_id`, `event_id` | 随机临时 ID，仅用于去重 |
 | `step` | 仅 `a2a_step` 的 1–5 整数 |
 
-未知事件/服务/字段全部拒绝。不包含输入、邮箱、完整 URL/query/hash/referrer、个人标识或持久指纹。去重键为事件/服务/分类/界面/步骤的本页组合；会话不等于独立人数，不能报告为 UV。浏览器交互不等于已核实的自然人访问，已知内部验证单独标记 `is_test=true`。GitHub Pages 的静态目录读取目前没有可用访问日志，Agent/爬虫读取量是未知，不是零。`product_view` 只表示卡片至少一半进入视口；`demo_complete` 仅为旧接口兼容枚举，本版不发送，也不据此计算完成率；打开样例只记 `demo_open`，不声称访客看完。通用 A2A 意向只记 `intent_open` 且 service=null，不归属默认产品；产品样例中的 A2A 意向才另记 `a2a_interest`。A2A 步骤是样例操作。有效场景、试点与付费意向须通过真实沟通人工确认，不从页面动作自动推断，也不设置未经用户批准的立项阈值。
+未知事件/服务/字段全部拒绝。`PRODUCTS` 和 A2A 仅含原前三个虚构样例；卡片可见性统计在观察及同意时都跳过未注册 ID，不发送 `tech-insight` 产品事件。旧 `tech-ma` 已从公开首页、样例定义、A2A 选项和目录移除，接收端与冻结 schema 保持不变。不包含输入、邮箱、完整 URL/query/hash/referrer、个人标识或持久指纹。去重键为事件/服务/分类/界面/步骤的本页组合；会话不等于独立人数，不能报告为 UV。浏览器交互不等于已核实的自然人访问，已知内部验证单独标记 `is_test=true`。GitHub Pages 的静态目录读取目前没有可用访问日志，Agent/爬虫读取量是未知，不是零。`product_view` 只表示卡片至少一半进入视口；`demo_complete` 仅为旧接口兼容枚举，本版不发送，也不据此计算完成率；打开样例只记 `demo_open`，不声称访客看完。通用 A2A 意向只记 `intent_open` 且 service=null，不归属默认产品；产品样例中的 A2A 意向才另记 `a2a_interest`。A2A 步骤是样例操作。有效场景、试点与付费意向须通过真实沟通人工确认，不从页面动作自动推断，也不设置未经用户批准的立项阈值。
 
 必须区分：**意向入口点击 ≠ 草稿准备 ≠ 邮件实际发出/送达 ≠ 已核实的合格需求**。`mailto_click` 也不能证明邮件发出；页面无法确认邮箱投递或需求质量。
 
@@ -69,7 +69,7 @@ git diff --check
 
 浏览器脚本默认仅监听 `127.0.0.1` 的临时随机端口，并在成功/失败时关闭服务器、线程与浏览器；无常驻进程。可传 `BASE_URL` 使用父流程提供的预览，脚本不会管理该外部服务器；`CHROME_PATH` 可指向既有 Chromium。所有测试页面使用测试标识，正式文件不注入测试配置。
 
-浏览器覆盖：320/390/820/1440 无溢出、导航与锚点、键盘/减少动态效果、其余三项演示按钮的样例内容及 Deep BLM 原生工具入口、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
+浏览器覆盖：320/390/820/1440 无溢出、导航与锚点、键盘/减少动态效果、原前三项 A2A 虚构样例、IP/架构演示按钮的样例内容及 Deep BLM 原生工具入口、第四卡详情与无 JS 全文、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
 
 编码子进程的沙箱可能禁止创建本地 socket，不能据此宣称浏览器通过；应在已授权的父流程环境中真跑交互。实际发布状态以对应 PR 的 CI、Pages 构建及发布后核验报告为准，本机测试不代表线上发布成功或真实手机蜂窝网可达。
 
