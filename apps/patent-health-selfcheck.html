@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>专利布局健康度自评</title>
+<meta name="description" content="10 个问题，看清你的专利是在保护技术，还是只在交年费。">
+<meta property="og:title" content="专利布局健康度自评">
+<meta property="og:description" content="10 个问题，看清你的专利是在保护技术，还是只在交年费。">
+<meta property="og:type" content="website">
+<style>
+/* DeepArchi 应用设计系统 v1.0
+   基调: 白底极简 + 靛蓝强调，短句、大留白、无营销腔
+   所有工厂应用共用此文件，改这里=全局改版 */
+:root {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --ink: #111111;
+  --ink-2: #4B4B4B;
+  --muted: #86868B;
+  --line: #E6E6E6;
+  --accent: #4F46E5;
+  --accent-soft: #EEF0FF;
+  --ok: #16794C;
+  --warn: #B45309;
+  --bad: #B42318;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px 64px;
+}
+
+/* ── 头部 ── */
+header { padding: 52px 0 28px; }
+.brand {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 14px;
+}
+h1 { font-size: 30px; line-height: 1.25; font-weight: 700; letter-spacing: -.02em; }
+.lede { margin-top: 14px; font-size: 16px; color: var(--ink-2); max-width: 34em; }
+
+/* ── 卡片 ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+
+/* ── 表单 ── */
+.field { margin-bottom: 18px; }
+label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 7px; }
+.hint { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+input[type=text], input[type=number], select, textarea {
+  width: 100%; padding: 12px 14px; font-size: 15px; font-family: inherit;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* 选项（单选/多选） */
+.options { display: grid; gap: 8px; }
+.opt {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+  cursor: pointer; font-size: 14px; background: #fff; transition: all .12s;
+}
+.opt:hover { border-color: #C9C9C9; }
+.opt input { margin-top: 3px; accent-color: var(--accent); }
+.opt.sel { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ── 按钮 ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 100%; padding: 14px 20px; font-size: 15px; font-weight: 600;
+  font-family: inherit; border: 0; border-radius: 11px;
+  background: var(--ink); color: #fff; cursor: pointer;
+  transition: opacity .15s, transform .1s;
+}
+.btn:hover { opacity: .88; }
+.btn:active { transform: scale(.995); }
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
+.btn.accent { background: var(--accent); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+
+/* ── 结果 ── */
+.score-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.score { font-size: 46px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+.score-unit { font-size: 14px; color: var(--muted); }
+.verdict { font-size: 19px; font-weight: 600; margin: 10px 0 6px; }
+
+.bar { height: 8px; background: #EFEFEF; border-radius: 99px; overflow: hidden; margin: 10px 0; }
+.bar > i { display: block; height: 100%; border-radius: 99px; background: var(--accent); transition: width .5s ease; }
+.bar.ok > i { background: var(--ok); }
+.bar.warn > i { background: var(--warn); }
+.bar.bad > i { background: var(--bad); }
+
+.dims { display: grid; gap: 12px; margin-top: 18px; }
+.dim { font-size: 13px; }
+.dim-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.dim-head b { font-weight: 600; }
+
+ul.findings { list-style: none; margin-top: 14px; display: grid; gap: 10px; }
+ul.findings li {
+  font-size: 14px; padding-left: 22px; position: relative; color: var(--ink-2);
+}
+ul.findings li::before {
+  content: "—"; position: absolute; left: 0; color: var(--muted);
+}
+
+.cta { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 20px; }
+.cta p { font-size: 14px; color: var(--ink-2); margin-bottom: 12px; }
+
+footer {
+  margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px;
+}
+
+.hidden { display: none !important; }
+
+@media (max-width: 420px) {
+  h1 { font-size: 25px; }
+  .card { padding: 18px; }
+  body { padding: 0 16px 48px; }
+}
+
+</style>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%234F46E5'/></svg>">
+</head>
+<body>
+
+<header>
+  <div class="brand" id="brand">深度架构 · DeepArchi</div>
+  <h1 id="title">专利布局健康度自评</h1>
+  <p class="lede" id="lede">10 个问题，看清你的专利是在保护技术，还是只在交年费。</p>
+</header>
+
+<main>
+  <form id="form" novalidate></form>
+  <section id="result" class="hidden" aria-live="polite"></section>
+</main>
+
+<footer>
+  <span id="footer-left">深度架构 DeepArchi</span>
+  <span id="footer-right"></span>
+</footer>
+
+<script>
+/* 专利布局健康度自评 · 配置
+ * 五个维度：覆盖 / 质量 / 地域 / 维护 / 运用
+ * 评分口径：每题 0-100，维度内取均值，总分取五维均值。
+ * 设计原则：不问"你觉得重要吗"，只问可观察到的事实。
+ */
+window.APP_CONFIG = {
+  id: "patent-health-selfcheck",
+  mode: "assessment",
+  brand: "深度架构 · DeepArchi",
+  title: "专利布局健康度自评",
+  lede: "10 个问题，看清你的专利是在保护技术，还是只在交年费。全部本地计算，不上传任何信息。",
+
+  dimensions: [
+    { key: "cover",   label: "保护覆盖" },
+    { key: "quality", label: "权利要求质量" },
+    { key: "geo",     label: "地域布局" },
+    { key: "maint",   label: "维护决策" },
+    { key: "use",     label: "运用能力" },
+  ],
+
+  questions: [
+    {
+      id: "q1",
+      text: "1. 你最难被替代的那项技术，有已授权的专利吗？",
+      hint: "之所以这样问：专利的价值不在数量，在于是否盖住了别人绕不开的那一点。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "有，且权利要求覆盖了核心实现", score: { cover: 100, quality: 85 } },
+        { label: "有申请，但还在审查中", score: { cover: 65, quality: 55 } },
+        { label: "有专利，但和核心技术关系不大", score: { cover: 30, quality: 30 } },
+        { label: "没有，主要靠商业秘密和先发优势", score: { cover: 0, quality: 15 } },
+      ],
+    },
+    {
+      id: "q2",
+      text: "2. 你的专利里，能明确指出「落在哪个产品/功能上」的比例是多少？",
+      hint: "之所以这样问：对不上产品的专利，在诉讼和许可里都很难主张价值。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "大部分（>70%）能对上", score: { cover: 95, use: 80 } },
+        { label: "约一半能对上", score: { cover: 65, use: 55 } },
+        { label: "少数能对上", score: { cover: 35, use: 30 } },
+        { label: "基本没梳理过", score: { cover: 10, use: 5 } },
+      ],
+    },
+    {
+      id: "q3",
+      text: "3. 独立权利要求写的是什么层级？",
+      hint: "之所以这样问：写成具体实施例，别人换个参数就绕开了；写成上位概念，才挡得住。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "上位概念 + 从属权利要求逐层限定", score: { quality: 95 } },
+        { label: "有一定概括，但范围偏窄", score: { quality: 65 } },
+        { label: "基本是照着具体实现写的", score: { quality: 30 } },
+        { label: "不清楚，是代理机构写的没细看", score: { quality: 10 } },
+      ],
+    },
+    {
+      id: "q4",
+      text: "4. 竞争对手能否在不侵犯你专利的情况下做出同类产品？",
+      hint: "之所以这样问：这是专利有没有用的唯一检验标准。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "很难，绕不开", score: { quality: 95, cover: 90 } },
+        { label: "能绕，但要付出明显成本", score: { quality: 70, cover: 65 } },
+        { label: "容易绕开", score: { quality: 35, cover: 30 } },
+        { label: "没评估过", score: { quality: 10, cover: 10 } },
+      ],
+    },
+    {
+      id: "q5",
+      text: "5. 你的主要销售市场，是否都有对应的专利布局？",
+      hint: "之所以这样问：专利是地域性的，中国授权不保护你在欧洲的销售。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "主要市场全覆盖", score: { geo: 100 } },
+        { label: "覆盖了一部分", score: { geo: 60 } },
+        { label: "只有中国", score: { geo: 30 } },
+        { label: "只有零散几件，没规划", score: { geo: 10 } },
+      ],
+    },
+    {
+      id: "q6",
+      text: "6. 有出口或海外业务的，目标国是否申请了专利？",
+      hint: "之所以这样问：海外参展、投标、被仿制时，当地没有专利权就没有谈判筹码。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "有业务的国家都布了", score: { geo: 100 } },
+        { label: "重点国家布了", score: { geo: 70 } },
+        { label: "只通过 PCT 占了个位，没进国家阶段", score: { geo: 45 } },
+        { label: "没有海外业务 / 完全没布", score: { geo: 20 } },
+      ],
+    },
+    {
+      id: "q7",
+      text: "7. 你是否清楚每件专利的年费和下次缴费日？",
+      hint: "之所以这样问：年费是专利组合最大的一笔隐性支出，也是被动放弃的主要死因。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "有台账，提前三个月预警", score: { maint: 100 } },
+        { label: "知道大概，靠代理机构提醒", score: { maint: 60 } },
+        { label: "只在收到缴费通知时才知道", score: { maint: 30 } },
+        { label: "不清楚，可能已经掉过", score: { maint: 5 } },
+      ],
+    },
+    {
+      id: "q8",
+      text: "8. 近三年放弃过专利吗？放弃是按价值判断还是按预算砍的？",
+      hint: "之所以这样问：主动放弃是健康动作，被动掉费是管理漏洞，结果一样但性质不同。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "主动放弃过，有明确的价值判断依据", score: { maint: 95, use: 70 } },
+        { label: "放弃过，理由说不清", score: { maint: 45 } },
+        { label: "没放弃过，全部维持", score: { maint: 50 } },
+        { label: "掉过费（忘缴）", score: { maint: 5 } },
+      ],
+    },
+    {
+      id: "q9",
+      text: "9. 职务发明归属、离职员工相关专利，是否做过清理？",
+      hint: "之所以这样问：权属瑕疵会让专利在维权时直接失效，且事后很难补。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "做过，文件齐全", score: { maint: 95, quality: 80 } },
+        { label: "有制度，但没逐件核过", score: { maint: 55, quality: 50 } },
+        { label: "只有劳动合同里的通用条款", score: { maint: 25, quality: 25 } },
+        { label: "没考虑过", score: { maint: 5, quality: 5 } },
+      ],
+    },
+    {
+      id: "q10",
+      text: "10. 专利有没有产生过实际收益或筹码？",
+      hint: "之所以这样问：许可、转让、质押、交叉授权、诉讼威慑，任一项都算。只维持不产生动作，就是成本中心。",
+      type: "single",
+      required: true,
+      options: [
+        { label: "有，且能量化收益", score: { use: 100 } },
+        { label: "有，在谈判/投标里起过作用", score: { use: 75 } },
+        { label: "没有，但计划做", score: { use: 35 } },
+        { label: "没有，也没计划", score: { use: 5 } },
+      ],
+    },
+  ],
+
+  bands: [
+    { min: 80, label: "健康", verdict: "专利在干活。下一步是把它变成谈判筹码。", tone: "ok" },
+    { min: 60, label: "成型但漏风", verdict: "方向对，缺口集中在一两个维度上，补齐成本不高。", tone: "ok" },
+    { min: 40, label: "有资产无防线", verdict: "花了钱，但关键环节没咬合。别人绕得开，你也用不上。", tone: "warn" },
+    { min: 0,  label: "成本中心", verdict: "现在的专利主要在产生年费，不在产生保护。", tone: "bad" },
+  ],
+
+  findings: [
+    { fn: (r) => r.dims.cover < 50, text: "保护覆盖偏低：核心技术没有被权利要求盖住，等于花钱买了不挡人的墙。" },
+    { fn: (r) => r.dims.quality < 50, text: "权利要求质量是最大短板：范围写在具体实施例上，竞争对手改个参数就能绕开。" },
+    { fn: (r) => r.dims.geo < 50, text: "地域布局缺口明显：专利有地域性，主战场没有专利权就没有排他力。" },
+    { fn: (r) => r.dims.maint < 50, text: "维护决策失控：年费与放弃缺少账面依据，最容易出现「该保的掉了、该放的在烧钱」。" },
+    { fn: (r) => r.dims.use < 40, text: "运用能力几乎为零：组合只出不进，没有许可、质押或威慑动作，长期是纯成本。" },
+    { fn: (r) => r.score >= 80, text: "整体健康。建议把重心从「申请」转到「运用」：许可、交叉授权、标准必要专利。" },
+    { fn: (r) => r.dims.cover >= 70 && r.dims.use < 40, text: "有保护但没变现：这是最容易补的一档，通常一次梳理就能找出可谈的对象。" },
+  ],
+
+  cta: {
+    title: "下一步",
+    text: "自评只到「哪一维弱」。要看「具体哪几件该保、该放、该改写法」，需要逐件拆解权利要求。",
+    button: "了解专利体检（人工 30 分钟）",
+    href: "https://deeparchi.com.cn",
+  },
+
+  footer: "本自评不构成法律意见 · 结果仅存于你的浏览器",
+};
+
+</script>
+<script>
+/* DeepArchi App Engine v1.0 —— 配置驱动，不需要按应用改。
+ * 支持 mode: assessment | lookup | calculator
+ * 约定：结果先给，留资后置。不拿门槛换信息。
+ */
+(function () {
+  "use strict";
+
+  const CFG = window.APP_CONFIG || {};
+  const $ = (s, r = document) => r.querySelector(s);
+  const el = (tag, cls, html) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  };
+  const esc = (s) =>
+    String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+
+  // ── 注入头部 ──
+  function paintHeader() {
+    if (CFG.brand) $("#brand").textContent = CFG.brand;
+    if (CFG.title) { $("#title").textContent = CFG.title; document.title = CFG.title; }
+    if (CFG.lede) $("#lede").textContent = CFG.lede;
+    if (CFG.footer) $("#footer-left").textContent = CFG.footer;
+    $("#footer-right").textContent = new Date().getFullYear() + " · 深度架构";
+  }
+
+  // ── 渲染表单 ──
+  function renderForm() {
+    const form = $("#form");
+    form.innerHTML = "";
+
+    (CFG.questions || []).forEach((q, qi) => {
+      const wrap = el("div", "card");
+      const label = el("label", null, esc(q.text) + (q.required ? "" : ' <span style="color:#86868B;font-weight:400">(选填)</span>'));
+      label.setAttribute("for", "f_" + q.id);
+      wrap.appendChild(label);
+      if (q.hint) wrap.appendChild(el("div", "hint", esc(q.hint)));
+
+      if (q.type === "text" || q.type === "number") {
+        const inp = el("input");
+        inp.type = q.type;
+        inp.id = "f_" + q.id;
+        inp.name = q.id;
+        if (q.placeholder) inp.placeholder = q.placeholder;
+        if (q.required) inp.required = true;
+        wrap.appendChild(inp);
+      } else {
+        const box = el("div", "options");
+        const name = q.id;
+        (q.options || []).forEach((o, oi) => {
+          const lo = el("label", "opt");
+          const inp = el("input");
+          inp.type = q.type === "multi" ? "checkbox" : "radio";
+          inp.name = name;
+          inp.value = String(oi);
+          inp.dataset.qi = qi;
+          inp.addEventListener("change", () => {
+            if (q.type !== "multi") {
+              box.querySelectorAll(".opt").forEach((x) => x.classList.remove("sel"));
+              lo.classList.add("sel");
+            } else {
+              lo.classList.toggle("sel", inp.checked);
+            }
+            validate();
+          });
+          lo.appendChild(inp);
+          lo.appendChild(el("span", null, esc(o.label)));
+          box.appendChild(lo);
+        });
+        wrap.appendChild(box);
+      }
+      form.appendChild(wrap);
+    });
+
+    const submit = el("button", "btn accent", CFG.mode === "assessment" ? "看结果" : "开始检查");
+    submit.type = "submit";
+    submit.id = "submitBtn";
+    form.appendChild(submit);
+    form.addEventListener("submit", onSubmit);
+    validate();
+  }
+
+  function collect() {
+    const answers = {};
+    (CFG.questions || []).forEach((q, qi) => {
+      if (q.type === "text" || q.type === "number") {
+        answers[q.id] = $("#f_" + q.id).value.trim();
+      } else if (q.type === "multi") {
+        answers[q.id] = Array.from(document.querySelectorAll(`input[name="${q.id}"]:checked`))
+          .map((i) => Number(i.value));
+      } else {
+        const c = document.querySelector(`input[name="${q.id}"]:checked`);
+        answers[q.id] = c ? Number(c.value) : null;
+      }
+    });
+    return answers;
+  }
+
+  function missing() {
+    const a = collect();
+    return (CFG.questions || []).filter(
+      (q) => q.required && (a[q.id] === null || a[q.id] === "" || (Array.isArray(a[q.id]) && !a[q.id].length))
+    );
+  }
+
+  function validate() {
+    const b = $("#submitBtn");
+    if (b) b.disabled = missing().length > 0;
+  }
+
+  // ── 评分 ──
+  function grade(answers) {
+    const dims = {};
+    (CFG.dimensions || []).forEach((d) => (dims[d.key] = { sum: 0, n: 0 }));
+
+    (CFG.questions || []).forEach((q, qi) => {
+      const a = answers[q.id];
+      if (a == null || a === "") return;
+      const idxs = Array.isArray(a) ? a : [a];
+      idxs.forEach((i) => {
+        const o = (q.options || [])[i];
+        if (!o || !o.score) return;
+        Object.entries(o.score).forEach(([k, v]) => {
+          if (!dims[k]) dims[k] = { sum: 0, n: 0 };
+          dims[k].sum += Number(v) || 0;
+          dims[k].n += 1;
+        });
+      });
+    });
+
+    const out = {};
+    Object.entries(dims).forEach(([k, v]) => (out[k] = v.n ? Math.round(v.sum / v.n) : 0));
+    const vals = Object.values(out);
+    const score = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    return { score, dims: out };
+  }
+
+  function bandOf(score) {
+    return (CFG.bands || []).find((b) => score >= b.min) || { label: "—", verdict: "", tone: "" };
+  }
+
+  // ── 渲染结果 ──
+  function renderResult(answers) {
+    const res = $("#result");
+    res.innerHTML = "";
+    res.classList.remove("hidden");
+    $("#form").classList.add("hidden");
+
+    let score = 0, dims = {}, extra = null;
+
+    if (CFG.mode === "calculator" && typeof CFG.compute === "function") {
+      extra = CFG.compute(answers) || {};
+      score = Math.max(0, Math.min(100, Math.round(extra.score || 0)));
+      dims = extra.dims || {};
+    } else {
+      const g = grade(answers);
+      score = g.score;
+      dims = g.dims;
+    }
+
+    const band = bandOf(score);
+
+    const card = el("div", "card");
+    card.appendChild(el("div", "score-row",
+      `<span class="score">${score}</span><span class="score-unit">/ 100 · ${esc(band.label)}</span>`));
+    card.appendChild(el("div", "verdict", esc(band.verdict)));
+    card.appendChild(el("div", "bar " + (band.tone || ""), `<i style="width:${score}%"></i>`));
+
+    const dimWrap = el("div", "dims");
+    (CFG.dimensions || []).forEach((d) => {
+      const v = dims[d.key] || 0;
+      const row = el("div", "dim");
+      row.appendChild(el("div", "dim-head", `<b>${esc(d.label)}</b><span>${v}</span>`));
+      row.appendChild(el("div", "bar " + (v >= 70 ? "ok" : v >= 40 ? "warn" : "bad"), `<i style="width:${v}%"></i>`));
+      dimWrap.appendChild(row);
+    });
+    card.appendChild(dimWrap);
+
+    const findings = [];
+    (CFG.findings || []).forEach((f) => {
+      try {
+        if (typeof f.fn === "function" ? f.fn({ score, dims, answers, extra }) : score < (f.below || 999) && score >= (f.above || 0)) {
+          findings.push(f.text);
+        }
+      } catch (e) { /* 单条规则失败不影响整体 */ }
+    });
+    if (findings.length) {
+      const ul = el("ul", "findings");
+      findings.forEach((t) => ul.appendChild(el("li", null, esc(t))));
+      card.appendChild(ul);
+    }
+
+    if (CFG.cta && CFG.cta.text) {
+      const cta = el("div", "cta");
+      cta.appendChild(el("p", null, esc(CFG.cta.text)));
+      const a = el("a", "btn accent", esc(CFG.cta.button || "下一步"));
+      a.href = CFG.cta.href || "#";
+      if (/^https?:/.test(a.href)) { a.target = "_blank"; a.rel = "noopener"; }
+      cta.appendChild(a);
+      card.appendChild(cta);
+    }
+
+    res.appendChild(card);
+
+    const again = el("button", "btn ghost", "重新填写");
+    again.addEventListener("click", () => {
+      res.classList.add("hidden");
+      $("#form").classList.remove("hidden");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    res.appendChild(again);
+
+    // 埋点：只用 URL 参数，不引第三方 SDK
+    try {
+      const q = new URLSearchParams(location.search);
+      if (q.get("utm_source")) {
+        console.log("[app]", CFG.id, "utm=" + q.get("utm_source"), "score=" + score);
+      }
+    } catch (e) { /* noop */ }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ── lookup 模式 ──
+  function renderLookup(answers) {
+    const term = (answers.__q || "").trim();
+    const data = window.APP_DATA || [];
+    const hit = data.filter((r) => JSON.stringify(r).toLowerCase().includes(term.toLowerCase()));
+    const res = $("#result");
+    res.innerHTML = "";
+    res.classList.remove("hidden");
+
+    const card = el("div", "card");
+    if (!term) {
+      card.appendChild(el("div", "verdict", "请输入要查的关键词"));
+    } else if (!hit.length) {
+      card.appendChild(el("div", "verdict", "未命中已知条目"));
+      card.appendChild(el("p", "hint", "不代表没有风险——本地快照可能不完整，完整核查需接入实时数据源。"));
+    } else {
+      card.appendChild(el("div", "verdict", `命中 ${hit.length} 条`));
+      const ul = el("ul", "findings");
+      hit.slice(0, 20).forEach((r) => ul.appendChild(el("li", null, esc(r.label || JSON.stringify(r)))));
+      card.appendChild(ul);
+    }
+    res.appendChild(card);
+  }
+
+  function onSubmit(e) {
+    e.preventDefault();
+    const ans = collect();
+    if (missing().length) return;
+    if (CFG.mode === "lookup") renderLookup(ans);
+    else renderResult(ans);
+  }
+
+  // ── 启动 ──
+  document.addEventListener("DOMContentLoaded", () => {
+    paintHeader();
+    renderForm();
+  });
+})();
+
+</script>
+</body>
+</html>
