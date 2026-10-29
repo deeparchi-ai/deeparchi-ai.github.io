@@ -1,7 +1,7 @@
 {
   "version": "1",
-  "kind": "concept-service-catalog",
-  "description": "概念服务目录，不是可运行的 Agent Card，不声明协议符合性。",
+  "kind": "service-catalog",
+  "description": "专业服务目录，包含概念样例、规划工具试用与人工联系的咨询服务；不是可运行的 Agent Card，不声明协议符合性。",
   "organization": {
     "name": "DeepArchi 深度架构",
     "legal_name": "上海申渡架固信息技术有限公司",
@@ -68,19 +68,13 @@
       "human_contact": "contact@deeparchi.com.cn"
     },
     {
-      "id": "tech-ma",
-      "name": "Tech M&A",
-      "availability": "concept-demo",
+      "id": "tech-insight",
+      "name": "技术与竞争洞察服务",
+      "availability": "manual-contact",
       "production_ready": false,
-      "proposed_input": [
-        "技术并购议题",
-        "授权核验范围"
-      ],
-      "proposed_output": [
-        "尽调框架",
-        "证据缺口",
-        "整合议题"
-      ],
+      "delivery_mode": "人工咨询；P1 标准订阅、P2 专业订阅、P3 定制服务",
+      "description": "AI 驱动研究与专家专业判断；具体服务范围、交付周期与成果形式以双方约定为准。无自动在线订阅、支付或 A2A 服务。",
+      "details_url": "index.html#insight-details",
       "human_contact": "contact@deeparchi.com.cn"
     }
   ]

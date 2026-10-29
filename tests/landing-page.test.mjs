@@ -8,7 +8,7 @@ const [html, css, js, dev, privacy, catalogText, configText] = await Promise.all
 const catalog = JSON.parse(catalogText);
 
 test('short acquisition page has approved positioning and no personal branding', () => {
-  assert.match(html, /AI 原生服务 · 概念 Demo/);
+  assert.match(html, /AI 原生服务 · 专家专业判断/);
   assert.match(html, /让重要的专业服务，<br>更容易获得。/);
   assert.match(html, /为你，也为你的 Agent。/);
   assert.match(html, /href="#capabilities">查看服务 Demo/);
@@ -18,30 +18,39 @@ test('short acquisition page has approved positioning and no personal branding',
   assert.match(html, /<noscript>[\s\S]*mailto:contact@deeparchi.com.cn/);
 });
 
-test('catalogue, cards, selection and sample definitions share exactly four service identities', () => {
+test('four catalogue/cards include three fictional samples and one manual consulting offering', () => {
+  const samples = ['ip-guard', 'deep-blm', 'architecture'];
+  const live = [...samples, 'tech-insight'];
   assert.equal(catalog.version, '1');
-  assert.equal(catalog.kind, 'concept-service-catalog');
-  assert.equal(catalog.services.length, 4);
-  assert.deepEqual(catalog.services.map(s => s.id), SERVICES);
-  assert.deepEqual(Object.keys(PRODUCTS), SERVICES);
+  assert.equal(catalog.kind, 'service-catalog');
+  assert.deepEqual(catalog.services.map(s => s.id), live);
+  assert.deepEqual(Object.keys(PRODUCTS), samples);
+  // Frozen receiver schema retains its legacy enum, never a live UI identity.
+  assert.deepEqual(SERVICES, [...samples, 'tech-ma']);
   const cards = [...html.matchAll(/<article class="product" id="([^"]+)">([\s\S]*?)<\/article>/g)];
-  assert.deepEqual(cards.map(card => card[1]), SERVICES);
-  assert.equal((html.match(/<option value=/g) || []).length, 4);
+  assert.deepEqual(cards.map(card => card[1]), live);
+  assert.deepEqual([...html.matchAll(/<option value="([^"]+)"/g)].map(m => m[1]), samples);
   for (const s of catalog.services) {
-    assert.equal(s.name, PRODUCTS[s.id].name);
-    assert.equal(cards.find(card => card[1] === s.id)[2].match(/<h3>(.*?)<\/h3>/)[1].replaceAll('&amp;', '&'), s.name);
-    assert.match(html, new RegExp(`id="${s.id}"`));
-    assert.match(html, new RegExp(`data-demo="${s.id}"`));
-    assert.match(html, new RegExp(`data-service="${s.id}"`));
-    assert.match(html, new RegExp(`<option value="${s.id}">`));
-    assert.equal(s.availability, s.id === 'deep-blm' ? 'web-trial' : 'concept-demo');
-    if (s.id === 'deep-blm') assert.equal(s.web_trial.url, 'apps/deepblm.html');
+    assert.equal(cards.find(card => card[1] === s.id)[2].match(/<h3>(.*?)<\/h3>/)[1], s.name);
     assert.equal(s.production_ready, false);
     assert.equal(s.human_contact, 'contact@deeparchi.com.cn');
+    if (s.id === 'tech-insight') {
+      assert.equal(s.availability, 'manual-contact');
+      assert.match(s.delivery_mode, /人工咨询/);
+      assert.match(s.description, /无自动在线订阅、支付或 A2A 服务/);
+      assert.equal(s.details_url, 'index.html#insight-details');
+      assert.equal(PRODUCTS[s.id], undefined);
+      continue;
+    }
+    assert.equal(s.name, PRODUCTS[s.id].name);
+    for (const attr of ['data-demo', 'data-service', '<option value']) assert.ok(html.includes(`${attr}="${s.id}"`));
+    assert.equal(s.availability, s.id === 'deep-blm' ? 'web-trial' : 'concept-demo');
+    if (s.id === 'deep-blm') assert.equal(s.web_trial.url, 'apps/deepblm.html');
     assert.ok(s.proposed_input.length && s.proposed_output.length);
     assert.equal(PRODUCTS[s.id].output.length, 3);
     assert.match(PRODUCTS[s.id].problem, /虚构/);
   }
+  assert.doesNotMatch(html + js + catalogText, /tech-ma|Tech M(?:&amp;|&)A/);
   assert.deepEqual(catalog.a2a, {available: false, endpoint: null});
 });
 
@@ -57,9 +66,9 @@ test('Chinese typography and responsive/reduced-motion contracts remain local', 
   assert.doesNotMatch(html+css, /https?:\/\/(?:fonts|cdn)|@import/);
 });
 
-test('homepage keeps four concise sections and discloses A2A details in a closed dialog', () => {
+test('homepage preserves four concise sections, four cards and a closed A2A dialog', () => {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
-  // Conservative budget includes no-JS and disclosure copy as well as default content.
+  // Service details live outside main; the original total copy budget still applies.
   assert.ok([...main.replace(/<[^>]+>/g, '').matchAll(/\p{Script=Han}/gu)].length <= 749 * .65);
   assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]), ['top','capabilities','integrate','contact']);
   assert.doesNotMatch(main, /hero-copy|class="outcome"|预期交付|SERVICE EXPLORATIONS|ALSO HERE TO HELP|a2a-workspace/);
@@ -68,7 +77,7 @@ test('homepage keeps four concise sections and discloses A2A details in a closed
   for (const [, id, card] of cards) {
     const paragraphs = [...card.matchAll(/<p\b[^>]*>(.*?)<\/p>/g)];
     assert.equal(paragraphs.length,2);
-    assert.match(paragraphs[0][1], id === 'deep-blm' ? /规划工具 · 试用/ : /概念 Demo/);
+    assert.match(paragraphs[0][1], id === 'deep-blm' ? /规划工具 · 试用/ : id === 'tech-insight' ? /订阅 \/ 定制服务/ : /概念 Demo/);
     assert.ok([...paragraphs[1][1].matchAll(/\p{Script=Han}/gu)].length <= 24);
     assert.doesNotMatch(card, /<ul|<ol|<details/);
   }
@@ -79,7 +88,7 @@ test('homepage keeps four concise sections and discloses A2A details in a closed
   assert.doesNotMatch(dialog[1], /\bopen\b/);
   assert.match(dialog[2], /aria-label="关闭协作演示"/);
   assert.match(dialog[2], /class="a2a-workspace"/);
-  assert.equal((dialog[2].match(/<option value=/g)||[]).length,4);
+  assert.equal((dialog[2].match(/<option value=/g)||[]).length,3);
   for (const product of Object.values(PRODUCTS)) {
     for (const output of product.output) assert.ok(!main.includes(output));
   }
@@ -96,9 +105,9 @@ test('compact consent prompt retains explicit choices, optional scope and access
   assert.match(banner, /href="privacy.html"/);
 });
 
-test('product actions have eight distinct service-specific accessible names', () => {
+test('four cards have eight labelled actions with generic consulting attribution', () => {
   const cards = [...html.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)].map(match => match[1]).join('');
-  const actions = [...cards.matchAll(/<(?:button|a)\b[^>]*(?:data-demo=|data-intent="product")[^>]*>/g)];
+  const actions = [...cards.matchAll(/<(?:button|a)\b[^>]*(?:data-demo=|data-intent="(?:product|consulting)"|id="open-insight")[^>]*>/g)];
   assert.equal(actions.length,8);
   const names = actions.map(([tag]) => tag.match(/aria-label="([^"]+)"/)?.[1]);
   assert.ok(names.every(Boolean));

@@ -3,8 +3,7 @@ import {createSignals, mailDraft, EMAIL} from './signals.mjs';
 export const PRODUCTS = Object.freeze({
   'ip-guard': {name: 'IP 守护', problem: '虚构团队正在设计一款模块化设备，希望先整理创新点与待核实的知识产权问题。', output: ['创新主题与检索范围（待确认）', '检索路径与证据记录模板', '风险问题与人工核验清单']},
   'deep-blm': {name: 'Deep BLM', problem: '虚构团队考虑进入一个新业务方向，需要梳理客户假设、能力差距与验证顺序。', output: ['基于 BLM 的战略议题图', '客户与价值主张假设清单', '能力差距与分阶段验证计划']},
-  architecture: {name: '技术架构规划', problem: '虚构团队准备扩展一个业务系统，希望比较模块拆分、数据边界与演进顺序。', output: ['业务目标与系统约束表', '候选架构比较与取舍记录', '能力边界与演进路线草案']},
-  'tech-ma': {name: 'Tech M&A', problem: '虚构团队讨论一项技术并购，希望先列清需要证据支持的能力、依赖与整合议题。', output: ['技术尽调问题与证据清单', '能力依赖与待核实风险模板', '整合议题与后续核验计划']}
+  architecture: {name: '技术架构规划', problem: '虚构团队准备扩展一个业务系统，希望比较模块拆分、数据边界与演进顺序。', output: ['业务目标与系统约束表', '候选架构比较与取舍记录', '能力边界与演进路线草案']}
 });
 const CATEGORIES = {product: '产品需求', a2a: 'A2A 意向', consulting: '咨询服务', integration: '工具集成', general: '通用需求', partnership: '伙伴合作'};
 const $ = selector => document.querySelector(selector);
@@ -40,6 +39,7 @@ export async function initAnalytics({transport} = {}) {
     render();
     // Measure only cards visible NOW after opt-in, never replay pre-consent views.
     if (accept) $$('.product').forEach(card => {
+      if (!Object.hasOwn(PRODUCTS, card.id)) return;
       const rect = card.getBoundingClientRect();
       const visible = Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top));
       if (rect.height > 0 && visible >= rect.height * .5) track('product_view', card.id, 'product', 'cards');
@@ -64,13 +64,24 @@ function initHome() {
   const demo = $('#demo-dialog');
   const a2a = $('#a2a-dialog');
   const a2aTrigger = $('#open-a2a');
+  const insight = $('#insight-dialog');
+  const insightTrigger = $('#open-insight');
+  // Reuse the complete no-JS disclosure; never maintain a second copy of service text.
+  insight.append($('#insight-content'));
+  $('#insight-details').hidden = true;
+  insightTrigger.setAttribute('aria-haspopup', 'dialog');
+  insightTrigger.setAttribute('aria-controls', 'insight-dialog');
+  insightTrigger.addEventListener('click', event => {
+    event.preventDefault();
+    insight.showModal();
+  });
   const demand = $('#demand-dialog');
   const form = $('#demand-form');
   let demoTrigger;
   let demandTrigger;
   let activeSource;
   let draft;
-  [demo, a2a, demand].forEach(dialog => {
+  [demo, a2a, insight, demand].forEach(dialog => {
     dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
     dialog.addEventListener('keydown', event => {
       if (event.key !== 'Tab') return;
@@ -90,6 +101,12 @@ function initHome() {
     });
   });
   demo.addEventListener('close', () => { if (!demand.open) demoTrigger?.focus(); });
+  insight.addEventListener('close', () => { if (!demand.open) insightTrigger.focus(); });
+  const openInsightHash = () => {
+    if (location.hash === '#insight-details' && !insight.open) insight.showModal();
+  };
+  window.addEventListener('hashchange', openInsightHash);
+  openInsightHash();
   a2aTrigger.addEventListener('click', () => { stage = 0; renderStage(); a2a.showModal(); });
   a2a.addEventListener('close', () => { if (!demand.open) a2aTrigger.focus(); });
   demand.addEventListener('close', () => { form.reset(); clearDraft(); demandTrigger?.focus(); });
@@ -126,13 +143,14 @@ function initHome() {
     const service = category === 'a2a' && button.dataset.surface === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
     const product = PRODUCTS[service];
     const source = `${CATEGORIES[category]}${product ? ` / ${product.name}` : ''}`;
-    demandTrigger = demo.open ? demoTrigger : a2a.open ? a2aTrigger : button;
-    if (demo.open) demo.close();
-    if (a2a.open) a2a.close();
+    demandTrigger = demo.open ? demoTrigger : a2a.open ? a2aTrigger : insight.open ? insightTrigger : button;
     activeSource = {category, service, source};
     form.reset(); clearDraft();
     $('#demand-source').textContent = `来源：${source}`;
     demand.showModal();
+    if (demo.open) demo.close();
+    if (a2a.open) a2a.close();
+    if (insight.open) insight.close();
     track('intent_open', service, category, button.dataset.surface);
     if (category === 'a2a' && product) track('a2a_interest', service, category, button.dataset.surface);
   }));
@@ -201,7 +219,9 @@ function initHome() {
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) track('product_view', entry.target.id, 'product', 'cards');
     }), {threshold: .5});
-    $$('.product').forEach(card => observer.observe(card));
+    $$('.product').forEach(card => {
+      if (Object.hasOwn(PRODUCTS, card.id)) observer.observe(card);
+    });
   }
 }
 
