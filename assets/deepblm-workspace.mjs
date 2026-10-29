@@ -1,5 +1,6 @@
-import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, normalizeImport, structuredExport, normalizeReport, parseBoundedJSON, normalizeConfig, validateEndpoint} from './deepblm-data.mjs';
-import {groups, groupFor, hasContent, missingFields, simpleField, purposes, wireMenu} from './deepblm-ui.mjs';
+import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, normalizeImport, structuredExport, normalizeReport, parseBoundedJSON, validateEndpoint} from './deepblm-data.mjs';
+import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from './deepblm-credentials.mjs';
+import {groups, groupFor, hasContent, missingFields, simpleField, purposes, wireMenu, writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages} from './deepblm-ui.mjs';
 import {escapeHTML, renderMarkdown, sanitizeRichHTML} from './deepblm-security.mjs';
 const $ = selector => document.querySelector(selector);
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -36,6 +37,7 @@ function buildWorkspace() {
   let formData = {}, metadata = {}, currentStep = 0, editors = [];
   let storageBlocked = false, configBlocked = false, undo = [], redo = [], lastEdit = {}, pending = false, aiEpoch = 0;
   let config = {provider: 'deepseek', ...PROVIDERS.deepseek};
+  let credential = null, remembered = false, configDirty = false;
   const recovery = new Map();
   const host = $('#workspace');
   host.className = 'workbench';
@@ -67,12 +69,13 @@ function buildWorkspace() {
   const exportMenu = menu('导出', 'export-menu');
   exportMenu.lastElementChild.append(button('导出 JSON', () => exportFile('json'), {id: 'export-json'}), button('导出 Markdown', () => exportFile('md'), {id: 'export-markdown'}), button('Word 兼容 .doc', () => exportFile('doc'), {id: 'export-word'}));
   const settingsMenu = menu('设置', 'settings-menu');
-  settingsMenu.lastElementChild.append(button('AI 连接设置', () => openAI(true)), button('保存到本机', () => save(), {id: 'save-draft'}), button('清除本工具本地数据', clearLocal, {id: 'clear-local'}));
+  settingsMenu.lastElementChild.append(button('保存到本机', () => save(), {id: 'save-draft'}), button('清除本工具本地数据', clearLocal, {id: 'clear-local'}));
   const help = el('details', {id: 'tool-help'});
   help.append(el('summary', {}, '使用与数据说明'), el('p', {}, '手工编辑始终可用。草稿只保存在当前浏览器，没有账号或云端同步。请定期导出 JSON 备份。JSON 兼容旧版扁平和分步结构；字段支持文本/Markdown 文件导入。Word 兼容 .doc 是 HTML，不是 .docx。不支持 .docx 导入。公共链接导入、代理抓取与自动搜索已关闭。'));
   settingsMenu.lastElementChild.append(button('使用与数据说明', () => { help.open = !help.open; if (help.open) help.querySelector('summary').focus(); }));
   help.addEventListener('keydown', event => { if (event.key === 'Escape') { help.open = false; settingsMenu.querySelector('summary').focus(); } });
-  topbar.append(importMenu, exportMenu, settingsMenu);
+  const globalAIButton = button('AI 设置 · 未配置', openGlobalAI, {id: 'open-ai-settings', 'aria-haspopup': 'dialog'});
+  topbar.append(globalAIButton, importMenu, exportMenu, settingsMenu);
   host.append(message, recoveryBox, help);
   const grid = el('div', {class: 'workspace-grid'}), sidebar = el('aside', {class: 'step-sidebar', 'aria-label': '规划进度'});
   const projectName = el('strong', {id: 'planning-name'}, '未命名规划');
@@ -81,7 +84,8 @@ function buildWorkspace() {
   const progressLabel = el('p', {id: 'progress-label', class: 'small'}), progress = el('progress', {id: 'planning-progress', max: '15', value: '0', 'aria-label': '有内容的步骤数'});
   const nav = el('nav', {'aria-label': '15 步规划导航', id: 'step-nav'}), stepButtons = [];
   for (const group of groups) {
-    const section = el('section', {class: 'nav-group'}); section.append(el('h2', {}, group.name));
+    const section = el('section', {class: group.note ? 'nav-group nav-foundation' : 'nav-group'}); section.append(el('h2', {}, group.name));
+    if (group.note) section.append(el('p', {class: 'nav-group-note'}, group.note));
     steps.slice(group.start, group.end).forEach((step, offset) => {
       const i = group.start + offset;
       const b = button(`${i + 1}. ${step.title}`, () => goToStep(i), {'data-step': step.id});
@@ -94,64 +98,128 @@ function buildWorkspace() {
   const hints = el('aside', {class: 'context-sidebar', 'aria-label': '填写帮助'});
   center.append(body, pager); grid.append(sidebar, center, hints); host.append(grid);
   let returnPoint = null, reportEntries = [];
-  const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading', 'aria-describedby': 'ai-disclosure'});
-  aiDetails.append(button('关闭 AI 辅助', closeAI, {id: 'close-ai'}), el('h2', {id: 'ai-heading', tabindex: '-1'}, 'AI 辅助（可选）'));
-  aiDetails.append(el('p', {id: 'ai-disclosure'}, '发送时，当前规划全文、已有校验报告和你的问题会交给所选提供方或你填写的自定义 HTTPS 接口；对方会处理这些数据与 Key。API 费用由你的账户承担。请先确认授权范围，不要发送敏感资料。'), el('p', {}, '未使用真实凭据验证 CORS、模型兼容性或真实生成质量。仅提供 OpenAI 兼容 Chat Completions 接口选项；请向提供方核对模型 ID 与浏览器跨域支持。打开页面不会请求模型。Key 始终仅在本页内存，刷新即丢失，不随草稿保存或导出。'));
+  const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading'});
+  const aiHeader = el('header', {class: 'ai-header'});
+  const aiHeading = el('div');
+  aiHeading.append(el('p', {class: 'ai-eyebrow'}, '写作助手'), el('h2', {id: 'ai-heading', tabindex: '-1'}, '把想法写进规划'));
+  aiHeader.append(aiHeading, button('关闭', closeAI, {id: 'close-ai', 'aria-label': '关闭 AI 辅助'}));
+  aiDetails.append(aiHeader);
+  const aiScroll = el('div', {class: 'ai-scroll'});
+  const aiSetup = el('div', {class: 'ai-setup'});
+  const aiDisclosure = el('p', {id: 'ai-disclosure'}, '主动发送后，当前规划全文、已有校验报告和你的问题（包含全部 15 步）会交给所选服务方处理，费用由你的账户承担。请确认发送范围，不要发送敏感资料；建议需自行核验。取消只停止本页等待，已发送内容无法撤回，服务方可能继续处理或计费。此处统一确认后，全部步骤共用；重新打开页面或修改连接设置后需重新确认。');
+  const sharedStatus = el('p', {id: 'ai-config-status', class: 'small'});
+  const destination = el('p', {id: 'ai-destination', class: 'small'});
+  const configureAIButton = button('去全局设置', openGlobalAI, {id: 'ai-open-settings', 'aria-haspopup': 'dialog'});
+  aiSetup.append(sharedStatus, configureAIButton);
+  const aiSettings = el('dialog', {id: 'ai-settings', 'aria-modal': 'true', 'aria-labelledby': 'ai-settings-heading', 'aria-describedby': 'ai-disclosure ai-storage-disclosure'});
+  aiSettings.append(button('关闭全局设置', closeGlobalAI, {id: 'close-ai-settings'}), el('h2', {id: 'ai-settings-heading', tabindex: '-1'}, '全局 AI 设置'));
+  aiSettings.append(el('p', {}, 'DeepBLM 工作台全部 15 步共用一份设置；导入或重置规划不影响它。仅支持 OpenAI 兼容 Chat Completions，请核对模型 ID、费用、权限与浏览器 CORS。保存设置不测试连接。'));
   const aiGrid = el('div', {class: 'ai-grid'});
   function aiField(name, node) { const l = el('label'); l.append(el('span', {}, name), node); aiGrid.append(l); return node; }
   const provider = aiField('提供方', el('select', {id: 'ai-provider'}));
   for (const [id, name] of [['deepseek', 'DeepSeek（需自行核对）'], ['openai', 'OpenAI（填写可用模型 ID）'], ['custom', '自定义 OpenAI 兼容接口']]) provider.append(el('option', {value: id}, name));
   const endpoint = aiField('完整 HTTPS Chat Completions 地址', el('input', {type: 'url', id: 'ai-endpoint', maxlength: '500', autocomplete: 'off', spellcheck: 'false'}));
   const model = aiField('模型 ID', el('input', {id: 'ai-model', maxlength: '100', autocomplete: 'off'}));
-  const key = aiField('API Key（仅本页内存）', el('input', {type: 'password', id: 'ai-key', autocomplete: 'off', spellcheck: 'false', maxlength: '4096'}));
-  const connection = el('details', {id: 'ai-connection', open: ''});
-  connection.append(el('summary', {}, '连接设置 · 提供方、模型与内存 Key'), aiGrid);
-  aiDetails.append(connection);
+  const key = aiField('API Key', el('input', {type: 'password', id: 'ai-key', autocomplete: 'off', spellcheck: 'false', maxlength: '4096'}));
+  const remember = el('input', {type: 'checkbox', id: 'ai-remember-key'});
+  const rememberLabel = el('label', {class: 'ai-checkbox'});
+  rememberLabel.append(remember, document.createTextNode('在此浏览器记住 Key（仅个人设备）'));
+  const rememberedStatus = el('p', {id: 'ai-remember-status', role: 'status'});
+  aiSettings.append(aiGrid, rememberLabel, el('p', {id: 'ai-storage-disclosure'}, '默认仅保存在当前页面内存。勾选并保存后，Key 以明文写入此浏览器同源 localStorage，同源脚本、XSS 或本机用户可读取；这不是安全密钥库，不要在共享设备使用。仅限同一浏览器与来源，无账号、云端或跨设备同步。刷新或重新打开仍须重新同意外部处理；只有主动发送才直接交给选定提供方，不上传到本站服务器，不进入草稿或导出。'), rememberedStatus);
   const consentLabel = el('label');
   const consent = el('input', {type: 'checkbox', id: 'ai-consent'});
-  consentLabel.append(consent, document.createTextNode('我同意向上述接口发送规划上下文并承担 API 费用（每次打开页面重新选择）。'));
-  aiDetails.append(consentLabel);
+  consentLabel.append(consent, document.createTextNode('我同意向所选服务方发送规划上下文并承担费用。'));
+  aiSettings.append(aiDisclosure, destination, consentLabel);
   const aiBar = el('div', {class: 'toolbar'});
-  aiBar.append(button('保存非秘密设置', () => {
-    try {
-      const next = readConfig();
-      if (configBlocked && !confirm('原设置无法读取。确认用当前非秘密设置替换？')) return;
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(next)); config = next; configBlocked = false; say('只保存了提供方、接口与模型 ID。Key 和同意状态未保存。');
-    } catch { say('设置无效或浏览器无法保存。原设置未更改。'); }
-  }, {id: 'save-ai-preferences'}), button('忘记内存 Key', () => { key.value = ''; aiSettingsChanged(); say('本页 Key 已清空。'); }, {id: 'forget-key'}));
+  const settingsBar = el('div', {class: 'toolbar'});
+  settingsBar.append(button('保存全局设置', saveAISettings, {id: 'save-ai-preferences', class: 'primary'}), button('忘记 Key', forgetKey, {id: 'forget-key'}));
   const legacyNotice = el('div', {id: 'legacy-settings', class: 'notice', hidden: ''});
   legacyNotice.append(el('p', {}, '检测到旧版 blm-ai-config 设置。新版不会读取其中的 Key，也不会自动使用或迁移。你可以显式删除旧设置。'), button('清除旧版 AI 设置', () => {
     if (!confirm('确认只删除 blm-ai-config 旧版 AI 设置？')) return;
     try { localStorage.removeItem('blm-ai-config'); legacyNotice.hidden = true; say('旧版 AI 设置已删除。'); } catch { say('浏览器不允许删除本地设置。'); }
   }, {id: 'clear-legacy-settings'}));
-  const targetLabel = el('p', {id: 'ai-target', class: 'small'}, '当前目标：规划讨论（不会写入字段）');
-  aiBar.append(button('仅讨论，不写入字段', () => chooseAITarget(null), {id: 'ai-discussion'}));
-  const questionLabel = el('label', {for: 'ai-question'}, '补充问题（可选）');
-  const question = el('textarea', {id: 'ai-question', maxlength: '8000', placeholder: '例如：这些战略目标与关键任务之间有哪些缺口？'});
-  const aiSend = button('发送问题与规划上下文', () => runAI(null), {id: 'ai-send', class: 'primary'});
-  const aiCancel = button('取消请求', () => { aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true; aiAnswer = ''; aiApply.hidden = true; aiResult.textContent = '已停止等待。已发送内容无法撤回，提供方仍可能处理或计费。'; say('已停止等待 AI 回复；草稿未更改。'); }, {id: 'ai-cancel', disabled: ''});
+  const targetBlock = el('section', {class: 'ai-target-block', 'aria-label': '写作目标'});
+  const targetLabel = el('p', {id: 'ai-target'});
+  const targetSelectLabel = el('label', {for: 'ai-target-select'}, '当前步骤 · 写作目标');
+  const targetSelect = el('select', {id: 'ai-target-select'});
+  const aiSnapshot = el('details', {id: 'ai-snapshot'});
+  const snapshotTitle = el('summary');
+  const snapshotContent = el('div', {id: 'ai-snapshot-content', class: 'ai-snapshot-content', tabindex: '0', role: 'region', 'aria-label': '已有内容，只读'});
+  aiSnapshot.append(snapshotTitle, snapshotContent);
+  aiBar.append(button('规划讨论', () => chooseAITarget(null), {id: 'ai-discussion', 'aria-pressed': 'false'}));
+  targetBlock.append(targetSelectLabel, targetSelect, aiBar, targetLabel, aiSnapshot);
+  targetSelect.addEventListener('change', () => {
+    const step = steps[currentStep], field = step.fields.find(f => `${step.id}-${f.name}` === targetSelect.value);
+    chooseAITarget(field ? {step, field, id: targetSelect.value} : null);
+  });
+  const composer = el('section', {class: 'ai-composer', 'aria-label': '写作要求'});
+  const actionBar = el('div', {class: 'ai-shortcuts', role: 'group', 'aria-label': '写作动作'});
+  const actionButtons = writingActions.map(action => button(action.label, () => {
+    if (aiAction === action.id) return;
+    resetAIResult(); aiAction = action.id; rememberComposer(); updateComposer();
+  }, {'data-ai-action': action.id, 'aria-pressed': 'false'}));
+  actionBar.append(...actionButtons);
+  const questionLabel = el('label', {for: 'ai-question'}, '补充要求（可选）');
+  const question = el('textarea', {id: 'ai-question', maxlength: '8000', rows: '3'});
+  question.addEventListener('input', rememberComposer);
+  let composing = false;
+  question.addEventListener('compositionstart', () => { composing = true; });
+  question.addEventListener('compositionend', () => { composing = false; });
+  question.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && !composing && event.keyCode !== 229) {
+      event.preventDefault(); runAI();
+    }
+  });
+  const aiSend = button('生成建议', () => runAI(), {id: 'ai-send', class: 'primary'});
+  const aiCancel = button('取消生成', () => {
+    resetAIResult('已停止等待；已发送内容无法撤回，草稿未更改。');
+  }, {id: 'ai-cancel', disabled: '', hidden: ''});
   const aiResult = el('div', {id: 'ai-result', class: 'rich-content ai-result', 'aria-live': 'polite'});
   const aiMessage = el('p', {id: 'ai-message', role: 'status', 'aria-live': 'polite'});
   const aiApply = button('采用到目标字段', () => applyAI(), {id: 'ai-apply', hidden: ''});
-  const sendBar = el('div', {class: 'toolbar'}); sendBar.append(aiSend, aiCancel);
-  connection.append(aiBar, legacyNotice);
-  aiDetails.append(targetLabel, questionLabel, question, sendBar, aiMessage, aiResult, aiApply);
-  host.append(aiDetails);
-  let controller = null, aiAnswer = '', aiTarget = null;
-  let aiOpener = null;
-  function openAI(settings = false) {
+  const resultCard = el('section', {class: 'ai-result-card', 'aria-labelledby': 'ai-result-heading', 'data-state': 'empty'});
+  resultCard.append(el('h3', {id: 'ai-result-heading'}, '建议预览'), aiResult, aiApply);
+  const sendBar = el('div', {class: 'ai-sendbar'});
+  sendBar.append(el('span', {class: 'ai-keyboard-hint'}, 'Ctrl / ⌘ + Enter 生成 · Enter 换行'), aiSend, aiCancel);
+  composer.append(actionBar, questionLabel, question, sendBar, aiMessage);
+  const settingsMessage = el('p', {id: 'ai-settings-message', role: 'status', 'aria-live': 'polite'});
+  aiSettings.append(settingsBar, legacyNotice, settingsMessage);
+  aiScroll.append(aiSetup, targetBlock, composer, resultCard); aiDetails.append(aiScroll);
+  host.append(aiDetails, aiSettings);
+  let controller = null, aiAnswer = '', aiTarget = null, aiAction = 'draft', aiMemoryKey = null;
+  const composerMemory = new Map();
+  let aiOpener = null, settingsOpener = null, returnToAI = false;
+  function openAI() {
     aiOpener = document.activeElement;
-    connection.open = settings || !key.value;
     aiMessage.textContent = '';
     if (!aiDetails.open) aiDetails.showModal();
-    aiDetails.scrollTop = 0;
-    (settings ? provider : $('#ai-heading')).focus();
+    aiScroll.scrollTop = 0;
+    (configureAIButton.hidden ? question : configureAIButton).focus();
   }
   function closeAI() { if (pending) aiCancel.click(); aiDetails.close(); }
+  function openGlobalAI() {
+    returnToAI = aiDetails.open;
+    settingsOpener = document.activeElement;
+    if (returnToAI) closeAI();
+    aiSettings.showModal(); aiSettings.scrollTop = 0; $('#ai-settings-heading').focus();
+  }
+  function closeGlobalAI() {
+    aiSettings.close();
+    if (returnToAI && matchMedia('(min-width: 1024px)').matches) {
+      aiDetails.showModal(); (configureAIButton.hidden ? question : configureAIButton).focus();
+    } else if (matchMedia('(min-width: 1024px)').matches) {
+      let focus = settingsOpener?.isConnected ? settingsOpener : globalAIButton;
+      const disclosure = focus?.closest('.disclosure-menu');
+      if (disclosure && !disclosure.open) focus = disclosure.querySelector('summary');
+      focus?.focus({preventScroll: true});
+    }
+    returnToAI = false;
+  }
   aiDetails.addEventListener('cancel', event => { event.preventDefault(); closeAI(); });
-  aiDetails.addEventListener('keydown', event => {
+  aiSettings.addEventListener('cancel', event => { event.preventDefault(); closeGlobalAI(); });
+  for (const dialog of [aiDetails, aiSettings]) dialog.addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;
-    const controls = [...aiDetails.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]')]
+    const controls = [...dialog.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]')]
       .filter(node => node.tabIndex >= 0 && !node.disabled && node.getClientRects().length);
     const first = controls[0], last = controls.at(-1);
     if (!first) { event.preventDefault(); return; }
@@ -162,19 +230,72 @@ function buildWorkspace() {
     }
   });
   aiDetails.addEventListener('close', () => {
+    if (aiSettings.open || aiDetails.open) return;
     if (pending) aiCancel.click();
     let focus = aiOpener?.isConnected ? aiOpener : $('#step-heading');
     const disclosure = focus?.closest('.disclosure-menu');
     if (disclosure && !disclosure.open) focus = disclosure.querySelector('summary');
-    focus?.focus({preventScroll: true});
+    if (matchMedia('(min-width: 1024px)').matches) focus?.focus({preventScroll: true});
   });
-  matchMedia('(min-width: 1024px)').addEventListener('change', event => { if (!event.matches && aiDetails.open) closeAI(); });
-  function say(text) { message.textContent = text; if (aiDetails.open) aiMessage.textContent = text; }
+  matchMedia('(min-width: 1024px)').addEventListener('change', event => {
+    if (!event.matches) { if (aiSettings.open) closeGlobalAI(); if (aiDetails.open) closeAI(); }
+  });
+  function say(text) { message.textContent = text; if (aiDetails.open) aiMessage.textContent = text; if (aiSettings.open) settingsMessage.textContent = text; }
 
+  function rememberComposer() { if (aiMemoryKey) composerMemory.set(aiMemoryKey, {question: question.value, action: aiAction}); }
+  function clearComposer(step = null) {
+    if (step) {
+      for (const id of composerMemory.keys()) if (id.startsWith(`${step.id}-`) || id === `discussion:${step.id}`) composerMemory.delete(id);
+    } else composerMemory.clear();
+    aiMemoryKey = null; aiTarget = null; aiAction = 'draft'; question.value = '';
+    resetAIResult();
+  }
+  function updatePending() {
+    aiSend.disabled = pending; aiSend.textContent = pending ? '生成中…' : aiTarget ? '生成建议' : '开始讨论';
+    aiCancel.hidden = !pending; aiCancel.disabled = !pending;
+    aiResult.setAttribute('aria-busy', String(pending));
+  }
+  function resetAIResult(text = '生成后在这里预览，核验后再决定是否采用。') {
+    aiEpoch++; controller?.abort(); pending = false; aiAnswer = ''; aiApply.hidden = true;
+    resultCard.dataset.state = 'empty'; aiResult.textContent = text; aiMessage.textContent = ''; updatePending();
+  }
+  function updateComposer() {
+    actionBar.hidden = !aiTarget;
+    actionButtons.forEach((node, i) => node.setAttribute('aria-pressed', String(writingActions[i].id === aiAction)));
+    $('#ai-discussion').setAttribute('aria-pressed', String(!aiTarget));
+    question.placeholder = writingPlaceholder(aiTarget); updatePending();
+  }
+  function renderAISnapshot() {
+    snapshotContent.replaceChildren();
+    targetLabel.textContent = aiTarget ? `${aiTarget.step.title} / ${aiTarget.field.name}` : '规划讨论 · 仅供参考，不写入字段';
+    aiSnapshot.hidden = !aiTarget;
+    if (!aiTarget) return;
+    const value = formData[aiTarget.id];
+    snapshotTitle.textContent = hasContent(value) ? '已有内容 · 只读' : '已有内容 · 尚未填写';
+    if (aiTarget.field.type === 'table') {
+      const table = el('table'), head = el('tr');
+      aiTarget.field.columns.forEach(column => head.append(el('th', {scope: 'col'}, column)));
+      const thead = el('thead'); thead.append(head); table.append(thead);
+      const tbody = el('tbody');
+      for (const row of value || []) { const tr = el('tr'); row.forEach(cell => tr.append(el('td', {}, cell))); tbody.append(tr); }
+      table.append(tbody); snapshotContent.append(table);
+      if (!hasContent(value)) snapshotContent.append(el('p', {}, '表格尚未填写。'));
+    } else snapshotContent.append(el('pre', {}, value || '此字段尚未填写。'));
+    aiSnapshot.open = JSON.stringify(value || '').length < 350;
+  }
   function chooseAITarget(target) {
-    aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true;
-    aiTarget = target; aiAnswer = ''; aiApply.hidden = true; aiResult.replaceChildren();
-    targetLabel.textContent = target ? `当前目标：${target.step.title} / ${target.field.name}（建议需确认后采用）` : '当前目标：规划讨论（不会写入字段）';
+    // Keep only the user's supplemental text and chosen action, in page memory.
+    rememberComposer();
+    resetAIResult(); aiTarget = target;
+    aiMemoryKey = target?.id || `discussion:${steps[currentStep].id}`;
+    const step = steps[currentStep]; targetSelect.replaceChildren();
+    step.fields.forEach(field => targetSelect.append(el('option', {value: `${step.id}-${field.name}`}, field.name)));
+    targetSelect.append(el('option', {value: 'discussion'}, '规划讨论'));
+    targetSelect.value = target?.id || 'discussion';
+    const saved = composerMemory.get(aiMemoryKey);
+    question.value = saved?.question ?? '';
+    aiAction = saved?.action ?? defaultWritingAction(target ? formData[target.id] : '');
+    renderAISnapshot(); updateComposer();
   }
   function snapshot() { return {formData: clone(formData), metadata: clone(metadata)}; }
   function pushHistory(editKey = '') {
@@ -231,16 +352,88 @@ function buildWorkspace() {
       // Deliberately detect only presence. Never parse or reuse persisted legacy secrets.
       legacyNotice.hidden = localStorage.getItem('blm-ai-config') === null;
       const raw = localStorage.getItem(CONFIG_KEY);
-      if (raw !== null) config = normalizeConfig(raw);
+      if (raw !== null) config = canonicalConfig(raw);
     } catch { configBlocked = true; say('非秘密 AI 设置无法读取，已保留原件；AI 默认关闭。'); }
     writeConfig();
+    try {
+      const raw = localStorage.getItem(REMEMBERED_KEY);
+      if (raw !== null) {
+        if (configBlocked) throw new Error('Invalid config');
+        credential = restoreRemembered(raw, config); key.value = credential.key;
+        remembered = true; remember.checked = true;
+      }
+    } catch { say('记忆 Key 无法读取、格式异常或与配置不符，未使用；原记录未导出或覆盖。可重新输入，或用“忘记 Key”删除。'); }
+    consent.checked = false; updateAIStatus();
   }
   function writeConfig() { provider.value = config.provider; endpoint.value = config.endpoint; model.value = config.model; }
-  function readConfig() { return normalizeConfig({provider: provider.value, endpoint: endpoint.value.trim(), model: model.value.trim()}); }
-  function aiSettingsChanged() { consent.checked = false; aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true; }
-  provider.addEventListener('change', () => { config = {provider: provider.value, ...PROVIDERS[provider.value]}; writeConfig(); aiSettingsChanged(); });
-  endpoint.addEventListener('input', aiSettingsChanged); model.addEventListener('input', aiSettingsChanged); key.addEventListener('input', aiSettingsChanged);
-  consent.addEventListener('change', () => { if (!consent.checked) aiSettingsChanged(); });
+  function readConfig() { return canonicalConfig({provider: provider.value, endpoint: endpoint.value.trim(), model: model.value.trim()}); }
+  function updateAIStatus() {
+    const configured = !configDirty && matchesDestination(credential, config) && !!config.model && consent.checked;
+    globalAIButton.textContent = `AI 设置 · ${configured ? '已配置' : '未配置'}`;
+    sharedStatus.textContent = configured ? '' : '请先完成全局设置。';
+    sharedStatus.hidden = configured; configureAIButton.hidden = configured; aiSetup.hidden = configured;
+    // Recipient and consent are shown only in global settings.
+    try { destination.textContent = `内容接收方：${new URL(endpoint.value).hostname}`; }
+    catch { destination.textContent = '请填写服务地址以确认内容接收方。'; }
+    rememberedStatus.textContent = remembered ? '已在此浏览器记住 Key（明文）。' : '当前未启用已确认的浏览器记忆；本页可使用内存 Key。';
+  }
+  function invalidateAI() {
+    consent.checked = false; resetAIResult();
+  }
+  function editAISettings(destinationChanged = false) {
+    invalidateAI(); configDirty = true; credential = null; remembered = false;
+    if (destinationChanged) { key.value = ''; remember.checked = false; }
+    updateAIStatus();
+  }
+  function saveAISettings() {
+    let next, nextCredential;
+    try {
+      next = readConfig();
+      const entered = key.value.trim();
+      if (entered) nextCredential = rememberedRecord(entered, next);
+      else if (remember.checked) throw new Error('Missing key');
+    } catch { say('设置无效：请检查公共 HTTPS 接口、模型 ID 和 Key；原存储未更改。'); return; }
+    if (configBlocked && !confirm('原设置无法读取。确认用当前全局设置替换？')) return;
+    const approved = consent.checked;
+    invalidateAI(); consent.checked = approved;
+    config = next; credential = nextCredential ?? null; configDirty = false; remembered = false; writeConfig();
+    // Remove the old secret first. If any write fails, keep only the explicitly applied
+    // in-memory credential and report the uncertain/failed persistence without echoing it.
+    let removed = false;
+    try {
+      localStorage.removeItem(REMEMBERED_KEY); removed = true;
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); configBlocked = false;
+      if (remember.checked) { localStorage.setItem(REMEMBERED_KEY, JSON.stringify(credential)); remembered = true; }
+      say(remembered ? '全局设置已保存；此浏览器已明文记住 Key。' : '全局设置已应用，非秘密配置已保存；浏览器记忆 Key 已移除，Key 仅在本页内存。');
+    } catch {
+      say(removed ? '本页已应用设置，但浏览器保存失败；未记住 Key。当前可用内存 Key，草稿仍可手工导出。' : '本页已应用设置，但浏览器拒绝删除旧记忆 Key；未确认已忘记，刷新可能恢复旧记录。请在浏览器设置中检查。');
+    }
+    if (!remembered) remember.checked = false;
+    updateAIStatus();
+  }
+  function dropCredential() {
+    key.value = ''; credential = null; remembered = false; remember.checked = false;
+    invalidateAI(); updateAIStatus();
+  }
+  function forgetKey() {
+    dropCredential();
+    try { localStorage.removeItem(REMEMBERED_KEY); say('本页与此浏览器记忆 Key 已清除。'); }
+    catch { say('本页 Key 已清空，但浏览器拒绝删除记忆 Key；未确认已忘记，刷新可能恢复旧记录。请在浏览器设置中检查。'); }
+  }
+  provider.addEventListener('change', () => {
+    endpoint.value = PROVIDERS[provider.value].endpoint; model.value = PROVIDERS[provider.value].model; editAISettings(true);
+  });
+  endpoint.addEventListener('input', () => editAISettings(true));
+  model.addEventListener('input', () => editAISettings()); key.addEventListener('input', () => editAISettings());
+  remember.addEventListener('change', () => editAISettings());
+  consent.addEventListener('change', () => { if (!consent.checked) invalidateAI(); updateAIStatus(); });
+  window.addEventListener('storage', event => {
+    if (event.key !== null && ![REMEMBERED_KEY, CONFIG_KEY].includes(event.key)) return;
+    // Never import another tab's credentials or silently change their destination.
+    dropCredential(); configDirty = true; updateAIStatus();
+    say('另一标签页更改或清除了全局 AI 存储。本页 Key、同意与旧回复已失效；请重新输入并保存全局设置。');
+  });
+  window.addEventListener('pageshow', event => { if (event.persisted) invalidateAI(); });
   function updateProgress() {
     const count = steps.filter(s => s.fields.some(f => hasContent(formData[`${s.id}-${f.name}`]))).length;
     projectName.textContent = formData['company-info-企业名称']?.trim() || '未命名规划';
@@ -270,6 +463,7 @@ function buildWorkspace() {
       if (step.id === 'strategy-validation') { delete metadata.validationReport; delete formData['strategy-validation-completed']; }
       if (step.id === 'revision') delete formData['revision-completed'];
       reportEntries = []; returnPoint = null;
+      clearComposer(step);
       save(); renderStep();
     }, {id: 'reset-step'}));
     const reportTools = el('div', {class: 'toolbar report-tools'});
@@ -304,7 +498,7 @@ function buildWorkspace() {
     const example = el('details', {id: 'writing-example'}); example.append(el('summary', {}, '查看填写示例'));
     example.append(el('p', {}, currentStep === 0 ? '示例（虚构，仅供参考）：某制造服务企业，为中小工厂提供设备监测服务。当前处于业务验证阶段，需要补充客户续费数据。' : `示例（虚构，仅供参考）：围绕“${step.title}”，记录已知事实、证据来源和仍需核实的问题。`));
     context.append(tips, example); hints.append(context);
-    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, 'AI 辅助（可选）'), el('p', {}, '自备 Key，按需启用，辅助生成内容建议。'), button('AI 辅助（可选）', () => { chooseAITarget(null); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
+    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, '一起写好这一步'), el('p', {}, '从待补充的字段开始，也可切换到规划讨论。'), button('AI 帮写当前步骤', () => { chooseAITarget(defaultAITarget(step, formData)); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
   }
   function renderMissing() {
     const current = missingFields(steps, formData);
@@ -346,8 +540,8 @@ function buildWorkspace() {
     const head = el('div', {class: 'field-heading'}), label = el('h3');
     label.append(el('label', {for: id}, field.name));
     if (field.type === 'table') label.firstChild.removeAttribute('for');
-    const actions = menu('AI / 导入', `actions-${id}`); actions.classList.add('field-actions');
-    actions.lastElementChild.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); openAI(); question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; say('请核对 AI 设置、外部处理同意与上下文，然后主动发送。'); }, {'data-ai-field': id}));
+    const actions = el('div', {class: 'field-actions', id: `actions-${id}`});
+    actions.append(button('AI 帮写', () => { chooseAITarget({id, field, step}); openAI(); }, {'data-ai-field': id, 'aria-haspopup': 'dialog'}));
     if (field.type !== 'table') {
       const file = el('input', {type: 'file', accept: '.txt,.md,text/plain,text/markdown', hidden: '', 'aria-label': `导入${field.name}文本`});
       file.addEventListener('change', async () => {
@@ -360,7 +554,7 @@ function buildWorkspace() {
         } catch { say('仅支持限长的 UTF-8 文本或 Markdown 文件；不支持 .docx。原字段未更改。'); }
         finally { file.value = ''; }
       });
-      actions.lastElementChild.append(button('导入文本', () => file.click()), file);
+      actions.append(button('导入文本', () => file.click()), file);
     }
     head.append(label, actions); box.append(head);
     if (field.type === 'table') {
@@ -427,6 +621,7 @@ function buildWorkspace() {
       // Persist first. A rejected/oversized/quota-failed import never changes either draft or storage.
       localStorage.setItem(DRAFT_KEY, serialized);
       pushHistory(); ({formData, metadata} = next); reportEntries = []; returnPoint = null;
+      clearComposer();
       renderStep(); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
     } catch { say('导入失败：仅支持有效、限长的规划 JSON（扁平或分步格式）。原草稿与存储未更改；不支持 .docx。'); }
     finally { importInput.value = ''; }
@@ -474,31 +669,37 @@ function buildWorkspace() {
     } catch { say('无法导出：草稿超出支持范围。请缩短字段，或导出恢复副本。'); }
   }
   function clearLocal() {
-    if (!confirm('确认删除本工具在本机的草稿、旧版项目、旧版 AI 设置与非秘密偏好？此操作不会清除其他应用数据。请先导出备份。')) return;
+    if (!confirm('确认删除本工具在本机的草稿、记忆 Key、旧版项目、旧版 AI 设置与非秘密偏好？此操作不会清除其他应用数据。请先导出备份。')) return;
+    dropCredential();
+    let failed = false;
+    for (const k of TOOL_KEYS) { try { localStorage.removeItem(k); } catch { failed = true; } }
+    if (failed) { say('清除未完成：本页 Key 已清空，但本地记录（包括记忆 Key）未确认全部删除；请使用浏览器设置检查。'); return; }
     try {
-      for (const k of TOOL_KEYS) localStorage.removeItem(k);
-      aiEpoch++; controller?.abort(); key.value = ''; consent.checked = false; aiAnswer = ''; aiTarget = null; targetLabel.textContent = '当前目标：规划讨论（不会写入字段）'; aiResult.replaceChildren(); aiApply.hidden = true; question.value = ''; pending = false; aiSend.disabled = false; aiCancel.disabled = true;
+      key.value = ''; consent.checked = false; resetAIResult(); composerMemory.clear(); aiMemoryKey = null; aiTarget = null; targetSelect.replaceChildren(); question.value = '';
       formData = {}; metadata = {}; currentStep = 0; undo = []; redo = []; returnPoint = null; reportEntries = []; recovery.clear(); storageBlocked = false; configBlocked = false; recoveryBox.hidden = true; legacyNotice.hidden = true;
-      config = {provider: 'deepseek', ...PROVIDERS.deepseek}; writeConfig(); renderStep(); updateHistory(); status.textContent = '本工具本地数据已清除；下次编辑才会重新保存。'; say('已清除本工具数据。');
+      config = {provider: 'deepseek', ...PROVIDERS.deepseek}; configDirty = false; writeConfig(); updateAIStatus(); renderStep(); updateHistory(); status.textContent = '本工具本地数据已清除；下次编辑才会重新保存。'; say('已清除本工具数据（包括记忆 Key）。');
     } catch { say('清除未完成：浏览器拒绝存储操作，请使用浏览器设置检查；未清除其他应用数据。'); }
   }
-  async function runAI(target) {
+  async function runAI() {
     if (pending) return;
     let settings;
     try {
-      settings = readConfig(); validateEndpoint(settings.endpoint);
-      if (!settings.model || !key.value.trim() || !consent.checked) { say('请填写模型 ID、内存 Key，并明确同意外部处理后再发送。'); return; }
+      settings = config;
+      if (configDirty || !settings.model || !matchesDestination(credential, settings) || !validKey(credential?.key)) { say('请先完成全局设置。'); return; }
+      if (!consent.checked) { say('请先完成全局设置。'); return; }
+      validateEndpoint(settings.endpoint);
+      const requestKey = credential.key;
       // Limit the aggregate context and prompt before any network request.
       const context = JSON.stringify(structuredExport(formData, metadata));
-      if (context.length + question.value.length > 180000) { say('规划上下文过长，请缩短后发送。'); return; }
-      if (target) aiTarget = target;
+      const messages = writingMessages({target: aiTarget, action: aiAction, context, question: question.value});
+      if (messages.reduce((size, item) => size + item.content.length, 0) > 180000) { say('规划上下文过长，请缩短后发送。'); return; }
       const epoch = ++aiEpoch;
       controller = new AbortController(); const requestController = controller; const timer = setTimeout(() => requestController.abort(), 60000);
-      pending = true; aiSend.disabled = true; aiCancel.disabled = false; aiApply.hidden = true; aiAnswer = ''; aiResult.textContent = '请求中；可以取消。';
+      pending = true; updatePending(); aiApply.hidden = true; aiAnswer = ''; aiMessage.textContent = ''; resultCard.dataset.state = 'loading'; aiResult.textContent = '正在整理建议…';
       try {
-        const response = await fetch(settings.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key.value.trim()}`}, body: JSON.stringify({model: settings.model, stream: false, messages: [{role: 'system', content: '你是战略规划辅助顾问。区分事实、假设和缺证；不得声称已验证业务结论。只返回 Markdown 文本。若要求表格 JSON 则仅返回二维字符串数组。'}, {role: 'user', content: `规划上下文：\n${context}\n\n目标：${aiTarget ? aiTarget.step.title + ' / ' + aiTarget.field.name : '规划讨论'}\n问题：${question.value}`}]}), signal: requestController.signal});
+        const response = await fetch(settings.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${requestKey}`}, body: JSON.stringify({model: settings.model, stream: false, messages}), signal: requestController.signal});
         if (epoch !== aiEpoch) return;
-        if (!response.ok) { aiResult.textContent = `AI 请求失败（HTTP ${response.status}）。请检查授权、余额、限额与模型 ID；未展示提供方原始响应。`; return; }
+        if (!response.ok) { resultCard.dataset.state = 'error'; aiResult.textContent = `生成失败（HTTP ${response.status}）。请稍后重试或去全局设置。`; return; }
         // Bound streamed response bytes before parsing to avoid unbounded provider output.
         const reader = response.body.getReader(), decoder = new TextDecoder(); let raw = '', bytes = 0;
         while (true) {
@@ -508,26 +709,31 @@ function buildWorkspace() {
         }
         raw += decoder.decode(); const data = parseBoundedJSON(raw);
         const content = data?.choices?.[0]?.message?.content;
-        if (typeof content !== 'string' || content.length > LIMITS.text) throw new Error('response-format');
+        if (typeof content !== 'string' || !content.trim() || content.length > LIMITS.text) throw new Error('response-format');
         if (epoch !== aiEpoch) return;
-        aiAnswer = key.value ? content.replaceAll(key.value.trim(), '[Key 已隐藏]') : content; aiResult.innerHTML = renderMarkdown(aiAnswer); aiApply.hidden = !aiTarget;
-        say(aiTarget ? `AI 建议已返回。核验后可主动采用到“${aiTarget.field.name}”；不会自动改写草稿。` : 'AI 回复仅供参考，请自行核验。');
+        aiAnswer = content.replaceAll(requestKey, '[Key 已隐藏]'); aiResult.innerHTML = renderMarkdown(aiAnswer); resultCard.dataset.state = 'success'; aiApply.hidden = !canApplyWriting(aiTarget, aiAction);
+        say(canApplyWriting(aiTarget, aiAction) ? `建议已返回，核验后可采用到“${aiTarget.field.name}”。` : '以下建议供人工核验，不写入字段。');
       } catch {
-        if (epoch === aiEpoch) aiResult.textContent = '请求未完成：网络、CORS、超时、取消或接口格式不兼容。未展示原始响应；草稿未更改。';
+        if (epoch === aiEpoch) { resultCard.dataset.state = 'error'; aiResult.textContent = '生成未完成：网络、CORS、超时或接口格式不兼容。请重试；草稿未更改。'; }
       } finally {
         clearTimeout(timer);
-        if (epoch === aiEpoch) { pending = false; aiSend.disabled = false; aiCancel.disabled = true; }
+        if (epoch === aiEpoch) { pending = false; updatePending(); }
       }
-    } catch { say('AI 设置无效。请检查公共 HTTPS 接口和模型；草稿未更改。'); }
+    } catch { say('请先完成全局设置。'); }
   }
   function applyAI() {
-    if (!aiTarget || !aiAnswer) return;
+    if (!canApplyWriting(aiTarget, aiAction) || !aiAnswer || pending) return;
     try {
       const {id, field} = aiTarget; let value = aiAnswer;
       if (field.type === 'table') value = parseBoundedJSON(value.replace(/^```(?:json)?\s*|\s*```$/g, ''));
       normalizeImport({...formData, [id]: value});
       if (!confirm(`确认将 AI 建议写入“${field.name}”？请先核验，原内容可撤销。`)) return;
-      if (commitField(id, value, '')) { renderStep(); say('已采用建议，请继续人工核验。'); }
+      if (commitField(id, value, '')) {
+        const scrollTop = body.scrollTop;
+        renderStep(); body.scrollTop = scrollTop;
+        aiOpener = body.querySelector(`[data-field="${CSS.escape(id)}"] [data-ai-field]`);
+        renderAISnapshot(); aiApply.hidden = true; say('已采用建议，可关闭后撤销；请继续人工核验。');
+      }
     } catch { say('AI 内容不符合字段或表格结构，未改写草稿。'); }
   }
   load(); host.hidden = false; document.body.classList.add('workspace-ready'); renderStep(); updateHistory();

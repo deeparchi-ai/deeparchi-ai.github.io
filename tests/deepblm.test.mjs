@@ -3,12 +3,78 @@ import test from 'node:test';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {steps, LIMITS, normalizeImport, structuredExport, normalizeReport, normalizeConfig, validateEndpoint, TOOL_KEYS, parseBoundedJSON} from '../assets/deepblm-data.mjs';
+import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from '../assets/deepblm-credentials.mjs';
+import {writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages, writingInstructions} from '../assets/deepblm-ui.mjs';
 const read = name => readFile(new URL(`../${name}`, import.meta.url), 'utf8');
 const allFields = Object.fromEntries(steps.flatMap(s => s.fields.map(f => [`${s.id}-${f.name}`, f.type === 'table' ? [f.columns.map((c, i) => `虚构验收 ${c} ${i}`), f.columns.map(() => '')] : `虚构验收：${s.title} / ${f.name}\n**保留内容**`])));
 allFields['strategy-validation-completed'] = 'true';
 allFields['revision-completed'] = false;
 const snapshot = Object.fromEntries(steps.map(s => [s.id, {title: s.title, description: s.description, fields: Object.fromEntries(s.fields.map(f => [f.name, f.type === 'table' ? {type: 'table', columns: f.columns, data: allFields[`${s.id}-${f.name}`]} : {type: f.type, value: allFields[`${s.id}-${f.name}`]}]))}]));
 const metadata = {validationReport: {content: '虚构校验报告 <img src=x onerror=alert(1)>', savedAt: 1, stepData: snapshot}};
+
+test('writing defaults use actual content and only current-step fields; review never applies', () => {
+  assert.deepEqual(writingActions.map(a => a.label), ['起草内容', '完善表达', '检查缺漏']);
+  for (const step of steps) {
+    assert.equal(defaultAITarget(step, {}).field, step.fields[0]);
+    assert.equal(defaultAITarget(step, allFields).field, step.fields[0]);
+    for (const field of step.fields) {
+      const id = `${step.id}-${field.name}`;
+      const data = {...allFields, [id]: field.type === 'table' ? [field.columns.map(() => ' ')] : ' '};
+      const target = defaultAITarget(step, data);
+      assert.equal(target.id, id);
+      assert.equal(defaultWritingAction(data[id]), 'draft');
+      assert.equal(defaultWritingAction(allFields[id]), 'improve');
+      assert.match(writingPlaceholder(target), new RegExp(field.name));
+      assert.equal(canApplyWriting(target, 'draft'), true);
+      assert.equal(canApplyWriting(target, 'improve'), true);
+      assert.equal(canApplyWriting(target, 'inspect'), false);
+      assert.equal(canApplyWriting(target, 'unknown'), false);
+    }
+  }
+  for (const action of writingActions) assert.equal(canApplyWriting(null, action.id), false);
+});
+
+test('blank supplemental input still produces schema-aware tasks with faithful source content and explicit unknowns', () => {
+  for (const step of steps) for (const field of step.fields) {
+    const id = `${step.id}-${field.name}`, target = {id, field, step};
+    for (const {id: action} of writingActions) {
+      const messages = writingMessages({target, action, context: 'explicit-fixture-context\n' + JSON.stringify({[id]: allFields[id]}), question: '  '});
+      assert.deepEqual(messages.map(m => m.role), ['system', 'user']);
+      assert.match(messages[0].content, /不得编造企业名称/);
+      assert.match(messages[0].content, /假设必须标明/);
+      const prompt = messages[1].content;
+      assert.ok(prompt.includes(`${step.title} / ${field.name}`));
+      assert.ok(prompt.includes(step.description));
+      assert.ok(prompt.includes(field.placeholder || field.columns?.join('、') || field.name));
+      assert.ok(prompt.includes(JSON.stringify(allFields[id])));
+      assert.ok(prompt.includes('explicit-fixture-context'));
+      assert.match(prompt, /无；请按上述任务与字段指引处理/);
+      if (action === 'inspect') {
+        assert.match(prompt, /问题清单，不改写字段/);
+        assert.doesNotMatch(prompt, /只返回 JSON/);
+      } else if (field.type === 'table') {
+        assert.ok(prompt.includes(`每行恰好 ${field.columns.length} 列`));
+        assert.match(prompt, /JSON 二维字符串数组，不含表头/);
+        assert.ok(prompt.includes(field.columns.join('、')));
+      } else assert.ok(prompt.includes(`最多 ${field.maxlength ?? LIMITS.text} 字符`));
+    }
+  }
+  const target = defaultAITarget(steps[0], {});
+  const prompt = writingMessages({target, action: 'draft', context: '{}', question: '虚构补充要求：简洁'});
+  assert.ok(prompt[1].content.endsWith('虚构补充要求：简洁'));
+  assert.ok(prompt[1].content.includes(`见规划上下文中的字段 ${target.id}；缺省即未填写。`));
+  assert.match(writingInstructions(null, 'draft'), /不生成用于覆盖字段的内容/);
+  assert.throws(() => writingInstructions(target, 'unknown'));
+});
+
+test('legal long fields are sent once without consuming the context budget twice', () => {
+  const step = steps.find(s => s.id === 'revision'), field = step.fields[0];
+  const id = `${step.id}-${field.name}`, value = 'x'.repeat(95000);
+  const context = JSON.stringify(structuredExport(normalizeImport({[id]: value}).formData, {}));
+  const messages = writingMessages({target: {id, field, step}, action: 'improve', context, question: ''});
+  assert.ok(messages.reduce((sum, m) => sum + m.content.length, 0) < 180000);
+  assert.equal(messages[1].content.split(value).length - 1, 1);
+});
 
 test('both flat and structured exports retain every field in all 15 steps, table cells, flags and report snapshots', () => {
   assert.equal(steps.length, 15);
@@ -49,13 +115,41 @@ test('company short-field limit is retained in both import formats', () => {
   assert.throws(() => normalizeImport(exported));
 });
 
-test('only nonsecret provider configuration persists; custom endpoints reject credentials and local/private literals', () => {
+test('preferences accept only nonsecret configuration; endpoints reject credentials and local/private literals', () => {
   const config = {provider: 'custom', endpoint: 'https://api.fixture-provider.example.org/v1/chat/completions', model: 'fixture-model-not-live'};
   assert.deepEqual(normalizeConfig(JSON.stringify(config)), config);
   for (const secret of ['apiKey', 'key', 'token', '__proto__']) assert.throws(() => normalizeConfig(JSON.parse(`{"provider":"custom","endpoint":"","model":"x","${secret}":"fixture-only"}`)));
   for (const url of ['http://api.fixture-provider.example.org', 'https://user:fixture@example.org', 'https://localhost', 'https://localhost.', 'https://api.local.', 'https://127.0.0.1', 'https://10.1.2.3', 'https://169.254.169.254', 'https://2130706433', 'https://[::1]', 'https://[::ffff:127.0.0.1]', 'https://api.local', 'https://api.internal', 'https://api.localhost', 'https://api.localdomain', 'https://api.home.arpa', 'https://127.0.0.1.nip.io', 'https://api.lvh.me', 'https://api.fixture-provider.example.org/?key=fixture', 'https://api.fixture-provider.example.org/#fragment', 'https://api.fixture-provider.example.org:8443']) assert.throws(() => validateEndpoint(url), url);
   assert.equal(validateEndpoint(config.endpoint), config.endpoint);
   assert.ok(!TOOL_KEYS.some(k => k.startsWith('da-')));
+});
+
+test('remembered credentials require explicit versioned opt-in, strict bounded shape and exact canonical destination', () => {
+  const config = {provider: 'custom', endpoint: 'https://api.fixture-provider.example.org/v1/chat/completions', model: 'fixture-only'};
+  const key = 'fixture-only-not-real';
+  const record = rememberedRecord(key, config);
+  assert.deepEqual(restoreRemembered(JSON.stringify(record), config), record);
+  assert.deepEqual(canonicalConfig({...config, endpoint: config.endpoint + '/'}), config);
+  assert.equal(matchesDestination(record, {...config, model: 'another-fixture-model'}), true);
+  assert.equal(matchesDestination(record, {...config, provider: 'openai'}), false);
+  assert.equal(matchesDestination(record, {...config, endpoint: config.endpoint + '/other'}), false);
+  assert.ok(TOOL_KEYS.includes(REMEMBERED_KEY));
+  for (const value of ['', ' ', 'a\nb', 'a\rb', 'x'.repeat(4097), null, 1]) assert.equal(validKey(value), false);
+  for (const value of [null, [], {}, {...record, version: 2}, {...record, remembered: false}, {...record, remembered: 'true'},
+    {...record, key: ''}, {...record, key: 'x'.repeat(4097)}, {...record, key: 'a\nb'}, {...record, key: {}},
+    {...record, endpoint: config.endpoint + '/'}, {...record, provider: 'openai'}, {...record, endpoint: config.endpoint + '/other'},
+    {...record, endpoint: 'https://localhost'}, {...record, consent: true}, {...record, extra: 'rejected'}, {apiKey: key}]) {
+    assert.throws(() => restoreRemembered(JSON.stringify(value), config));
+  }
+  for (const raw of ['{broken', ' '.repeat(32769), JSON.stringify(record).replace('"version":1', '"__proto__":{},"version":1')]) {
+    assert.throws(() => restoreRemembered(raw, config));
+  }
+  // HTML-like fixture secrets remain data. Even a valid credential cannot enter draft formats.
+  const htmlRecord = rememberedRecord('<img/src=x/onerror=alert(1)>', config);
+  assert.equal(restoreRemembered(JSON.stringify(htmlRecord), config).key, htmlRecord.key);
+  assert.throws(() => normalizeImport(record));
+  assert.throws(() => normalizeConfig(record));
+  assert.doesNotMatch(JSON.stringify(structuredExport({})), /fixture-only-not-real|remembered-key/);
 });
 
 test('pinned local vendor assets match every manifest hash and byte count', async () => {
@@ -89,9 +183,17 @@ test('public entry remains native and mobile loader has no storage, AI UI, analy
 
 test('workspace groups retain every step exactly once; completeness follows actual text and table values', async () => {
   const {groups, groupFor, missingFields, simpleField} = await import('../assets/deepblm-ui.mjs');
-  assert.deepEqual(groups.map(g => g.name), ['现状与洞察', '战略选择', '执行与保障', '检查与修订']);
+  assert.deepEqual(groups.map(g => g.name), ['现状与差距', '战略选择', '战略执行', '领导力与价值观', '检查与修订']);
+  assert.deepEqual(groups.map(g => g.end - g.start), [2, 4, 5, 2, 2]);
   assert.deepEqual(groups.flatMap(g => steps.slice(g.start, g.end).map(s => s.id)), steps.map(s => s.id));
-  assert.equal(groupFor(12), '执行与保障');
+  assert.equal(groupFor(1), '现状与差距');
+  assert.equal(groupFor(2), '战略选择');
+  assert.equal(groupFor(5), '战略选择');
+  assert.equal(groupFor(6), '战略执行');
+  assert.equal(groupFor(10), '战略执行');
+  assert.equal(groupFor(11), '领导力与价值观');
+  assert.equal(groupFor(12), '领导力与价值观');
+  assert.equal(groups[3].note, '贯穿战略与执行');
   assert.equal(groupFor(13), '检查与修订');
   assert.equal(steps[0].fields.filter(f => simpleField(steps[0], f)).length, 4);
   const empty = missingFields(steps, {});

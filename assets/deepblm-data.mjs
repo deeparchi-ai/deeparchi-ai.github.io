@@ -4,7 +4,7 @@ export const LIMITS = Object.freeze({bytes: 4 * 1024 * 1024, text: 100000, cell:
 export const DRAFT_KEY = 'deepblm-draft-v1';
 export const STEP_KEY = 'deepblm-step-v1';
 export const CONFIG_KEY = 'deepblm-preferences-v1';
-export const TOOL_KEYS = [DRAFT_KEY, STEP_KEY, CONFIG_KEY, 'blm-strategy-data', 'blm-strategy-step', 'blm-validation-report', 'blm-ai-config', 'blm-ai-tasks', 'blm-welcome-dismissed', 'blm-ai-agent-position'];
+export const TOOL_KEYS = ['deepblm-remembered-key-v1', DRAFT_KEY, STEP_KEY, CONFIG_KEY, 'blm-strategy-data', 'blm-strategy-step', 'blm-validation-report', 'blm-ai-config', 'blm-ai-tasks', 'blm-welcome-dismissed', 'blm-ai-agent-position'];
 const fields = new Map(steps.flatMap(s => s.fields.map(f => [`${s.id}-${f.name}`, f])));
 const completion = ['strategy-validation-completed', 'revision-completed'];
 const own = (o, k) => Object.hasOwn(o, k);
