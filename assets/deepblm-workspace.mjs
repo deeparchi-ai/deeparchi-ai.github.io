@@ -269,6 +269,7 @@ function buildWorkspace() {
       pushHistory(); for (const f of step.fields) delete formData[`${step.id}-${f.name}`];
       if (step.id === 'strategy-validation') { delete metadata.validationReport; delete formData['strategy-validation-completed']; }
       if (step.id === 'revision') delete formData['revision-completed'];
+      reportEntries = []; returnPoint = null;
       save(); renderStep();
     }, {id: 'reset-step'}));
     const reportTools = el('div', {class: 'toolbar report-tools'});
@@ -425,7 +426,8 @@ function buildWorkspace() {
       if (!confirm('确认用所选 JSON 替换当前草稿？可在当前会话撤销。')) return;
       // Persist first. A rejected/oversized/quota-failed import never changes either draft or storage.
       localStorage.setItem(DRAFT_KEY, serialized);
-      pushHistory(); ({formData, metadata} = next); renderStep(); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
+      pushHistory(); ({formData, metadata} = next); reportEntries = []; returnPoint = null;
+      renderStep(); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
     } catch { say('导入失败：仅支持有效、限长的规划 JSON（扁平或分步格式）。原草稿与存储未更改；不支持 .docx。'); }
     finally { importInput.value = ''; }
   });

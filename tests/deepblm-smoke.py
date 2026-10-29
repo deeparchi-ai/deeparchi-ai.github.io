@@ -535,6 +535,53 @@ def check_storage(browser, base, directory):
     context.close()
 
 
+def check_review_sessions(browser, base, directory):
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    requests, errors, assets = watch(page, base)
+    page.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+    page.locator('[data-step="strategy-validation"]').click()
+    activate(page, '#basic-validation')
+    baseline = page.locator('[data-missing-field]').count()
+    incoming = Path(directory) / 'review-session-import.json'
+    incoming.write_text(json.dumps({f'company-info-{name}': '虚构导入值' for name in
+                                   ('企业名称', '主营业务', '行业描述', '企业规模', '企业现状')}, ensure_ascii=False))
+    # Import in a report must discard the previous draft's resolved-entry snapshot.
+    page.once('dialog', lambda dialog: dialog.accept())
+    chooser_import(page, incoming)
+    expect(page.locator('#tool-message')).to_contain_text('导入成功')
+    expect(page.locator('[data-missing-field]')).to_have_count(baseline - 5)
+    expect(page.locator('[data-missing-field^="company-info-"]')).to_have_count(0)
+    # A rejected import preserves the active review; successful replacement ends it.
+    page.locator('[data-missing-field="gap-机会差距"]').get_by_role('button', name='去补充').click()
+    page.once('dialog', lambda dialog: dialog.dismiss())
+    chooser_import(page, incoming)
+    expect(page.locator('#return-report')).to_be_visible()
+    page.once('dialog', lambda dialog: dialog.accept())
+    chooser_import(page, incoming)
+    expect(page.locator('#tool-message')).to_contain_text('导入成功')
+    expect(page.locator('#return-report')).to_have_count(0)
+    expect(page.locator('#return-report-footer')).to_have_count(0)
+    page.locator('[data-step="strategy-validation"]').click()
+    page.locator('[data-missing-field="gap-机会差距"]').get_by_role('button', name='去补充').click()
+    write_editor(page, 'gap-机会差距', '虚构会话补充')
+    page.locator('#return-report').click()
+    expect(page.locator('[data-missing-field="gap-机会差距"]')).to_have_attribute('data-resolved', 'true')
+    # Reset starts a fresh review, without resolved entries from before reset.
+    page.once('dialog', lambda dialog: dialog.accept())
+    activate(page, '#reset-step')
+    expect(page.locator('[data-missing-field="gap-机会差距"]')).to_have_count(0)
+    expect(page.locator('[data-missing-field]')).to_have_count(baseline - 6)
+    page.locator('[data-missing-field="gap-业绩差距"]').get_by_role('button', name='去补充').click()
+    page.once('dialog', lambda dialog: dialog.accept())
+    activate(page, '#reset-step')
+    expect(page.locator('#return-report')).to_have_count(0)
+    expect(page.locator('#return-report-footer')).to_have_count(0)
+    page.locator('[data-step="strategy-validation"]').click()
+    expect(page.locator('[data-missing-field]')).to_have_count(baseline - 5)
+    assert not errors and not assets, (errors, assets)
+    page.close()
+
+
 def check_save_failure(browser, base, directory):
     page = browser.new_page(viewport={'width': 1440, 'height': 1000})
     requests, errors, assets = watch(page, base)
@@ -580,6 +627,8 @@ if __name__ == '__main__':
                 print('PASS: 320/390/820 companion, no heavy vendor/Key/AI, native no-JS entry', flush=True)
                 check_desktop(browser, base, directory)
                 print('PASS: 15 steps, real editor/save/table/history, downloads/reimport, XSS, explicit fixture AI, 1024/1440', flush=True)
+                check_review_sessions(browser, base, directory)
+                print('PASS: import/reset start a fresh review; cancelled import preserves active review', flush=True)
                 check_save_failure(browser, base, directory)
                 print('PASS: quota failure stays truthful, memory export survives, failed import is atomic', flush=True)
                 check_storage(browser, base, directory)
