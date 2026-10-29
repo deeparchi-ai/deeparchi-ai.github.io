@@ -719,7 +719,7 @@ def check_layout(browser, base):
         long_result = '\n\n'.join(f'虚构建议第 {i} 条：数据待核实，需人工判断。' for i in range(1, 121))
         open_target(page, 'company-info-企业现状')
         generate(page, calls, reply, long_result)
-        for width, height in ((1440, 900), (1024, 768), (1440, 560)):
+        for width, height in ((1440, 900), (1024, 768), (1440, 560), (1024, 600)):
             page.set_viewport_size({'width': width, 'height': height})
             expect(page.locator('#ai-footer')).to_be_visible()
             footer = page.locator('#ai-footer').bounding_box()
@@ -741,6 +741,93 @@ def check_layout(browser, base):
             assert panel['y'] >= -1 and panel['y'] + panel['height'] <= height + 1
             screenshot(page, f'deep-ux-footer-{width}x{height}.png')
         page.locator('#close-ai').click()
+        assert_clean(errors, assets)
+    finally:
+        context.close()
+
+
+# ---------------------------------------------------------------- C. actual cross-tab draft and navigation events
+
+def check_cross_tab_context(browser, base):
+    context, page, requests, errors, assets = new_page(browser, base)
+    calls, reply = [], {'content': ''}
+    install_fixture(page, calls, reply)
+    try:
+        original_name = '虚构跨标签企业'
+        page.locator('#company-info-企业名称').fill(original_name)
+        configure(page)
+        other = context.new_page()
+        smoke.watch(other, base)
+        other.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
+        target = 'company-info-主营业务'
+        open_target(page, target)
+        generate(page, calls, reply, '虚构跨标签已完成建议')
+
+        async_frame = 'async () => {await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));}'
+        # Navigation and semantically identical saves must retain completed results and caches.
+        other.locator('[data-step="gap"]').click()
+        page.evaluate(async_frame)
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+        other.locator('#save-later').click()
+        other.evaluate("""key => {
+            const saved=JSON.parse(localStorage.getItem(key));
+            saved.created='fixture-serialization-time-only';
+            localStorage.setItem(key,JSON.stringify(saved,null,2));
+        }""", DRAFT)
+        page.evaluate(async_frame)
+        close_panel(page)
+        open_target(page, target)
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'success')
+        assert len(calls) == 1
+
+        # Keep a second, explicitly initiated fixture request unresolved while A changes tabs/data.
+        page.evaluate("""endpoint => {
+            window.__savedCrossFetch=window.fetch;
+            window.fetch=(url,options)=>{
+                if(String(url)!==endpoint)return window.__savedCrossFetch(url,options);
+                return new Promise(resolve=>{
+                    window.__crossRequest={resolve,aborted:false};
+                    options.signal.addEventListener('abort',()=>{window.__crossRequest.aborted=true;});
+                });
+            };
+        }""", ENDPOINT)
+        page.locator('#ai-send').click()
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'loading')
+        other.locator('[data-step="market-insight"]').click()
+        other.locator('#save-later').click()
+        page.evaluate(async_frame)
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'loading')
+        assert not page.evaluate('window.__crossRequest.aborted')
+
+        other.locator('[data-step="company-info"]').click()
+        other.locator('#company-info-企业名称').fill('虚构其他标签已改名')
+        expect(page.locator('#ai-message')).to_contain_text('另一标签页')
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'loading')
+        assert not page.evaluate('window.__crossRequest.aborted'), 'draft conflict must not wastefully abort the paid request'
+        expect(page.locator('#company-info-企业名称')).to_have_value(original_name)
+        text = '虚构已发起请求的回复：必须保留给用户查看，但不可采用。'
+        page.evaluate("""async content=>{
+            window.__crossRequest.resolve(new Response(JSON.stringify({choices:[{message:{content}}]}),
+                {status:200,headers:{'Content-Type':'application/json'}}));
+            await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+        }""", text)
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'stale')
+        expect(page.locator('#ai-result')).to_have_text(text)
+        expect(page.locator('#ai-copy')).to_be_visible()
+        expect(page.locator('#ai-apply')).not_to_be_visible()
+        other.locator('#company-info-企业名称').fill('虚构其他标签继续修改')
+        page.evaluate(async_frame)
+        expect(page.locator('.ai-result-card')).to_have_attribute('data-state', 'stale')
+        expect(page.locator('#ai-result')).to_have_text(text)
+        page.locator('[data-ai-view="edit"]').click()
+        expect(page.locator('#ai-draft-editor')).to_have_attribute('readonly', '')
+        page.locator('#ai-draft-editor').click()
+        page.keyboard.type('fixture cannot alter outdated output')
+        expect(page.locator('#ai-draft-editor')).to_have_value(text)
+        assert not page.evaluate('window.__crossRequest.aborted')
+        assert_not_adoptable(page, calls, target, 'cross-tab changed draft')
+        page.evaluate('() => {window.fetch=window.__savedCrossFetch;}')
+        assert len(calls) == 1
         assert_clean(errors, assets)
     finally:
         context.close()
@@ -962,7 +1049,9 @@ def main():
                 check_table_safety(browser, base)
                 print('PASS: table JSON guidance, malformed edit mutates nothing, valid edit replaces atomically and is undoable', flush=True)
                 check_layout(browser, base)
-                print('PASS: long result keeps sticky footer actions visible at 1440x900, 1024x768 and 1440x560', flush=True)
+                print('PASS: long result keeps sticky footer actions visible at 1440x900, 1024x768, 1440x560 and 1024x600', flush=True)
+                check_cross_tab_context(browser, base)
+                print('PASS: actual cross-tab navigation/identical saves retain work; changed drafts keep in-flight response read-only without aborting or permitting adoption', flush=True)
                 check_session_safety(browser, base, directory)
                 print('PASS: stale results never re-adoptable after edit/undo/config/consent/other-tab/reset/import; cancelled or late replies never revived; failed imports keep sessions', flush=True)
             finally:

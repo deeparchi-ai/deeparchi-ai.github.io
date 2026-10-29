@@ -254,12 +254,15 @@ def check_desktop(browser, base, directory):
     activate(page, '#undo')
     assert field_value(page, 'company-info-企业名称') == '虚构验收企业'
     # Every real step renders, including both report and revision editing.
+    field(page, 'company-info-企业名称').locator('input.simple-input').focus()
     for nav in page.locator('#step-nav button').all():
         nav.click()
         assert nav.get_attribute('aria-current') == 'step'
         expect(page.locator('#step-heading')).to_be_visible()
-        # Focus stays in the step region: heading on first entry, the remembered field on a revisit.
-        assert page.evaluate("document.querySelector('#step-content').contains(document.activeElement)")
+        if nav.get_attribute('data-step') == 'company-info':
+            expect(field(page, 'company-info-企业名称').locator('input.simple-input')).to_be_focused()
+        else:
+            expect(page.locator('#step-heading')).to_be_focused()
         no_overflow(page)
     page.locator('[data-step="gap"]').click()
     table = field(page, 'gap-业绩差距')
@@ -458,9 +461,26 @@ def check_desktop(browser, base, directory):
         expect(field(page, 'company-info-主营业务').locator('.simple-input')).to_be_visible()
         no_overflow(page); screenshot(page, f'workspace-{width}.png')
         if width == 1024:
+            # Seed a known real field/control for each revisit, independent of application memory.
+            expected_focus = {}
             for nav in page.locator('#step-nav button').all():
                 nav.click()
-                assert page.evaluate("document.querySelector('#step-content').contains(document.activeElement)")
+                first = page.locator('#step-content [data-field]').first
+                target_id = first.get_attribute('data-field')
+                if first.locator('.CodeMirror').count():
+                    first.locator('.CodeMirror').click()
+                    expected_focus[nav.get_attribute('data-step')] = (target_id, False)
+                else:
+                    control = first.locator('input:not([type="file"]), textarea').first
+                    control.click()
+                    expected_focus[nav.get_attribute('data-step')] = (target_id, control.get_attribute('data-row') is not None)
+            for nav in page.locator('#step-nav button').all():
+                nav.click()
+                expected_id, is_table = expected_focus[nav.get_attribute('data-step')]
+                actual_id = page.evaluate("document.activeElement.closest('[data-field]')?.dataset.field")
+                assert actual_id == expected_id, (expected_id, actual_id)
+                if is_table:
+                    assert page.evaluate("[document.activeElement.dataset.row, document.activeElement.dataset.column]") == ['0', '0']
                 no_overflow(page)
                 footer = page.locator('.step-pager').bounding_box()
                 assert footer['y'] + footer['height'] <= 1000

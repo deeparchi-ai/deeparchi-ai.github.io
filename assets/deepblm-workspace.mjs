@@ -218,7 +218,7 @@ function buildWorkspace() {
   const writingPane = el('div', {class: 'ai-writing'}); writingPane.append(aiSetup, targetBlock, composer);
   aiScroll.append(writingPane, resultCard); aiDetails.append(aiScroll, resultFooter);
   host.append(aiDetails, aiSettings);
-  let controller = null, aiAnswer = '', aiTarget = null, aiAction = 'draft', aiMemoryKey = null;
+  let controller = null, aiTarget = null, aiAction = 'draft', aiMemoryKey = null;
   const composerMemory = writingSessions();
   let activeResult = null, shownDraft = '', shownOriginal = '', shownKind = 'none';
   const viewMemory = new Map(), fieldMemory = new Map();
@@ -226,8 +226,8 @@ function buildWorkspace() {
   aiDraft.addEventListener('input', () => {
     const value = aiDraft.value;
     if (value.length > LIMITS.text) { aiDraft.value = shownDraft; aiMessage.textContent = `建议最多 ${LIMITS.text} 个字符。`; return; }
-    if (shownKind === 'none') return;
-    shownDraft = value; aiAnswer = value;
+    if (shownKind !== 'live') { aiDraft.value = shownDraft; return; }
+    shownDraft = value;
     if (shownKind === 'live' && activeResult) activeResult.draft = value;
     if (!previewPane.hidden) aiResult.innerHTML = renderMarkdown(value);
     draftHelp.textContent = draftHint();
@@ -320,7 +320,8 @@ function buildWorkspace() {
   function showResult() {
     if (!validResult()) return;
     shownDraft = activeResult.draft; shownOriginal = activeResult.original; shownKind = 'live';
-    aiDraft.value = shownDraft; aiAnswer = shownDraft; draftHelp.textContent = draftHint();
+    aiDraft.value = shownDraft; aiDraft.readOnly = false; draftHelp.textContent = draftHint();
+    reviewButtons[0].textContent = '编辑建议';
     reviewBar.hidden = false; copyButton.hidden = false; manualCopy.hidden = true;
     aiApply.hidden = !canApplyWriting(aiTarget, aiAction); aiApply.disabled = false;
     aiApply.textContent = aiTarget ? `采用到“${aiTarget.field.name}”` : '采用到目标字段';
@@ -329,14 +330,23 @@ function buildWorkspace() {
     nextEmpty.hidden = !nextMissingFieldId(steps[currentStep], formData, aiTarget?.id);
     showView('preview'); updatePending();
   }
-  // Outdated output stays readable but is never applicable again without an explicit regeneration.
+  // An outdated response remains available to read/copy, but can never be adopted.
+  function showOutdated(result, reason) {
+    shownDraft = result.draft; shownOriginal = result.original;
+    activeResult = null; shownKind = 'stale';
+    aiDraft.value = shownDraft; aiDraft.readOnly = true; draftHelp.textContent = draftHint();
+    reviewButtons[0].textContent = '查看建议';
+    reviewBar.hidden = false; copyButton.hidden = false; manualCopy.hidden = true;
+    aiApply.hidden = true; nextEmpty.hidden = true;
+    resultCard.dataset.state = 'stale'; adoptedStatus.textContent = '已过期 · 不可采用';
+    aiMessage.textContent = reason;
+    showView('preview'); updatePending();
+  }
   function markStale() {
+    if (shownKind === 'stale' && aiDetails.open) return;
     if (shownKind === 'live' && aiDetails.open) {
-      activeResult = null; shownKind = 'stale';
-      aiApply.hidden = true; nextEmpty.hidden = true;
-      resultCard.dataset.state = 'stale'; adoptedStatus.textContent = '已过期 · 不可采用';
-      aiMessage.textContent = '规划内容或全局设置已变化，这条建议已过期，只能查看或复制；需要时请重新生成。';
-      updatePending(); return;
+      showOutdated(activeResult, '规划内容或全局设置已变化，这条建议已过期，只能查看或复制；需要时请重新生成。');
+      return;
     }
     resetAIResult('规划内容已变化，请按需重新生成建议。');
   }
@@ -378,7 +388,8 @@ function buildWorkspace() {
     aiEpoch++; controller?.abort(); pending = false;
     activeResult = null; shownDraft = ''; shownOriginal = ''; shownKind = 'none';
     aiApply.hidden = true; aiApply.disabled = false; copyButton.hidden = true; nextEmpty.hidden = true;
-    adoptedStatus.textContent = ''; aiDraft.value = ''; draftHelp.textContent = '';
+    adoptedStatus.textContent = ''; aiDraft.value = ''; aiDraft.readOnly = false; draftHelp.textContent = '';
+    reviewButtons[0].textContent = '编辑建议';
     copyFallback.value = ''; manualCopy.hidden = true;
     reviewBar.hidden = true; editPane.hidden = true; originalPane.hidden = true; previewPane.hidden = false;
     delete resultCard.dataset.adopted;
@@ -559,7 +570,28 @@ function buildWorkspace() {
   remember.addEventListener('change', () => editAISettings());
   consent.addEventListener('change', () => { composerMemory.invalidate('connection'); resetAIResult(); updateAIStatus(); });
   window.addEventListener('storage', event => {
-    if ([DRAFT_KEY, STEP_KEY, 'blm-strategy-data', 'blm-validation-report'].includes(event.key)) { invalidatePlanning(); return; }
+    // Another tab's navigation is not a planning/context change.
+    if (event.key === STEP_KEY) return;
+    if ([DRAFT_KEY, 'blm-strategy-data', 'blm-validation-report'].includes(event.key)) {
+      if (event.key === DRAFT_KEY && event.newValue !== null) {
+        try {
+          const incoming = normalizeImport(event.newValue);
+          // Serialization time/key order/empty defaults alone do not change the planning content.
+          const incomingContext = JSON.stringify(structuredExport(incoming.formData, incoming.metadata, 'comparison'));
+          const localContext = JSON.stringify(structuredExport(formData, metadata, 'comparison'));
+          if (incomingContext === localContext) return;
+        } catch { /* Unreadable remote content is a conflict; never import or overwrite it here. */ }
+      }
+      composerMemory.invalidate();
+      if (pending) {
+        // Keep the explicit request alive; its response will be delivered read-only, not discarded.
+        say('另一标签页修改了规划；本页草稿未被覆盖。当前生成继续接收，但结果仅供查看或复制，不能采用。');
+      } else {
+        markStale();
+        say('另一标签页修改了规划；本页草稿未被覆盖，旧建议已失效。请先核对并备份本页内容。');
+      }
+      return;
+    }
     if (event.key !== null && ![REMEMBERED_KEY, CONFIG_KEY].includes(event.key)) return;
     // Never import another tab's credentials or silently change their destination.
     dropCredential(); configDirty = true; updateAIStatus();
@@ -916,7 +948,7 @@ function buildWorkspace() {
         : formData[aiTarget.id] || '') : '';
       const epoch = ++aiEpoch;
       controller = new AbortController(); const requestController = controller; const timer = setTimeout(() => requestController.abort(), 60000);
-      pending = true; updatePending(); aiApply.hidden = true; aiAnswer = ''; aiMessage.textContent = ''; resultCard.dataset.state = 'loading'; aiResult.textContent = '正在整理建议…';
+      pending = true; updatePending(); aiApply.hidden = true; aiMessage.textContent = ''; resultCard.dataset.state = 'loading'; aiResult.textContent = '正在整理建议…';
       try {
         const response = await fetch(settings.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${requestKey}`}, body: JSON.stringify({model: settings.model, stream: false, messages}), signal: requestController.signal});
         if (epoch !== aiEpoch) return;
@@ -935,7 +967,10 @@ function buildWorkspace() {
         // Bind the suggestion to this exact planning/connection revision and request target.
         activeResult = {state: 'success', target: requestTarget, action: requestAction, planning: revision.planning, connection: revision.connection, original, draft: content.replaceAll(requestKey, '[Key 已隐藏]')};
         shownKind = 'live';
-        if (!validResult()) { activeResult = null; shownKind = 'none'; return; }
+        if (!validResult()) {
+          showOutdated(activeResult, '生成期间另一标签页修改了规划；已收到本次建议，仅供查看或复制，不能采用。本页草稿未被覆盖，请先核对并备份。');
+          return;
+        }
         showResult(); rememberComposer();
         say(canApplyWriting(aiTarget, aiAction) ? `建议已返回，核验后可采用到“${aiTarget.field.name}”。` : '以下建议供人工核验，不写入字段。');
       } catch {
