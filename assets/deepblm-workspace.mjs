@@ -99,10 +99,11 @@ function buildWorkspace() {
   let returnPoint = null, reportEntries = [];
   const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading', 'aria-describedby': 'ai-disclosure'});
   aiDetails.append(button('关闭 AI 辅助', closeAI, {id: 'close-ai'}), el('h2', {id: 'ai-heading', tabindex: '-1'}, 'AI 辅助（可选）'));
-  aiDetails.append(el('p', {id: 'ai-disclosure'}, '发送时，当前规划全文、已有校验报告和你的问题（包含全部 15 步）会交给所选提供方或你填写的自定义 HTTPS 接口；对方会处理这些数据与 Key。API 费用由你的账户承担。请先确认授权范围，不要发送敏感资料。'), el('p', {}, '未使用真实凭据验证 CORS、模型兼容性或真实生成质量。打开页面或恢复设置不会请求模型。Key 不随草稿保存或导出，也不上传到本站服务器；只有你同意并主动发送后才直接交给所选提供方。'));
+  aiDetails.append(el('p', {id: 'ai-disclosure'}, '主动发送后，当前规划全文、已有校验报告和你的问题（包含全部 15 步）会交给所选服务方处理，费用由你的账户承担。请确认发送范围，不要发送敏感资料；建议需自行核验。'));
   const sharedStatus = el('p', {id: 'ai-config-status', class: 'small'});
   const destination = el('p', {id: 'ai-destination', class: 'small'});
-  aiDetails.append(sharedStatus, destination, button('打开全局 AI 设置', openGlobalAI, {id: 'ai-open-settings', 'aria-haspopup': 'dialog'}));
+  const configureAIButton = button('去全局设置', openGlobalAI, {id: 'ai-open-settings', 'aria-haspopup': 'dialog'});
+  aiDetails.append(sharedStatus, destination, configureAIButton);
   const aiSettings = el('dialog', {id: 'ai-settings', 'aria-modal': 'true', 'aria-labelledby': 'ai-settings-heading', 'aria-describedby': 'ai-storage-disclosure'});
   aiSettings.append(button('关闭全局设置', closeGlobalAI, {id: 'close-ai-settings'}), el('h2', {id: 'ai-settings-heading', tabindex: '-1'}, '全局 AI 设置'));
   aiSettings.append(el('p', {}, 'DeepBLM 工作台全部 15 步共用一份设置；导入或重置规划不影响它。仅支持 OpenAI 兼容 Chat Completions，请核对模型 ID、费用、权限与浏览器 CORS。保存设置不测试连接。'));
@@ -120,7 +121,7 @@ function buildWorkspace() {
   aiSettings.append(aiGrid, rememberLabel, el('p', {id: 'ai-storage-disclosure'}, '默认仅保存在当前页面内存。勾选并保存后，Key 以明文写入此浏览器同源 localStorage，同源脚本、XSS 或本机用户可读取；这不是安全密钥库，不要在共享设备使用。仅限同一浏览器与来源，无账号、云端或跨设备同步。刷新或重新打开仍须重新同意外部处理；只有主动发送才直接交给选定提供方，不上传到本站服务器，不进入草稿或导出。'), rememberedStatus);
   const consentLabel = el('label');
   const consent = el('input', {type: 'checkbox', id: 'ai-consent'});
-  consentLabel.append(consent, document.createTextNode('我同意向上述接口发送规划上下文并承担 API 费用（每次打开页面重新选择）。'));
+  consentLabel.append(consent, document.createTextNode('我同意向所选服务方发送规划上下文并承担费用。'));
   aiDetails.append(consentLabel);
   const aiBar = el('div', {class: 'toolbar'});
   const settingsBar = el('div', {class: 'toolbar'});
@@ -163,7 +164,7 @@ function buildWorkspace() {
   function closeGlobalAI() {
     aiSettings.close();
     if (returnToAI && matchMedia('(min-width: 1024px)').matches) {
-      aiDetails.showModal(); $('#ai-open-settings').focus();
+      aiDetails.showModal(); (configureAIButton.hidden ? question : configureAIButton).focus();
     } else if (matchMedia('(min-width: 1024px)').matches) {
       let focus = settingsOpener?.isConnected ? settingsOpener : globalAIButton;
       const disclosure = focus?.closest('.disclosure-menu');
@@ -277,9 +278,11 @@ function buildWorkspace() {
   function updateAIStatus() {
     const configured = !configDirty && matchesDestination(credential, config) && !!config.model;
     globalAIButton.textContent = `AI 设置 · ${configured ? '已配置' : '未配置'}`;
-    // Never echo endpoint, model or Key into status text.
-    sharedStatus.textContent = `${configured ? '已配置' : '未配置'} · 全部 15 步共用全局设置${configDirty ? '（有未保存修改）' : ''}。`;
-    destination.textContent = configured ? `发送目的地：${config.provider} · ${config.endpoint} · 模型 ${config.model}` : '发送前请打开全局设置，保存并核对提供方、接口和模型。';
+    sharedStatus.textContent = configured ? '' : '尚未配置 AI，请先完成全局设置。';
+    sharedStatus.hidden = configured; configureAIButton.hidden = configured;
+    // Disclose the recipient for consent, without repeating technical settings.
+    destination.textContent = configured ? `内容接收方：${new URL(config.endpoint).hostname}` : '';
+    destination.hidden = !configured;
     rememberedStatus.textContent = remembered ? '已在此浏览器记住 Key（明文）。' : '当前未启用已确认的浏览器记忆；本页可使用内存 Key。';
   }
   function invalidateAI() {
@@ -401,7 +404,7 @@ function buildWorkspace() {
     const example = el('details', {id: 'writing-example'}); example.append(el('summary', {}, '查看填写示例'));
     example.append(el('p', {}, currentStep === 0 ? '示例（虚构，仅供参考）：某制造服务企业，为中小工厂提供设备监测服务。当前处于业务验证阶段，需要补充客户续费数据。' : `示例（虚构，仅供参考）：围绕“${step.title}”，记录已知事实、证据来源和仍需核实的问题。`));
     context.append(tips, example); hints.append(context);
-    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, 'AI 辅助（可选）'), el('p', {}, '自备 Key，按需启用，辅助生成内容建议。'), button('AI 辅助（可选）', () => { chooseAITarget(null); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
+    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, 'AI 辅助（可选）'), el('p', {}, '围绕当前内容提供分析与建议。'), button('AI 辅助（可选）', () => { chooseAITarget(null); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
   }
   function renderMissing() {
     const current = missingFields(steps, formData);
@@ -444,7 +447,7 @@ function buildWorkspace() {
     label.append(el('label', {for: id}, field.name));
     if (field.type === 'table') label.firstChild.removeAttribute('for');
     const actions = menu('AI / 导入', `actions-${id}`); actions.classList.add('field-actions');
-    actions.lastElementChild.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); openAI(); question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; say('请核对 AI 设置、外部处理同意与上下文，然后主动发送。'); }, {'data-ai-field': id}));
+    actions.lastElementChild.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); openAI(); question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; }, {'data-ai-field': id}));
     if (field.type !== 'table') {
       const file = el('input', {type: 'file', accept: '.txt,.md,text/plain,text/markdown', hidden: '', 'aria-label': `导入${field.name}文本`});
       file.addEventListener('change', async () => {
@@ -586,8 +589,10 @@ function buildWorkspace() {
     if (pending) return;
     let settings;
     try {
-      settings = config; validateEndpoint(settings.endpoint);
-      if (configDirty || !settings.model || !matchesDestination(credential, settings) || !validKey(credential?.key) || !consent.checked) { say('请在全局设置中保存模型与 Key，并明确同意外部处理后再发送。'); return; }
+      settings = config;
+      if (configDirty || !settings.model || !matchesDestination(credential, settings) || !validKey(credential?.key)) { say('请先完成全局设置。'); return; }
+      if (!consent.checked) { say('请先确认发送范围，并勾选同意外部处理。'); return; }
+      validateEndpoint(settings.endpoint);
       const requestKey = credential.key;
       // Limit the aggregate context and prompt before any network request.
       const context = JSON.stringify(structuredExport(formData, metadata));

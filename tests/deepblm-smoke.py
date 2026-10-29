@@ -537,8 +537,10 @@ def check_global_ai(browser, base, directory):
         page.locator('#step-nav button').nth(i).click()
         activate(page, page.locator('[data-ai-field]').first)
         assert page.locator('#ai-panel #ai-key, #ai-panel #ai-provider, #ai-panel #ai-endpoint, #ai-panel #ai-model, #ai-panel #save-ai-preferences').count() == 0
-        expect(page.locator('#ai-config-status')).to_contain_text('已配置')
-        expect(page.locator('#ai-destination')).to_contain_text(ENDPOINT_FIXTURE)
+        expect(page.locator('#ai-config-status')).not_to_be_visible()
+        expect(page.locator('#ai-open-settings')).not_to_be_visible()
+        expect(page.locator('#ai-destination')).to_contain_text(urlsplit(ENDPOINT_FIXTURE).hostname)
+        assert not any(text in page.locator('#ai-panel').inner_text() for text in ('API', 'Key', '模型 ID', 'CORS', '全局设置'))
         if i == 0:
             page.locator('#ai-send').click()
             assert not calls
@@ -579,19 +581,22 @@ def check_global_ai(browser, base, directory):
     page.locator('#open-ai').click()
     assert not page.locator('#ai-consent').is_checked()
     page.locator('#ai-send').click(); assert len(calls) == 15
-    page.locator('#ai-open-settings').click()
+    expect(page.locator('#ai-message')).to_contain_text('勾选同意外部处理')
+    page.locator('#close-ai').click()
+    page.locator('#open-ai-settings').click()
     assert page.locator('#ai-key').input_value() == KEY_FIXTURE
     assert page.locator('#ai-provider').input_value() == 'custom'
     assert page.locator('#ai-remember-key').is_checked()
     page.locator('#close-ai-settings').click()
-    page.locator('#close-ai').click()
     # A new page in the same browser context restores the explicit record, never consent.
     other = context.new_page()
     other_requests, other_errors, other_assets = watch(other, base)
     other.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
     other.locator('#open-ai').click()
     assert not other.locator('#ai-consent').is_checked()
-    other.locator('#ai-open-settings').click()
+    expect(other.locator('#ai-open-settings')).not_to_be_visible()
+    other.locator('#close-ai').click()
+    other.locator('#open-ai-settings').click()
     assert other.locator('#ai-key').input_value() == KEY_FIXTURE
     assert not any(u == ENDPOINT_FIXTURE for u in other_requests)
     # A different tab changes only the saved endpoint, leaving a stale secret record.
@@ -639,7 +644,8 @@ def check_global_ai(browser, base, directory):
     page.locator('#ai-open-settings').click()
     configure_global(page)
     page.keyboard.press('Escape')
-    expect(page.locator('#ai-open-settings')).to_be_focused()
+    expect(page.locator('#ai-question')).to_be_focused()
+    expect(page.locator('#ai-open-settings')).not_to_be_visible()
     assert page.locator('#ai-target').inner_text() == target
     assert page.locator('#ai-question').input_value() == '虚构需要保留的问题'
     assert page.locator('dialog[open]').count() == 1
@@ -660,12 +666,14 @@ def check_global_ai(browser, base, directory):
     }''', ENDPOINT_FIXTURE)
     page.locator('#ai-send').click()
     expect(page.locator('#ai-cancel')).to_be_enabled()
-    page.locator('#ai-open-settings').click()
+    page.locator('#close-ai').click()
+    page.locator('#open-ai-settings').click()
     assert page.evaluate('window.__globalFixtureAborted === true')
     page.locator('#ai-endpoint').fill(ENDPOINT_FIXTURE + '/changed')
     assert page.locator('#ai-key').input_value() == ''
     page.locator('#save-ai-preferences').click()
     page.locator('#close-ai-settings').click()
+    activate(page, page.locator('[data-ai-field]').first)
     assert not page.locator('#ai-consent').is_checked()
     expect(page.locator('#ai-apply')).not_to_be_visible()
     expect(page.locator('#ai-result')).to_be_empty()
@@ -673,7 +681,7 @@ def check_global_ai(browser, base, directory):
     expect(page.locator('#ai-result')).not_to_contain_text('fixture-old-global-response')
     request_count = len(requests)
     page.locator('#ai-consent').check(); page.locator('#ai-send').click()
-    expect(page.locator('#ai-message')).to_contain_text('请在全局设置中保存')
+    expect(page.locator('#ai-message')).to_contain_text('请先完成全局设置')
     assert len(calls) == count and len(requests) == request_count
     page.locator('#ai-open-settings').click()
     page.locator('#ai-key').fill(KEY_FIXTURE)
@@ -685,7 +693,7 @@ def check_global_ai(browser, base, directory):
     assert not page.locator('#ai-consent').is_checked()
     expect(page.locator('#ai-apply')).not_to_be_visible()
     page.locator('#ai-consent').check(); page.locator('#ai-send').click()
-    expect(page.locator('#ai-message')).to_contain_text('请在全局设置中保存')
+    expect(page.locator('#ai-message')).to_contain_text('请先完成全局设置')
     assert len(calls) == count and len(requests) == request_count
     page.locator('#ai-open-settings').click()
     # Both dialogs close on mobile resize, without a hidden stacked modal.
