@@ -8,7 +8,7 @@ const [html, css, js, dev, privacy, catalogText, configText] = await Promise.all
 const catalog = JSON.parse(catalogText);
 
 test('short acquisition page has approved positioning and no personal branding', () => {
-  assert.match(html, /AI 原生服务 · 概念 Demo/);
+  assert.match(html, /AI 原生服务 · 专家专业判断/);
   assert.match(html, /让重要的专业服务，<br>更容易获得。/);
   assert.match(html, /为你，也为你的 Agent。/);
   assert.match(html, /href="#capabilities">查看服务 Demo/);
@@ -57,11 +57,12 @@ test('Chinese typography and responsive/reduced-motion contracts remain local', 
   assert.doesNotMatch(html+css, /https?:\/\/(?:fonts|cdn)|@import/);
 });
 
-test('homepage keeps four concise sections and discloses A2A details in a closed dialog', () => {
+test('homepage adds consulting before the concise demo sections and keeps A2A in a closed dialog', () => {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
-  // Conservative budget includes no-JS and disclosure copy as well as default content.
-  assert.ok([...main.replace(/<[^>]+>/g, '').matchAll(/\p{Script=Han}/gu)].length <= 749 * .65);
-  assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]), ['top','capabilities','integrate','contact']);
+  // Preserve the original copy budget outside the new, fully readable consulting section.
+  const conciseMain = main.replace(/<section\b[^>]*\bid="insight-services"[\s\S]*?<\/section>/, '');
+  assert.ok([...conciseMain.replace(/<[^>]+>/g, '').matchAll(/\p{Script=Han}/gu)].length <= 749 * .65);
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]), ['top','insight-services','capabilities','integrate','contact']);
   assert.doesNotMatch(main, /hero-copy|class="outcome"|预期交付|SERVICE EXPLORATIONS|ALSO HERE TO HELP|a2a-workspace/);
   const cards = [...main.matchAll(/<article class="product" id="([^"]+)"[^>]*>([\s\S]*?)<\/article>/g)];
   assert.equal(cards.length,4);

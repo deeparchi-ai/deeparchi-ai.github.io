@@ -1,24 +1,27 @@
 # DeepArchi 需求验证 Demo
 
-无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。围绕 IP 守护、Deep BLM、技术架构规划、Tech M&A 了解需求；Deep BLM 另提供桌面规划工具试用。无框架、外部字体、永久服务器或新增付费服务；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
+无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页新增技术与竞争洞察咨询服务；另围绕 IP 守护、Deep BLM、技术架构规划、Tech M&A 了解需求，Deep BLM 提供桌面规划工具试用。无框架、外部字体、永久服务器或新增付费服务；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
 
 ## 文件
 
-- `index.html`：短首页、四个产品卡、本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
+- `index.html`：首页、技术与竞争洞察服务、四个产品卡、本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
+- `assets/insight-services.css`：仅首页使用的洞察服务样式；三档服务、完整交付项与模式边界静态可读，适配 320/390/820/1440 宽度。
 - `assets/site.css`：共用视觉、移动导航、dialog 和减少动态效果设置。
 - `assets/site.mjs`：四个虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
 - `assets/signals.mjs`：纯配置/事件校验、RFC6068 草稿编码、默认拒绝的匿名事件适配器。
 - `service-catalog.json`：四项服务的同源机器目录；不是可运行的 Agent Card。
 - `analytics-config.json`：已配置经授权的 CloudBase HTTPS 接收端，`enabled=true`、`consent_required=true`；访客仍默认不发送，须逐页主动同意。
 - `developers.html` / `privacy.html`：能力边界、官方文档、公开仓库、浏览器数据行为与统计状态。
-- `tests/landing-page.test.mjs` / `tests/signals.test.mjs`：Node 内置离线测试；无外部包。
+- `tests/landing-page.test.mjs` / `tests/insight-services.test.mjs` / `tests/signals.test.mjs`：首页、洞察服务全文/交付/边界与统计的 Node 内置离线测试；无外部包。
 - `tests/visual-smoke.py`：使用既有 Playwright 的实际交互测试，保留原临时服务器生命周期与错误记录助手。
 - `scripts/check_site.py` / `tests/test_check_site.py`：原静态检查器与 9 项单元测试，未修改。
 - `.github/workflows/site-checks.yml`：仅将 Node 命令改为运行所有 `tests/*.test.mjs`，仍只检查、不发布。
 
 ## 概念边界
 
-所有服务均为“概念 Demo · 招募试点”，所有样例均为虚构场景与拟议交付结构。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立的次要入口，无需先购买咨询才能表达产品需求。
+首页 `#insight-services` 独立介绍技术与竞争洞察咨询服务，与下方四个概念方向及工具试用分开。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。共用咨询入口沿用 `consulting` / `support` 和通用需求草稿，不记录档位归属；静态邮箱在无 JS 时仍可使用。
+
+下方概念 Demo 样例均为虚构场景与拟议交付结构，Deep BLM 另提供规划工具试用。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
 
 A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录中 Deep BLM 为 `availability=web-trial`，其余为 `concept-demo`；全部保持 `production_ready=false`、`a2a.available=false`、`a2a.endpoint=null`。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
 
