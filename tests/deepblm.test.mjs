@@ -86,3 +86,22 @@ test('public entry remains native and mobile loader has no storage, AI UI, analy
   assert.match(entry, /script-src 'self'/);
   assert.doesNotMatch(entry, /unsafe-eval/);
 });
+
+test('workspace groups retain every step exactly once; completeness follows actual text and table values', async () => {
+  const {groups, groupFor, missingFields, simpleField} = await import('../assets/deepblm-ui.mjs');
+  assert.deepEqual(groups.map(g => g.name), ['现状与洞察', '战略选择', '执行与保障', '检查与修订']);
+  assert.deepEqual(groups.flatMap(g => steps.slice(g.start, g.end).map(s => s.id)), steps.map(s => s.id));
+  assert.equal(groupFor(12), '执行与保障');
+  assert.equal(groupFor(13), '检查与修订');
+  assert.equal(steps[0].fields.filter(f => simpleField(steps[0], f)).length, 4);
+  const empty = missingFields(steps, {});
+  assert.ok(empty.some(f => f.id === 'gap-业绩差距' && f.index === 1));
+  assert.ok(!empty.some(f => f.index > 12));
+  const values = {'company-info-企业名称': '   ', 'gap-业绩差距': [Array(5).fill(' ')]};
+  assert.equal(missingFields(steps, values).length, empty.length);
+  values['company-info-企业名称'] = '虚构验收';
+  values['gap-业绩差距'][0][2] = '现状依据待核实';
+  assert.equal(missingFields(steps, values).length, empty.length - 2);
+  values['company-info-企业名称'] = '';
+  assert.ok(missingFields(steps, values).some(f => f.id === 'company-info-企业名称'));
+});
