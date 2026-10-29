@@ -1,6 +1,7 @@
 import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, normalizeImport, structuredExport, normalizeReport, parseBoundedJSON, validateEndpoint} from './deepblm-data.mjs';
 import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from './deepblm-credentials.mjs';
-import {groups, groupFor, hasContent, missingFields, simpleField, purposes, wireMenu, writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages} from './deepblm-ui.mjs';
+import {groups, groupFor, hasContent, stepCompletion, nextMissingFieldId, missingFields, simpleField, purposes, wireMenu, writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages} from './deepblm-ui.mjs';
+import {writingSessions, resultEligible} from './deepblm-sessions.mjs';
 import {escapeHTML, renderMarkdown, sanitizeRichHTML} from './deepblm-security.mjs';
 const $ = selector => document.querySelector(selector);
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -88,7 +89,9 @@ function buildWorkspace() {
     if (group.note) section.append(el('p', {class: 'nav-group-note'}, group.note));
     steps.slice(group.start, group.end).forEach((step, offset) => {
       const i = group.start + offset;
-      const b = button(`${i + 1}. ${step.title}`, () => goToStep(i), {'data-step': step.id});
+      const b = button('', () => goToStep(i), {'data-step': step.id});
+      // The main title stays in .step-title; the trailing span carries real per-step completion.
+      b.append(el('span', {class: 'step-title'}, `${i + 1}. ${step.title}`), el('span', {class: 'step-completion'}));
       section.append(b); stepButtons.push(b);
     }); nav.append(section);
   }
@@ -174,20 +177,62 @@ function buildWorkspace() {
   const aiCancel = button('取消生成', () => {
     resetAIResult('已停止等待；已发送内容无法撤回，草稿未更改。');
   }, {id: 'ai-cancel', disabled: '', hidden: ''});
-  const aiResult = el('div', {id: 'ai-result', class: 'rich-content ai-result', 'aria-live': 'polite'});
+  const aiResult = el('div', {id: 'ai-result', class: 'rich-content ai-result', tabindex: '0', role: 'region', 'aria-label': '建议预览'});
   const aiMessage = el('p', {id: 'ai-message', role: 'status', 'aria-live': 'polite'});
-  const aiApply = button('采用到目标字段', () => applyAI(), {id: 'ai-apply', hidden: ''});
+  const aiApply = button('采用到目标字段', () => applyAI(), {id: 'ai-apply', class: 'primary', hidden: ''});
+  const viewModes = [['edit', '编辑建议'], ['preview', '预览'], ['compare', '原文对照']];
+  const reviewBar = el('div', {class: 'ai-review-bar', role: 'group', 'aria-label': '审阅方式', hidden: ''});
+  const reviewButtons = viewModes.map(([id, label]) => button(label, () => showView(id), {'data-ai-view': id, 'aria-pressed': 'false'}));
+  reviewBar.append(...reviewButtons);
+  const aiDraft = el('textarea', {id: 'ai-draft-editor', maxlength: String(LIMITS.text), rows: '12', 'aria-describedby': 'ai-draft-help'});
+  const draftHelp = el('p', {id: 'ai-draft-help', class: 'ai-help'});
+  const editPane = el('section', {id: 'ai-edit-pane', hidden: ''});
+  editPane.append(el('label', {for: 'ai-draft-editor'}, '编辑建议'), draftHelp, aiDraft);
+  const previewPane = el('div', {id: 'ai-preview-pane', hidden: ''}); previewPane.append(aiResult);
+  const originalPane = el('section', {id: 'ai-compare-pane', hidden: ''});
+  const originalText = el('pre', {id: 'ai-original', tabindex: '0', 'aria-label': '生成时的字段原文'});
+  const comparisonDraft = el('pre', {id: 'ai-compare-draft', tabindex: '0', 'aria-label': '当前建议编辑稿'});
+  const comparisonGrid = el('div', {class: 'ai-compare-grid'});
+  const originalColumn = el('section'), draftColumn = el('section');
+  originalColumn.append(el('h4', {}, '生成时原文 · 只读'), originalText);
+  draftColumn.append(el('h4', {}, '当前编辑稿'), comparisonDraft);
+  comparisonGrid.append(originalColumn, draftColumn);
+  originalPane.append(comparisonGrid,
+    el('p', {class: 'ai-help'}, '左右对照实际文本，不做语义差异判断；核验后采用右侧编辑稿。'));
+  const copyButton = button('复制建议', () => copySuggestion(), {id: 'ai-copy', hidden: ''});
+  const manualCopy = el('section', {id: 'ai-manual-copy', hidden: ''});
+  const copyFallback = el('textarea', {id: 'ai-copy-fallback', readonly: '', rows: '5', 'aria-label': '手动复制的建议文本'});
+  manualCopy.append(el('p', {class: 'ai-help'}, '自动复制不可用，请在这里选择并复制：'), copyFallback,
+    button('全选建议', () => { copyFallback.focus(); copyFallback.select(); }, {id: 'ai-select-copy'}));
+  const nextEmpty = button('下一项待补充', () => nextMissing(), {id: 'ai-next-empty', hidden: ''});
+  const adoptedStatus = el('span', {id: 'ai-adopted-status', class: 'ai-status', role: 'status'});
+  const resultFooter = el('footer', {id: 'ai-footer', class: 'ai-result-footer'});
+  resultFooter.append(adoptedStatus, aiApply, copyButton, nextEmpty, button('返回字段', () => returnToField(), {id: 'ai-return'}));
   const resultCard = el('section', {class: 'ai-result-card', 'aria-labelledby': 'ai-result-heading', 'data-state': 'empty'});
-  resultCard.append(el('h3', {id: 'ai-result-heading'}, '建议预览'), aiResult, aiApply);
+  resultCard.append(el('h3', {id: 'ai-result-heading'}, '审阅建议'), reviewBar, editPane, previewPane, originalPane, manualCopy);
   const sendBar = el('div', {class: 'ai-sendbar'});
   sendBar.append(el('span', {class: 'ai-keyboard-hint'}, 'Ctrl / ⌘ + Enter 生成 · Enter 换行'), aiSend, aiCancel);
   composer.append(actionBar, questionLabel, question, sendBar, aiMessage);
   const settingsMessage = el('p', {id: 'ai-settings-message', role: 'status', 'aria-live': 'polite'});
   aiSettings.append(settingsBar, legacyNotice, settingsMessage);
-  aiScroll.append(aiSetup, targetBlock, composer, resultCard); aiDetails.append(aiScroll);
+  const writingPane = el('div', {class: 'ai-writing'}); writingPane.append(aiSetup, targetBlock, composer);
+  aiScroll.append(writingPane, resultCard); aiDetails.append(aiScroll, resultFooter);
   host.append(aiDetails, aiSettings);
-  let controller = null, aiAnswer = '', aiTarget = null, aiAction = 'draft', aiMemoryKey = null;
-  const composerMemory = new Map();
+  let controller = null, aiTarget = null, aiAction = 'draft', aiMemoryKey = null;
+  const composerMemory = writingSessions();
+  let activeResult = null, shownDraft = '', shownOriginal = '', shownKind = 'none';
+  const viewMemory = new Map(), fieldMemory = new Map();
+  let renderedStep = null, pendingFieldFocus = null;
+  aiDraft.addEventListener('input', () => {
+    const value = aiDraft.value;
+    if (value.length > LIMITS.text) { aiDraft.value = shownDraft; aiMessage.textContent = `建议最多 ${LIMITS.text} 个字符。`; return; }
+    if (shownKind !== 'live') { aiDraft.value = shownDraft; return; }
+    shownDraft = value;
+    if (shownKind === 'live' && activeResult) activeResult.draft = value;
+    if (!previewPane.hidden) aiResult.innerHTML = renderMarkdown(value);
+    draftHelp.textContent = draftHint();
+    rememberComposer();
+  });
   let aiOpener = null, settingsOpener = null, returnToAI = false;
   function openAI() {
     aiOpener = document.activeElement;
@@ -196,7 +241,7 @@ function buildWorkspace() {
     aiScroll.scrollTop = 0;
     (configureAIButton.hidden ? question : configureAIButton).focus();
   }
-  function closeAI() { if (pending) aiCancel.click(); aiDetails.close(); }
+  function closeAI() { if (pending) aiCancel.click(); rememberComposer(); aiDetails.close(); }
   function openGlobalAI() {
     returnToAI = aiDetails.open;
     settingsOpener = document.activeElement;
@@ -232,6 +277,7 @@ function buildWorkspace() {
   aiDetails.addEventListener('close', () => {
     if (aiSettings.open || aiDetails.open) return;
     if (pending) aiCancel.click();
+    if (pendingFieldFocus) { const id = pendingFieldFocus; pendingFieldFocus = null; focusField(id); return; }
     let focus = aiOpener?.isConnected ? aiOpener : $('#step-heading');
     const disclosure = focus?.closest('.disclosure-menu');
     if (disclosure && !disclosure.open) focus = disclosure.querySelector('summary');
@@ -242,22 +288,113 @@ function buildWorkspace() {
   });
   function say(text) { message.textContent = text; if (aiDetails.open) aiMessage.textContent = text; if (aiSettings.open) settingsMessage.textContent = text; }
 
-  function rememberComposer() { if (aiMemoryKey) composerMemory.set(aiMemoryKey, {question: question.value, action: aiAction}); }
+  function validResult() { return shownKind === 'live' && resultEligible(activeResult, composerMemory.revision(), aiMemoryKey, aiAction); }
+  function rememberComposer() {
+    if (aiMemoryKey) composerMemory.set(aiMemoryKey, {question: question.value, action: aiAction, result: validResult() ? activeResult : null});
+  }
   function clearComposer(step = null) {
-    if (step) {
-      for (const id of composerMemory.keys()) if (id.startsWith(`${step.id}-`) || id === `discussion:${step.id}`) composerMemory.delete(id);
-    } else composerMemory.clear();
+    composerMemory.clear(step?.id);
     aiMemoryKey = null; aiTarget = null; aiAction = 'draft'; question.value = '';
     resetAIResult();
   }
+  // Planning or connection changes drop applicability; a visible result is marked outdated, never re-enabled.
+  function invalidatePlanning() { markStale(); composerMemory.invalidate(); }
+  function draftHint() {
+    const field = aiTarget?.field;
+    if (field?.type === 'table') return `编辑稿使用 JSON 二维字符串数组（不含表头），每行恰好 ${field.columns.length} 列，顺序：${field.columns.join('、')}；最多 ${LIMITS.rows} 行，每格 ${LIMITS.cell} 字符。采用前会校验结构并整体替换。`;
+    if (!aiTarget) return '这里是规划讨论文本，仅供参考，不会写入任何字段。';
+    if (shownKind === 'adopted') return '已采用到字段；这里保留的是采用时的文字，字段内容请在表单中撤销或修改。';
+    if (shownKind === 'stale') return '这条建议已过期，只能查看或复制；不能采用。';
+    return '可直接编辑；预览、复制和采用都使用这份编辑稿。';
+  }
+  function showView(id) {
+    if (shownKind === 'none') return;
+    editPane.hidden = id !== 'edit'; previewPane.hidden = id !== 'preview'; originalPane.hidden = id !== 'compare';
+    reviewButtons.forEach(node => node.setAttribute('aria-pressed', String(node.dataset.aiView === id)));
+    if (id === 'preview') aiResult.innerHTML = renderMarkdown(shownDraft);
+    if (id === 'compare') {
+      originalText.textContent = shownOriginal || '此字段在生成时尚未填写。';
+      comparisonDraft.textContent = shownDraft;
+    }
+  }
+  function showResult() {
+    if (!validResult()) return;
+    shownDraft = activeResult.draft; shownOriginal = activeResult.original; shownKind = 'live';
+    aiDraft.value = shownDraft; aiDraft.readOnly = false; draftHelp.textContent = draftHint();
+    reviewButtons[0].textContent = '编辑建议';
+    reviewBar.hidden = false; copyButton.hidden = false; manualCopy.hidden = true;
+    aiApply.hidden = !canApplyWriting(aiTarget, aiAction); aiApply.disabled = false;
+    aiApply.textContent = aiTarget ? `采用到“${aiTarget.field.name}”` : '采用到目标字段';
+    resultCard.dataset.state = 'success'; delete resultCard.dataset.adopted;
+    adoptedStatus.textContent = canApplyWriting(aiTarget, aiAction) ? '' : '仅供参考 · 不写入字段';
+    nextEmpty.hidden = !nextMissingFieldId(steps[currentStep], formData, aiTarget?.id);
+    showView('preview'); updatePending();
+  }
+  // An outdated response remains available to read/copy, but can never be adopted.
+  function showOutdated(result, reason) {
+    shownDraft = result.draft; shownOriginal = result.original;
+    activeResult = null; shownKind = 'stale';
+    aiDraft.value = shownDraft; aiDraft.readOnly = true; draftHelp.textContent = draftHint();
+    reviewButtons[0].textContent = '查看建议';
+    reviewBar.hidden = false; copyButton.hidden = false; manualCopy.hidden = true;
+    aiApply.hidden = true; nextEmpty.hidden = true;
+    resultCard.dataset.state = 'stale'; adoptedStatus.textContent = '已过期 · 不可采用';
+    aiMessage.textContent = reason;
+    showView('preview'); updatePending();
+  }
+  function markStale() {
+    if (shownKind === 'stale' && aiDetails.open) return;
+    if (shownKind === 'live' && aiDetails.open) {
+      showOutdated(activeResult, '规划内容或全局设置已变化，这条建议已过期，只能查看或复制；需要时请重新生成。');
+      return;
+    }
+    resetAIResult('规划内容已变化，请按需重新生成建议。');
+  }
+  async function copySuggestion() {
+    if (!shownDraft) return;
+    const text = shownDraft, epoch = aiEpoch, target = aiMemoryKey, kind = shownKind;
+    const stillCurrent = () => aiDetails.open && epoch === aiEpoch && target === aiMemoryKey && kind === shownKind;
+    manualCopy.hidden = true; copyFallback.value = '';
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('clipboard-unavailable');
+      await navigator.clipboard.writeText(text);
+      if (!stillCurrent()) return;
+      aiMessage.textContent = shownDraft === text ? '已复制当前编辑稿。' : '已复制点击时的版本；之后又编辑过，如需最新请再次复制。';
+    } catch {
+      if (!stillCurrent()) return;
+      // Truthful failure: expose a keyboard-selectable manual copy box instead of claiming success.
+      copyFallback.value = text; manualCopy.hidden = false;
+      aiMessage.textContent = '自动复制不可用；请在下方手动复制框中选择并复制。';
+      copyFallback.focus(); copyFallback.select();
+    }
+  }
+  function nextMissing() {
+    const id = nextMissingFieldId(steps[currentStep], formData, aiTarget?.id ?? fieldMemory.get(currentStep)?.id);
+    if (!id) { aiMessage.textContent = '这一步的字段都已填写；仍建议人工核验内容。'; return; }
+    pendingFieldFocus = id; closeAI();
+  }
+  function returnToField() {
+    if (!aiTarget?.id) { closeAI(); return; }
+    pendingFieldFocus = aiTarget.id; closeAI();
+  }
   function updatePending() {
-    aiSend.disabled = pending; aiSend.textContent = pending ? '生成中…' : aiTarget ? '生成建议' : '开始讨论';
+    aiSend.disabled = pending;
+    aiSend.textContent = pending ? '生成中…' : shownKind !== 'none' ? (aiTarget ? '重新生成建议' : '重新讨论') : aiTarget ? '生成建议' : '开始讨论';
+    aiSend.classList.toggle('primary', !pending && shownKind === 'none');
     aiCancel.hidden = !pending; aiCancel.disabled = !pending;
     aiResult.setAttribute('aria-busy', String(pending));
   }
-  function resetAIResult(text = '生成后在这里预览，核验后再决定是否采用。') {
-    aiEpoch++; controller?.abort(); pending = false; aiAnswer = ''; aiApply.hidden = true;
-    resultCard.dataset.state = 'empty'; aiResult.textContent = text; aiMessage.textContent = ''; updatePending();
+  function resetAIResult(text = '生成后在这里预览；可以编辑、对照原文，核验后再决定是否采用。') {
+    aiEpoch++; controller?.abort(); pending = false;
+    activeResult = null; shownDraft = ''; shownOriginal = ''; shownKind = 'none';
+    aiApply.hidden = true; aiApply.disabled = false; copyButton.hidden = true; nextEmpty.hidden = true;
+    adoptedStatus.textContent = ''; aiDraft.value = ''; aiDraft.readOnly = false; draftHelp.textContent = '';
+    reviewButtons[0].textContent = '编辑建议';
+    copyFallback.value = ''; manualCopy.hidden = true;
+    reviewBar.hidden = true; editPane.hidden = true; originalPane.hidden = true; previewPane.hidden = false;
+    delete resultCard.dataset.adopted;
+    aiResult.textContent = text;
+    resultCard.dataset.state = 'empty'; aiMessage.textContent = ''; updatePending();
   }
   function updateComposer() {
     actionBar.hidden = !aiTarget;
@@ -284,7 +421,7 @@ function buildWorkspace() {
     aiSnapshot.open = JSON.stringify(value || '').length < 350;
   }
   function chooseAITarget(target) {
-    // Keep only the user's supplemental text and chosen action, in page memory.
+    // Only the user's own text and, when still valid, the suggestion are kept in page memory.
     rememberComposer();
     resetAIResult(); aiTarget = target;
     aiMemoryKey = target?.id || `discussion:${steps[currentStep].id}`;
@@ -296,6 +433,10 @@ function buildWorkspace() {
     question.value = saved?.question ?? '';
     aiAction = saved?.action ?? defaultWritingAction(target ? formData[target.id] : '');
     renderAISnapshot(); updateComposer();
+    // Rehydrate only a result that still matches the current revision, target and action.
+    if (saved?.result && resultEligible(saved.result, composerMemory.revision(), aiMemoryKey, aiAction)) {
+      activeResult = saved.result; shownKind = 'live'; showResult();
+    }
   }
   function snapshot() { return {formData: clone(formData), metadata: clone(metadata)}; }
   function pushHistory(editKey = '') {
@@ -308,7 +449,7 @@ function buildWorkspace() {
     if (!from.length) return;
     to.push(snapshot()); const state = from.pop();
     formData = state.formData; metadata = state.metadata; lastEdit = {};
-    save(); renderStep(); updateHistory();
+    invalidatePlanning(); save(); renderStep(); updateHistory();
   }
   function commitField(id, value, editKey = id) {
     const f = steps.flatMap(s => s.fields.map(f => ({...f, id: `${s.id}-${f.name}`}))).find(f => f.id === id);
@@ -316,7 +457,8 @@ function buildWorkspace() {
     if (typeof value === 'string' && value.length > maxLength) { say(`此字段最多 ${maxLength} 个字符，请缩短内容。`); return false; }
     if (f?.type === 'table' && value.length > LIMITS.rows) { say(`每张表最多 ${LIMITS.rows} 行。`); return false; }
     try { normalizeImport({[id]: value}); } catch { say('字段或表格超出支持范围，已保留原内容。'); return false; }
-    pushHistory(editKey); formData[id] = value;
+    if (JSON.stringify(formData[id]) === JSON.stringify(value)) return true;
+    pushHistory(editKey); formData[id] = value; invalidatePlanning();
     if (id === 'strategy-validation-逻辑校验报告') { metadata.validationReport = {content: value, savedAt: Date.now()}; formData['strategy-validation-completed'] = value.trim() ? 'true' : 'false'; }
     if (id === 'revision-修改建议列表') formData['revision-completed'] = value.trim() ? 'true' : 'false';
     save(); updateProgress(); return true;
@@ -378,7 +520,7 @@ function buildWorkspace() {
     rememberedStatus.textContent = remembered ? '已在此浏览器记住 Key（明文）。' : '当前未启用已确认的浏览器记忆；本页可使用内存 Key。';
   }
   function invalidateAI() {
-    consent.checked = false; resetAIResult();
+    consent.checked = false; composerMemory.invalidate('connection'); resetAIResult();
   }
   function editAISettings(destinationChanged = false) {
     invalidateAI(); configDirty = true; credential = null; remembered = false;
@@ -426,8 +568,30 @@ function buildWorkspace() {
   endpoint.addEventListener('input', () => editAISettings(true));
   model.addEventListener('input', () => editAISettings()); key.addEventListener('input', () => editAISettings());
   remember.addEventListener('change', () => editAISettings());
-  consent.addEventListener('change', () => { if (!consent.checked) invalidateAI(); updateAIStatus(); });
+  consent.addEventListener('change', () => { composerMemory.invalidate('connection'); resetAIResult(); updateAIStatus(); });
   window.addEventListener('storage', event => {
+    // Another tab's navigation is not a planning/context change.
+    if (event.key === STEP_KEY) return;
+    if ([DRAFT_KEY, 'blm-strategy-data', 'blm-validation-report'].includes(event.key)) {
+      if (event.key === DRAFT_KEY && event.newValue !== null) {
+        try {
+          const incoming = normalizeImport(event.newValue);
+          // Serialization time/key order/empty defaults alone do not change the planning content.
+          const incomingContext = JSON.stringify(structuredExport(incoming.formData, incoming.metadata, 'comparison'));
+          const localContext = JSON.stringify(structuredExport(formData, metadata, 'comparison'));
+          if (incomingContext === localContext) return;
+        } catch { /* Unreadable remote content is a conflict; never import or overwrite it here. */ }
+      }
+      composerMemory.invalidate();
+      if (pending) {
+        // Keep the explicit request alive; its response will be delivered read-only, not discarded.
+        say('另一标签页修改了规划；本页草稿未被覆盖。当前生成继续接收，但结果仅供查看或复制，不能采用。');
+      } else {
+        markStale();
+        say('另一标签页修改了规划；本页草稿未被覆盖，旧建议已失效。请先核对并备份本页内容。');
+      }
+      return;
+    }
     if (event.key !== null && ![REMEMBERED_KEY, CONFIG_KEY].includes(event.key)) return;
     // Never import another tab's credentials or silently change their destination.
     dropCredential(); configDirty = true; updateAIStatus();
@@ -435,18 +599,84 @@ function buildWorkspace() {
   });
   window.addEventListener('pageshow', event => { if (event.persisted) invalidateAI(); });
   function updateProgress() {
-    const count = steps.filter(s => s.fields.some(f => hasContent(formData[`${s.id}-${f.name}`]))).length;
+    const counts = steps.map(step => stepCompletion(step, formData));
+    const count = counts.filter(c => c.filled).length;
     projectName.textContent = formData['company-info-企业名称']?.trim() || '未命名规划';
+    // Original top-level contract stays: N/15 steps have any content.
     progress.value = count; progressLabel.textContent = `${count} / 15 步已有内容`;
-    stepButtons.forEach((b, i) => { if (i === currentStep) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+    stepButtons.forEach((b, i) => {
+      if (i === currentStep) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+      const c = counts[i];
+      b.querySelector('.step-completion').textContent = `${c.label} · ${c.filled}/${c.total}`;
+    });
+    const c = counts[currentStep];
+    const label = `${c.filled}/${c.total} 项已填写 · 仅按非空内容统计`;
+    const current = $('#current-completion'); if (current) current.textContent = label;
+    const pagerCount = pager.querySelector('.field-count'); if (pagerCount) pagerCount.textContent = `${c.label} · ${label}`;
+    for (const jump of hints.querySelectorAll('[data-outline-field]')) {
+      const filled = hasContent(formData[jump.dataset.outlineField]);
+      const state = jump.parentElement.querySelector('.field-state');
+      if (state) state.textContent = filled ? '已填写' : '待补充';
+      jump.dataset.filled = String(filled);
+    }
+    const next = $('#next-missing-field'); if (next) next.disabled = !nextMissingFieldId(steps[currentStep], formData);
   }
-  function goToStep(index) {
-    currentStep = index;
+  function fieldBox(id) { return [...body.querySelectorAll('[data-field]')].find(node => node.dataset.field === id); }
+  function describeFocus(node) {
+    const box = node?.closest?.('[data-field]'); if (!box) return null;
+    const descriptor = {id: box.dataset.field};
+    const cm = box.querySelector('.CodeMirror')?.CodeMirror;
+    if (node.closest('.CodeMirror') && cm) {
+      const [selection] = cm.listSelections();
+      return {...descriptor, kind: 'editor', selection, editorScroll: cm.getScrollInfo().top};
+    }
+    if (node.matches('[data-ai-field]')) return {...descriptor, kind: 'ai'};
+    if (node.matches('[data-add-row]')) return {...descriptor, kind: 'add'};
+    if (node.matches('textarea[data-row]')) return {...descriptor, kind: 'cell', row: Number(node.dataset.row), column: Number(node.dataset.column), start: node.selectionStart, end: node.selectionEnd};
+    if (node.matches('input:not([type=file]), textarea')) return {...descriptor, kind: 'input', start: node.selectionStart, end: node.selectionEnd};
+    return descriptor;
+  }
+  body.addEventListener('focusin', event => {
+    const focus = describeFocus(event.target); if (focus) fieldMemory.set(currentStep, focus);
+  });
+  function captureView() {
+    if (renderedStep === null) return;
+    const focus = describeFocus(document.activeElement) || fieldMemory.get(renderedStep);
+    viewMemory.set(renderedStep, {scroll: body.scrollTop, focus});
+  }
+  function restoreFocus(focus) {
+    const box = focus && fieldBox(focus.id); if (!box) return false;
+    const cm = box.querySelector('.CodeMirror')?.CodeMirror;
+    let control;
+    if (focus.kind === 'ai') control = box.querySelector('[data-ai-field]');
+    else if (focus.kind === 'add') control = box.querySelector('[data-add-row]');
+    else if (focus.kind === 'cell') control = box.querySelector(`textarea[data-row="${focus.row}"][data-column="${focus.column}"]`) || box.querySelector('textarea[data-row]');
+    else if (cm) {
+      const top = body.scrollTop; cm.focus();
+      if (focus.selection) cm.setSelection(focus.selection.anchor, focus.selection.head, {scroll: false});
+      if (focus.editorScroll !== undefined) cm.scrollTo(null, focus.editorScroll);
+      body.scrollTop = top; return true;
+    } else control = box.querySelector('input:not([type=file]), textarea');
+    if (!control) return false;
+    control.focus({preventScroll: true});
+    if (focus.start !== undefined && control.setSelectionRange) control.setSelectionRange(focus.start, focus.end);
+    return true;
+  }
+  function goToStep(index, {explicit = false} = {}) {
+    captureView();
+    if (explicit) { viewMemory.delete(index); fieldMemory.delete(index); }
+    currentStep = index; renderedStep = null;
     if (!storageBlocked) { try { localStorage.setItem(STEP_KEY, String(index)); } catch { say('步骤位置无法保存，规划内容仍可导出。'); } }
     renderStep();
-    body.scrollTop = 0; $('#step-heading').focus({preventScroll: true});
+    // Normal navigation returns to the remembered scroll position and field; first visits stay at top.
+    const view = viewMemory.get(index);
+    if (!restoreFocus(view?.focus)) $('#step-heading').focus({preventScroll: true});
+    if (view?.scroll) body.scrollTop = view.scroll;
   }
-  function renderStep() {
+  function renderStep({fresh = false} = {}) {
+    const restoreActive = body.contains(document.activeElement) || hints.contains(document.activeElement);
+    if (!fresh) captureView();
+    const view = fresh ? null : viewMemory.get(currentStep);
     for (const e of editors) e.toTextArea(); editors = [];
     body.replaceChildren(); pager.replaceChildren();
     const step = steps[currentStep];
@@ -463,8 +693,8 @@ function buildWorkspace() {
       if (step.id === 'strategy-validation') { delete metadata.validationReport; delete formData['strategy-validation-completed']; }
       if (step.id === 'revision') delete formData['revision-completed'];
       reportEntries = []; returnPoint = null;
-      clearComposer(step);
-      save(); renderStep();
+      invalidatePlanning(); clearComposer(step); viewMemory.delete(currentStep); fieldMemory.delete(currentStep);
+      save(); renderStep({fresh: true}); $('#step-heading').focus({preventScroll: true});
     }, {id: 'reset-step'}));
     const reportTools = el('div', {class: 'toolbar report-tools'});
     if (step.id === 'strategy-validation') reportTools.append(button('生成本地完整性报告', basicValidation, {id: 'basic-validation'}));
@@ -489,9 +719,28 @@ function buildWorkspace() {
     const next = button(`下一步：${steps[currentStep + 1]?.title || ''}`, () => goToStep(currentStep + 1), {id: 'next-step', class: 'primary'}); next.hidden = currentStep === 14;
     if (returnPoint) pager.append(button('返回检查结果', returnToReport, {id: 'return-report-footer'}));
     pager.append(count, prev, button('稍后继续', () => { if (save()) say('已保存到当前浏览器，可随时继续填写。建议导出 JSON 备份。'); }, {id: 'save-later'}), next); updateProgress();
+    renderedStep = currentStep; body.scrollTop = view?.scroll ?? 0;
+    if (restoreActive && !aiDetails.open && !aiSettings.open) {
+      if (!restoreFocus(view?.focus)) $('#step-heading').focus({preventScroll: true});
+      body.scrollTop = view?.scroll ?? 0;
+    }
   }
   function renderHints(step) {
     hints.replaceChildren();
+    const outline = el('section', {id: 'field-outline', class: 'field-outline', 'aria-labelledby': 'field-outline-heading'});
+    outline.append(el('h2', {id: 'field-outline-heading'}, '这一步的字段'), el('p', {id: 'current-completion', class: 'small'}));
+    const list = el('ul');
+    for (const field of step.fields) {
+      const id = `${step.id}-${field.name}`, row = el('li');
+      // Jump buttons carry the real field id so tests and keyboard users target the actual control.
+      row.append(button(field.name, () => focusField(id), {'data-outline-field': id}), el('span', {class: 'field-state'}, '待补充'));
+      list.append(row);
+    }
+    outline.append(list, button('下一项待补充', () => {
+      const id = nextMissingFieldId(step, formData, fieldMemory.get(currentStep)?.id);
+      if (id) focusField(id);
+    }, {id: 'next-missing-field'}));
+    hints.append(outline);
     const context = el('details', {class: 'context-help', open: ''}); context.append(el('summary', {}, '填写提示'));
     const tips = el('ol');
     for (const tip of ['明确本次规划的业务范围', '先写事实，判断可以逐步补充', '不确定的内容可暂时留空']) tips.append(el('li', {}, tip));
@@ -513,23 +762,21 @@ function buildWorkspace() {
       const row = el('li', {'data-missing-field': item.id, 'data-resolved': String(resolved)});
       row.append(el('span', {}, `${item.step.title} / ${item.field.name} · ${resolved ? '已补充' : '待补充'}`), button(resolved ? '查看' : '去补充', () => {
         returnPoint = {step: currentStep, scroll: body.scrollTop, field: item.id};
-        goToStep(item.index); focusField(item.id);
+        goToStep(item.index, {explicit: true}); focusField(item.id);
       })); list.append(row);
     }
     if (!entries.length) box.append(el('p', {}, '前 13 步均有内容，仍需人工核验。'));
     box.append(list); body.append(box);
   }
-  function focusField(id) {
-    const box = [...body.querySelectorAll('[data-field]')].find(node => node.dataset.field === id);
-    if (!box) return;
+  function focusField(id, {scroll = true, row, column = 0} = {}) {
     requestAnimationFrame(() => {
-      const cm = box.querySelector('.CodeMirror')?.CodeMirror;
-      if (cm) cm.focus(); else box.querySelector('input:not([type=file]), textarea')?.focus({preventScroll: true});
-      box.scrollIntoView({block: 'center', behavior: 'instant'});
+      const box = fieldBox(id); if (!box) return;
+      restoreFocus(row === undefined ? {id} : {id, kind: 'cell', row, column});
+      if (scroll) box.scrollIntoView({block: 'center', behavior: 'instant'});
     });
   }
   function returnToReport() {
-    const point = returnPoint; returnPoint = null; goToStep(point.step);
+    const point = returnPoint; returnPoint = null; goToStep(point.step, {explicit: true});
     body.scrollTop = point.scroll;
     const row = [...body.querySelectorAll('[data-missing-field]')].find(node => node.dataset.missingField === point.field);
     row?.querySelector('button')?.focus({preventScroll: true});
@@ -567,9 +814,9 @@ function buildWorkspace() {
           const td = el('td'), input = el('textarea', {'aria-label': `${field.name} 第${r + 1}行 ${field.columns[c]}`, maxlength: String(LIMITS.cell), 'data-row': r, 'data-column': c}); input.value = cell;
           input.addEventListener('input', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data[r][c] = input.value; if (!commitField(id, data, `${id}-${r}-${c}`)) input.value = (formData[id]?.[r]?.[c] ?? rows[r][c]); }); td.append(input); line.append(td);
         });
-        const operation = el('td'); operation.append(button('删除', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.splice(r, 1); commitField(id, data, ''); renderStep(); }, {'aria-label': `删除${field.name}第${r + 1}行`})); line.append(operation); tbody.append(line);
+        const operation = el('td'); operation.append(button('删除', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.splice(r, 1); if (commitField(id, data, '')) { renderStep(); focusField(id, {row: Math.min(r, Math.max(0, data.length - 1)), scroll: false}); } }, {'aria-label': `删除${field.name}第${r + 1}行`})); line.append(operation); tbody.append(line);
       });
-      table.append(tbody); wrap.append(table); box.append(wrap, button('添加行', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.push(field.columns.map(() => '')); if (commitField(id, data, '')) renderStep(); }, {'data-add-row': id}));
+      table.append(tbody); wrap.append(table); box.append(wrap, button('添加行', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.push(field.columns.map(() => '')); if (commitField(id, data, '')) { renderStep(); focusField(id, {row: data.length - 1}); } }, {'data-add-row': id}));
     } else {
       const maxLength = field.maxlength ?? LIMITS.text;
       const input = el(field.type === 'input' ? 'input' : 'textarea', {id, 'aria-label': field.name, maxlength: String(maxLength), placeholder: field.placeholder || '支持 Markdown；可手工编辑并保存。'});
@@ -621,8 +868,8 @@ function buildWorkspace() {
       // Persist first. A rejected/oversized/quota-failed import never changes either draft or storage.
       localStorage.setItem(DRAFT_KEY, serialized);
       pushHistory(); ({formData, metadata} = next); reportEntries = []; returnPoint = null;
-      clearComposer();
-      renderStep(); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
+      invalidatePlanning(); clearComposer(); viewMemory.clear(); fieldMemory.clear(); renderedStep = null;
+      renderStep({fresh: true}); $('#step-heading').focus({preventScroll: true}); status.textContent = 'JSON 已校验、导入并保存到本机。'; say('导入成功。');
     } catch { say('导入失败：仅支持有效、限长的规划 JSON（扁平或分步格式）。原草稿与存储未更改；不支持 .docx。'); }
     finally { importInput.value = ''; }
   });
@@ -675,7 +922,8 @@ function buildWorkspace() {
     for (const k of TOOL_KEYS) { try { localStorage.removeItem(k); } catch { failed = true; } }
     if (failed) { say('清除未完成：本页 Key 已清空，但本地记录（包括记忆 Key）未确认全部删除；请使用浏览器设置检查。'); return; }
     try {
-      key.value = ''; consent.checked = false; resetAIResult(); composerMemory.clear(); aiMemoryKey = null; aiTarget = null; targetSelect.replaceChildren(); question.value = '';
+      key.value = ''; consent.checked = false; composerMemory.invalidate('connection'); resetAIResult(); composerMemory.clear(); aiMemoryKey = null; aiTarget = null; targetSelect.replaceChildren(); question.value = '';
+      viewMemory.clear(); fieldMemory.clear(); renderedStep = null; pendingFieldFocus = null;
       formData = {}; metadata = {}; currentStep = 0; undo = []; redo = []; returnPoint = null; reportEntries = []; recovery.clear(); storageBlocked = false; configBlocked = false; recoveryBox.hidden = true; legacyNotice.hidden = true;
       config = {provider: 'deepseek', ...PROVIDERS.deepseek}; configDirty = false; writeConfig(); updateAIStatus(); renderStep(); updateHistory(); status.textContent = '本工具本地数据已清除；下次编辑才会重新保存。'; say('已清除本工具数据（包括记忆 Key）。');
     } catch { say('清除未完成：浏览器拒绝存储操作，请使用浏览器设置检查；未清除其他应用数据。'); }
@@ -693,9 +941,14 @@ function buildWorkspace() {
       const context = JSON.stringify(structuredExport(formData, metadata));
       const messages = writingMessages({target: aiTarget, action: aiAction, context, question: question.value});
       if (messages.reduce((size, item) => size + item.content.length, 0) > 180000) { say('规划上下文过长，请缩短后发送。'); return; }
+      resetAIResult(); rememberComposer();
+      const revision = composerMemory.revision(), requestTarget = aiMemoryKey, requestAction = aiAction;
+      const original = aiTarget ? (aiTarget.field.type === 'table'
+        ? (hasContent(formData[aiTarget.id]) ? JSON.stringify(formData[aiTarget.id], null, 2) : '')
+        : formData[aiTarget.id] || '') : '';
       const epoch = ++aiEpoch;
       controller = new AbortController(); const requestController = controller; const timer = setTimeout(() => requestController.abort(), 60000);
-      pending = true; updatePending(); aiApply.hidden = true; aiAnswer = ''; aiMessage.textContent = ''; resultCard.dataset.state = 'loading'; aiResult.textContent = '正在整理建议…';
+      pending = true; updatePending(); aiApply.hidden = true; aiMessage.textContent = ''; resultCard.dataset.state = 'loading'; aiResult.textContent = '正在整理建议…';
       try {
         const response = await fetch(settings.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${requestKey}`}, body: JSON.stringify({model: settings.model, stream: false, messages}), signal: requestController.signal});
         if (epoch !== aiEpoch) return;
@@ -711,7 +964,14 @@ function buildWorkspace() {
         const content = data?.choices?.[0]?.message?.content;
         if (typeof content !== 'string' || !content.trim() || content.length > LIMITS.text) throw new Error('response-format');
         if (epoch !== aiEpoch) return;
-        aiAnswer = content.replaceAll(requestKey, '[Key 已隐藏]'); aiResult.innerHTML = renderMarkdown(aiAnswer); resultCard.dataset.state = 'success'; aiApply.hidden = !canApplyWriting(aiTarget, aiAction);
+        // Bind the suggestion to this exact planning/connection revision and request target.
+        activeResult = {state: 'success', target: requestTarget, action: requestAction, planning: revision.planning, connection: revision.connection, original, draft: content.replaceAll(requestKey, '[Key 已隐藏]')};
+        shownKind = 'live';
+        if (!validResult()) {
+          showOutdated(activeResult, '生成期间另一标签页修改了规划；已收到本次建议，仅供查看或复制，不能采用。本页草稿未被覆盖，请先核对并备份。');
+          return;
+        }
+        showResult(); rememberComposer();
         say(canApplyWriting(aiTarget, aiAction) ? `建议已返回，核验后可采用到“${aiTarget.field.name}”。` : '以下建议供人工核验，不写入字段。');
       } catch {
         if (epoch === aiEpoch) { resultCard.dataset.state = 'error'; aiResult.textContent = '生成未完成：网络、CORS、超时或接口格式不兼容。请重试；草稿未更改。'; }
@@ -722,19 +982,37 @@ function buildWorkspace() {
     } catch { say('请先完成全局设置。'); }
   }
   function applyAI() {
-    if (!canApplyWriting(aiTarget, aiAction) || !aiAnswer || pending) return;
+    // Only a live, still-eligible draft/fix suggestion for the current target may be adopted.
+    if (pending || !validResult() || !canApplyWriting(aiTarget, aiAction)) return;
+    const {id, field} = aiTarget, draft = shownDraft;
+    if (!draft.trim()) { aiMessage.textContent = '编辑稿为空，未写入字段。'; return; }
+    let value = draft;
     try {
-      const {id, field} = aiTarget; let value = aiAnswer;
-      if (field.type === 'table') value = parseBoundedJSON(value.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+      if (field.type === 'table') value = parseBoundedJSON(draft.replace(/^```(?:json)?\s*|\s*```$/g, '').trim());
       normalizeImport({...formData, [id]: value});
-      if (!confirm(`确认将 AI 建议写入“${field.name}”？请先核验，原内容可撤销。`)) return;
-      if (commitField(id, value, '')) {
-        const scrollTop = body.scrollTop;
-        renderStep(); body.scrollTop = scrollTop;
-        aiOpener = body.querySelector(`[data-field="${CSS.escape(id)}"] [data-ai-field]`);
-        renderAISnapshot(); aiApply.hidden = true; say('已采用建议，可关闭后撤销；请继续人工核验。');
-      }
-    } catch { say('AI 内容不符合字段或表格结构，未改写草稿。'); }
+    } catch {
+      say('AI 内容不符合字段或表格结构，未改写草稿。');
+      aiMessage.textContent = 'AI 内容不符合字段或表格结构，未改写草稿。';
+      return;
+    }
+    if (!confirm(`确认将 AI 建议写入“${field.name}”？请先核验，原内容可撤销。`)) return;
+    // The user may have edited the draft while the confirmation was open.
+    if (!validResult() || shownDraft !== draft) return;
+    const scrollTop = body.scrollTop;
+    if (!commitField(id, value, '')) return;
+    // Adoption consumes eligibility, also when the proposed value equals the current one.
+    composerMemory.invalidate();
+    activeResult = null; shownKind = 'adopted'; shownDraft = draft;
+    resultCard.dataset.state = 'success'; resultCard.dataset.adopted = 'true';
+    aiApply.hidden = true; copyButton.hidden = false; nextEmpty.hidden = !nextMissingFieldId(steps[currentStep], formData, id);
+    reviewBar.hidden = true; editPane.hidden = true; originalPane.hidden = true; previewPane.hidden = false;
+    adoptedStatus.textContent = `已采用到“${field.name}” · 可在字段中撤销`;
+    draftHelp.textContent = draftHint();
+    aiResult.innerHTML = renderMarkdown(draft);
+    renderStep(); body.scrollTop = Math.min(scrollTop, body.scrollHeight);
+    aiOpener = body.querySelector(`[data-field="${CSS.escape(id)}"] [data-ai-field]`);
+    renderAISnapshot(); updatePending();
+    say('已采用建议，可关闭后撤销；请继续人工核验。');
   }
   load(); host.hidden = false; document.body.classList.add('workspace-ready'); renderStep(); updateHistory();
   matchMedia('(min-width: 1024px)').addEventListener('change', event => {

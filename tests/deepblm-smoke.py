@@ -169,8 +169,11 @@ def check_desktop(browser, base, directory):
     assert [g.locator('h2').inner_text() for g in page.locator('.nav-group').all()] == ['现状与差距', '战略选择', '战略执行', '领导力与价值观', '检查与修订']
     assert [g.locator('button').count() for g in page.locator('.nav-group').all()] == [2, 4, 5, 2, 2]
     expect(page.locator('.nav-foundation .nav-group-note')).to_have_text('贯穿战略与执行')
-    assert page.locator('.nav-group').nth(1).locator('button').first.inner_text() == '3. 市场洞察'
-    assert [b.inner_text() for b in page.locator('.nav-foundation button').all()] == ['12. 领导力', '13. 价值观']
+    assert page.locator('.nav-group').nth(1).locator('button').first.locator('.step-title').inner_text() == '3. 市场洞察'
+    assert [b.inner_text() for b in page.locator('.nav-foundation .step-title').all()] == ['12. 领导力', '13. 价值观']
+    # Sidebar exposes real per-step completion, counted from nonblank field values only.
+    expect(page.locator('[data-step="company-info"] .step-completion')).to_have_text('未开始 · 0/5')
+    expect(page.locator('[data-step="gap"] .step-completion')).to_have_text('未开始 · 0/2')
     expect(page.locator('#planning-name')).to_have_text('未命名规划')
     expect(page.locator('#next-step')).to_have_text('下一步：差距分析')
     expect(page.locator('.preview-pane')).not_to_be_visible()
@@ -251,11 +254,15 @@ def check_desktop(browser, base, directory):
     activate(page, '#undo')
     assert field_value(page, 'company-info-企业名称') == '虚构验收企业'
     # Every real step renders, including both report and revision editing.
+    field(page, 'company-info-企业名称').locator('input.simple-input').focus()
     for nav in page.locator('#step-nav button').all():
         nav.click()
         assert nav.get_attribute('aria-current') == 'step'
         expect(page.locator('#step-heading')).to_be_visible()
-        expect(page.locator('#step-heading')).to_be_focused()
+        if nav.get_attribute('data-step') == 'company-info':
+            expect(field(page, 'company-info-企业名称').locator('input.simple-input')).to_be_focused()
+        else:
+            expect(page.locator('#step-heading')).to_be_focused()
         no_overflow(page)
     page.locator('[data-step="gap"]').click()
     table = field(page, 'gap-业绩差距')
@@ -454,8 +461,27 @@ def check_desktop(browser, base, directory):
         expect(field(page, 'company-info-主营业务').locator('.simple-input')).to_be_visible()
         no_overflow(page); screenshot(page, f'workspace-{width}.png')
         if width == 1024:
+            # Seed a known real field/control for each revisit, independent of application memory.
+            expected_focus = {}
             for nav in page.locator('#step-nav button').all():
-                nav.click(); expect(page.locator('#step-heading')).to_be_focused(); no_overflow(page)
+                nav.click()
+                first = page.locator('#step-content [data-field]').first
+                target_id = first.get_attribute('data-field')
+                if first.locator('.CodeMirror').count():
+                    first.locator('.CodeMirror').click()
+                    expected_focus[nav.get_attribute('data-step')] = (target_id, False)
+                else:
+                    control = first.locator('input:not([type="file"]), textarea').first
+                    control.click()
+                    expected_focus[nav.get_attribute('data-step')] = (target_id, control.get_attribute('data-row') is not None)
+            for nav in page.locator('#step-nav button').all():
+                nav.click()
+                expected_id, is_table = expected_focus[nav.get_attribute('data-step')]
+                actual_id = page.evaluate("document.activeElement.closest('[data-field]')?.dataset.field")
+                assert actual_id == expected_id, (expected_id, actual_id)
+                if is_table:
+                    assert page.evaluate("[document.activeElement.dataset.row, document.activeElement.dataset.column]") == ['0', '0']
+                no_overflow(page)
                 footer = page.locator('.step-pager').bounding_box()
                 assert footer['y'] + footer['height'] <= 1000
             page.locator('[data-step="company-info"]').click()

@@ -97,7 +97,15 @@ Deep BLM 集成基线为 `b83271a83c5cb0a155b7c57bb32c49526ebd3a16`，实现分�
 - 工具不导入 `site.mjs`/`signals.mjs`，不初始化首页统计。首页 Deep BLM 卡为普通链接，保留 `data-demo="deep-blm"` 身份与需求按钮；用户同意后的现有 `demo_open` 仅说明入口兴趣，不是规划完成。
 - 内容安全入口为 `deepblm-security.mjs`：真实 DOMPurify 严格标签白名单，去除图片等自动外载、事件、样式、SVG、表单、框架等；只允许显式 HTTP(S)/mailto 链接并加 `noopener noreferrer`。文本/表格使用 DOM 文本或转义；预览、AI 回复、报告、修订与 Word HTML 共用净化路径。新版不保留旧内联事件处理器；CSP 的脚本限同源，无 `unsafe-eval` 或内联脚本许可。样式仍允许 `unsafe-inline` 以兼容编辑器布局，AI 的动态 HTTPS 接口使 `connect-src` 为 `https:`，不宣称是完全锁定的 CSP。浏览器端存储与 Key 仍受同源其他页面代码及浏览器扩展的安全边界限制。
 
-关键实现：`assets/deepblm-{entry,workspace,ui,data,schema,security}.mjs` 与独立 `assets/deepblm.css`；纯 Node 测试 `tests/deepblm.test.mjs`；真实浏览器验收 `tests/deepblm-smoke.py`。
+### 深度填写与审阅 UX
+
+- 左侧 15 步按实际非空字段显示“未开始 / 填写中 / 已填写”和字段数；仅表示已输入内容，不代表战略通过审核。右侧字段目录可直达真实编辑器，“下一项待补充”循环定位本步实际空字段。正常切换步骤会在本页恢复滚动位置、上次编辑字段与光标/选区；检查清单跳转仍以明确目标为先。成功导入和清除工具数据清理全部位置记忆；单步重置清理本步，取消或失败不抹掉原工作状态。
+- AI 建议支持“编辑建议 / 预览 / 原文对照”。对照同时展示生成时原文和当前编辑稿，不冒充语义差异分析；复制、净化预览和人工确认采用都使用最新编辑稿。表格编辑为带列顺序说明的 JSON 二维字符串数组，坏结构、空稿和超限不会写入；检查缺漏和规划讨论始终不可采用。采用后可通过既有历史撤销。
+- 大屏采用要求与结果分栏；1024px 宽度按纵向排列。底栏常驻显示明确目标字段的采用、复制、下一空字段与返回字段操作，长结果不会把采用推到视口外。复制被浏览器拒绝时如实展示只读手工复制框；切换目标后的迟到剪贴板回调不会显示旧字段内容或抢走焦点。
+- 问题、动作与成功建议编辑稿仅存页面内存：同目标关闭重开或切走再回来可恢复，不额外调用模型。缓存最多 24 个目标、总计 600000 字符，最近最少使用的记录会被淘汰；刷新清空，不写入存储、草稿或导出。任何规划内容/历史变动和连接/Key/同意/其他标签设置变更都会使旧建议不可采用；成功导入清全部会话，单步重置清本步补充要求，取消/失败导入保持会话。生成、重新生成始终需要主动操作。
+- 另一标签仅切换步骤、重复保存相同内容（包括序列化时间或键顺序不同）不取消本页请求、不清空建议。真正的外部草稿变更不会自动覆盖本页；在途请求继续接收，但返回内容明确标为过期、只读、可复制且不可采用，外部继续编辑也不会抹掉已收到的参考内容。连接/Key/同意变更仍立即使旧连接和在途请求失效。这不是跨标签协同编辑，建议先核对并导出本页备份。
+
+关键实现：`assets/deepblm-{entry,workspace,ui,sessions,data,schema,security,credentials}.mjs` 与独立 `assets/deepblm.css`；纯 Node 测试含 `tests/deepblm.test.mjs` 和 `tests/deepblm-sessions.test.mjs`；真实浏览器验收含既有与深度 UX 两套 DeepBLM 脚本。
 
 ```sh
 node --test tests/*.test.mjs
@@ -105,12 +113,13 @@ node --test tests/*.test.mjs
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 .venv/bin/python tests/visual-smoke.py
 .venv/bin/python tests/deepblm-smoke.py
+.venv/bin/python tests/deepblm-deep-ux-smoke.py
 # 可选：BASE_URL=https://预览站点、CHROME_PATH=/浏览器路径
 # 可选：DEEPBLM_SCREENSHOT_DIR=${TMPDIR}/deepblm-screenshots
 ```
 
 浏览器脚本复用既有回环 HTTP helper；AI 请求只使用显式 `fixture-only` 路由与非真实 Key，不调用收费模型。保留 1440/1024 下全部步骤、五组导航及归属、原生控件超限拒绝、只读示例、净化预览、检查清单、导入原子性、存储失败和全局 AI 配置/凭据安全回归。新增写作面板用例覆盖直接字段入口、侧栏首空/全填默认、只读文本/表格快照及目标切换、三个动作不自动请求、空补充要求的实际载荷、同目标重开与设置往返、讨论/检查无采用、Ctrl/Cmd+Enter/换行及模拟 IME 事件、生成中重复提交/取消/迟到结果拒绝、结构化表格拒绝/确认采用/撤销，以及 1024/1440 的长原文和长结果滚动。设置 `DEEPBLM_SCREENSHOT_DIR` 后会额外保存 `writing-composer-{1024,1440}.png` 与 `writing-result-{1024,1440}.png`。
 
-本次写作面板迭代由父流程实跑完成：Node 33 项、Python 9 项、站点静态检查、`tests/deepblm-smoke.py` 与 `tests/visual-smoke.py` 均通过，并检查了 1024/1440 截图。独立复核无 P1；导入/重置后补充要求残留、原文重复导致的长字段预算回归和取消状态文案已修复。新增真实浏览器回归覆盖成功导入清空全部要求、单步重置仅清对应要求、取消/无效导入保留要求、95k 合法字段只发送一次以及长原文键盘滚动；采用建议后保留原表单滚动位置和返回焦点。子进程曾遇到 socket 沙箱限制，不将该失败视为通过；父流程另修正了字段直达按钮带来的紧凑布局，以及 Playwright 恢复 fetch 时返回函数的夹具问题。重点选择器：`[data-ai-field]`、`#open-ai`、`#ai-target-select`、`#ai-target`、`#ai-snapshot`、`[data-ai-action]`、`#ai-question`、`#ai-send` / `#ai-cancel` / `#ai-result` / `#ai-apply`、`#ai-discussion`、`#open-ai-settings` / `#ai-settings` / `#ai-remember-key`；原字段、编辑器、导航、导入/导出和报告选择器保持。
+本轮父流程真实运行 Node 49 项、Python 9 项、站点静态检查及 `deepblm-smoke.py`、`deepblm-deep-ux-smoke.py`、`visual-smoke.py`；并检查 1024/1440 宽度及 1440×560、1024×600 短高场景。前后测量确认：长表单返回由滚动归零变为恢复原位置和焦点；关闭重开由丢掉结果变为保留编辑稿，且请求数不增加；长结果采用按钮由视口外变为常驻可见。新增用例覆盖最新编辑稿预览/对照/采用/撤销、畸形表格拒绝、剪贴板失败及迟到结果隔离、跨目标恢复和规划/连接变更失效、导入/重置/清除位置记忆、真实双标签导航/等价保存/内容冲突与在途响应只读保留。首访断言标题焦点，回访断言明确字段 ID，表格进一步断言行列，不能用“焦点在区域内”放过错误目标。测试仅用非真实 Key 和显式模拟接口；不将网络或沙箱失败视为通过。新增主要选择器：`#field-outline` / `[data-outline-field]` / `#next-missing-field`、`#ai-draft-editor`、`[data-ai-view]`、`#ai-original` / `#ai-compare-draft`、`#ai-footer` / `#ai-copy` / `#ai-copy-fallback` / `#ai-return`；原字段、编辑器、导航、导入/导出与全局设置选择器保留。
 
 验收应同时运行上述纯逻辑、静态与真实浏览器命令；受限编码沙箱的 socket 拒绝不等于浏览器验收成功。模型请求验收仅使用显式非真实夹具，不证明真实提供方的 CORS、账户权限或生成质量；Word 实际排版也需单独核验。同一浏览器请勿在多个标签页同时编辑同一规划，以免后保存的草稿覆盖先前版本；开始研讨前请先导出 JSON 备份。
