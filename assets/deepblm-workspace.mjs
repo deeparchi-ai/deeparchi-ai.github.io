@@ -1,4 +1,5 @@
 import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, normalizeImport, structuredExport, normalizeReport, parseBoundedJSON, normalizeConfig, validateEndpoint} from './deepblm-data.mjs';
+import {groups, groupFor, hasContent, missingFields, simpleField, purposes, wireMenu} from './deepblm-ui.mjs';
 import {escapeHTML, renderMarkdown, sanitizeRichHTML} from './deepblm-security.mjs';
 const $ = selector => document.querySelector(selector);
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -38,43 +39,64 @@ function buildWorkspace() {
   const recovery = new Map();
   const host = $('#workspace');
   host.className = 'workbench';
-  const intro = el('div', {class: 'workbench-intro'}), titleBox = el('div');
-  titleBox.append(el('h2', {}, '战略规划工作台'), el('p', {}, '15 步战略规划 · 本机自动保存 · 无云端同步'));
-  intro.append(titleBox, button('AI 设置与辅助（可选）', () => { aiDetails.open = true; aiDetails.scrollIntoView({block: 'start'}); }, {id: 'open-ai'}));
-  host.append(intro);
+  const topbar = el('header', {class: 'workspace-topbar'});
+  const brand = el('a', {class: 'workspace-brand', href: '../index.html', 'aria-label': 'DeepArchi 首页'});
+  const brandIcon = el('span', {class: 'workspace-brand-icon', 'aria-hidden': 'true'});
+  brandIcon.append(el('img', {src: '../assets/deeparchi-logo.png', width: '64', height: '66', alt: ''}));
+  brand.append(brandIcon, el('strong', {}, 'DeepArchi'));
+  const product = el('div', {class: 'workspace-product'});
+  product.append(el('strong', {}, 'Deep BLM'), el('span', {}, '规划工具 · 试用'));
   const status = el('p', {id: 'save-status', class: 'status', role: 'status', 'aria-live': 'polite'});
   const message = el('p', {id: 'tool-message', class: 'status', role: 'status', 'aria-live': 'polite'});
+  topbar.append(brand, product, status); host.append(topbar);
+  function menu(title, id) {
+    const node = el('details', {class: 'disclosure-menu', id});
+    node.append(el('summary', {}, title), el('div', {class: 'menu-items'})); wireMenu(node); return node;
+  }
   const recoveryBox = el('div', {id: 'storage-recovery', class: 'notice warning', hidden: ''});
   recoveryBox.append(el('p', {}, '本工具发现无法读取的本地数据，已保留原件并暂停自动保存。可导出恢复副本，检查文件后重新导入，或确认清除本工具数据。'));
   recoveryBox.append(button('导出恢复副本', () => {
     if (!recovery.size) { say('浏览器存储不可用；可用下方 JSON 导出保留当前内存草稿。'); return; }
     download('deepblm-recovery.json', JSON.stringify(Object.fromEntries(recovery), null, 2), 'application/json');
   }, {id: 'export-recovery'}));
-  const toolbar = el('div', {class: 'toolbar', role: 'group', 'aria-label': '草稿操作'});
   const undoBtn = button('撤销', () => historyMove(undo, redo), {id: 'undo'});
   const redoBtn = button('重做', () => historyMove(redo, undo), {id: 'redo'});
-  toolbar.append(undoBtn, redoBtn, button('保存到本机', () => save(), {id: 'save-draft', class: 'primary'}));
   const importInput = el('input', {type: 'file', accept: '.json,application/json', hidden: '', id: 'import-file', 'aria-label': '导入规划 JSON'});
-  toolbar.append(button('导入 JSON', () => importInput.click(), {id: 'import-json'}), importInput);
-  toolbar.append(button('导出 JSON', () => exportFile('json'), {id: 'export-json'}), button('导出 Markdown', () => exportFile('md'), {id: 'export-markdown'}), button('Word 兼容 .doc', () => exportFile('doc'), {id: 'export-word'}));
-  toolbar.append(button('清除本工具本地数据', clearLocal, {id: 'clear-local'}));
-  host.append(toolbar, status, message, recoveryBox);
+  const importMenu = menu('导入', 'import-menu');
+  importMenu.lastElementChild.append(button('导入 JSON', () => importInput.click(), {id: 'import-json'}), importInput);
+  const exportMenu = menu('导出', 'export-menu');
+  exportMenu.lastElementChild.append(button('导出 JSON', () => exportFile('json'), {id: 'export-json'}), button('导出 Markdown', () => exportFile('md'), {id: 'export-markdown'}), button('Word 兼容 .doc', () => exportFile('doc'), {id: 'export-word'}));
+  const settingsMenu = menu('设置', 'settings-menu');
+  settingsMenu.lastElementChild.append(button('AI 连接设置', () => openAI(true)), button('保存到本机', () => save(), {id: 'save-draft'}), button('清除本工具本地数据', clearLocal, {id: 'clear-local'}));
   const help = el('details', {id: 'tool-help'});
-  help.append(el('summary', {}, '使用与数据说明'), el('p', {}, '手工编辑始终可用。先填写企业信息，再沿侧栏推进 15 步；可添加或删除表格行，使用撤销、重做与逐字段预览。校验报告和修订建议也可手工编写。'), el('p', {}, '草稿与非秘密模型设置只保存在当前浏览器。请定期导出 JSON 备份；导入兼容旧版扁平 JSON 和分步结构 JSON。Markdown 与 Word 兼容 .doc 用于阅读交付，不是原生 .docx；不支持 .docx 导入。'), el('p', {}, '本次试用关闭公共链接导入、代理抓取与自动网络搜索，避免通过隐藏第三方发送网址或查询。请使用 JSON 文件或字段的文本/Markdown 文件导入。本站不提供账号或跨设备自动同步。'));
-  host.append(help);
+  help.append(el('summary', {}, '使用与数据说明'), el('p', {}, '手工编辑始终可用。草稿只保存在当前浏览器，没有账号或云端同步。请定期导出 JSON 备份。JSON 兼容旧版扁平和分步结构；字段支持文本/Markdown 文件导入。Word 兼容 .doc 是 HTML，不是 .docx。不支持 .docx 导入。公共链接导入、代理抓取与自动搜索已关闭。'));
+  settingsMenu.lastElementChild.append(button('使用与数据说明', () => { help.open = !help.open; if (help.open) help.querySelector('summary').focus(); }));
+  help.addEventListener('keydown', event => { if (event.key === 'Escape') { help.open = false; settingsMenu.querySelector('summary').focus(); } });
+  topbar.append(importMenu, exportMenu, settingsMenu);
+  host.append(message, recoveryBox, help);
   const grid = el('div', {class: 'workspace-grid'}), sidebar = el('aside', {class: 'step-sidebar', 'aria-label': '规划进度'});
+  const projectName = el('strong', {id: 'planning-name'}, '未命名规划');
+  const planning = el('div', {class: 'current-planning'});
+  planning.append(el('span', {}, '当前规划'), projectName);
   const progressLabel = el('p', {id: 'progress-label', class: 'small'}), progress = el('progress', {id: 'planning-progress', max: '15', value: '0', 'aria-label': '有内容的步骤数'});
-  const nav = el('nav', {'aria-label': '15 步规划导航', id: 'step-nav'});
-  const stepButtons = steps.map((s, i) => {
-    const b = button(`${i + 1}. ${s.title}`, () => goToStep(i), {'data-step': s.id});
-    nav.append(b); return b;
-  });
-  sidebar.append(progressLabel, progress, nav);
+  const nav = el('nav', {'aria-label': '15 步规划导航', id: 'step-nav'}), stepButtons = [];
+  for (const group of groups) {
+    const section = el('section', {class: 'nav-group'}); section.append(el('h2', {}, group.name));
+    steps.slice(group.start, group.end).forEach((step, offset) => {
+      const i = group.start + offset;
+      const b = button(`${i + 1}. ${step.title}`, () => goToStep(i), {'data-step': step.id});
+      section.append(b); stepButtons.push(b);
+    }); nav.append(section);
+  }
+  sidebar.append(planning, nav, progressLabel, progress, el('p', {class: 'local-note'}, '仅存于此浏览器'));
   const body = el('section', {class: 'step-body', id: 'step-content', 'aria-label': '当前规划步骤'});
-  grid.append(sidebar, body); host.append(grid);
-  const aiDetails = el('details', {id: 'ai-panel'});
-  aiDetails.append(el('summary', {}, '实验性 AI 辅助 · 自备 Key，按需启用'));
-  aiDetails.append(el('p', {}, '发送时，当前规划全文、已有校验报告和你的问题会交给所选提供方或你填写的自定义 HTTPS 接口；对方会处理这些数据与 Key。API 费用由你的账户承担。请先确认授权范围，不要发送敏感资料。'), el('p', {}, '未使用真实凭据验证 CORS、模型兼容性或真实生成质量。仅提供 OpenAI 兼容 Chat Completions 接口选项；请向提供方核对模型 ID 与浏览器跨域支持。打开页面不会请求模型。Key 始终仅在本页内存，刷新即丢失，不随草稿保存或导出。'));
+  const center = el('div', {class: 'workspace-center'}), pager = el('footer', {class: 'step-pager'});
+  const hints = el('aside', {class: 'context-sidebar', 'aria-label': '填写帮助'});
+  center.append(body, pager); grid.append(sidebar, center, hints); host.append(grid);
+  let returnPoint = null, reportEntries = [];
+  const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading', 'aria-describedby': 'ai-disclosure'});
+  aiDetails.append(button('关闭 AI 辅助', closeAI, {id: 'close-ai'}), el('h2', {id: 'ai-heading', tabindex: '-1'}, 'AI 辅助（可选）'));
+  aiDetails.append(el('p', {id: 'ai-disclosure'}, '发送时，当前规划全文、已有校验报告和你的问题会交给所选提供方或你填写的自定义 HTTPS 接口；对方会处理这些数据与 Key。API 费用由你的账户承担。请先确认授权范围，不要发送敏感资料。'), el('p', {}, '未使用真实凭据验证 CORS、模型兼容性或真实生成质量。仅提供 OpenAI 兼容 Chat Completions 接口选项；请向提供方核对模型 ID 与浏览器跨域支持。打开页面不会请求模型。Key 始终仅在本页内存，刷新即丢失，不随草稿保存或导出。'));
   const aiGrid = el('div', {class: 'ai-grid'});
   function aiField(name, node) { const l = el('label'); l.append(el('span', {}, name), node); aiGrid.append(l); return node; }
   const provider = aiField('提供方', el('select', {id: 'ai-provider'}));
@@ -82,7 +104,9 @@ function buildWorkspace() {
   const endpoint = aiField('完整 HTTPS Chat Completions 地址', el('input', {type: 'url', id: 'ai-endpoint', maxlength: '500', autocomplete: 'off', spellcheck: 'false'}));
   const model = aiField('模型 ID', el('input', {id: 'ai-model', maxlength: '100', autocomplete: 'off'}));
   const key = aiField('API Key（仅本页内存）', el('input', {type: 'password', id: 'ai-key', autocomplete: 'off', spellcheck: 'false', maxlength: '4096'}));
-  aiDetails.append(aiGrid);
+  const connection = el('details', {id: 'ai-connection', open: ''});
+  connection.append(el('summary', {}, '连接设置 · 提供方、模型与内存 Key'), aiGrid);
+  aiDetails.append(connection);
   const consentLabel = el('label');
   const consent = el('input', {type: 'checkbox', id: 'ai-consent'});
   consentLabel.append(consent, document.createTextNode('我同意向上述接口发送规划上下文并承担 API 费用（每次打开页面重新选择）。'));
@@ -107,12 +131,46 @@ function buildWorkspace() {
   const aiSend = button('发送问题与规划上下文', () => runAI(null), {id: 'ai-send', class: 'primary'});
   const aiCancel = button('取消请求', () => { aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true; aiAnswer = ''; aiApply.hidden = true; aiResult.textContent = '已停止等待。已发送内容无法撤回，提供方仍可能处理或计费。'; say('已停止等待 AI 回复；草稿未更改。'); }, {id: 'ai-cancel', disabled: ''});
   const aiResult = el('div', {id: 'ai-result', class: 'rich-content ai-result', 'aria-live': 'polite'});
+  const aiMessage = el('p', {id: 'ai-message', role: 'status', 'aria-live': 'polite'});
   const aiApply = button('采用到目标字段', () => applyAI(), {id: 'ai-apply', hidden: ''});
   const sendBar = el('div', {class: 'toolbar'}); sendBar.append(aiSend, aiCancel);
-  aiDetails.append(aiBar, legacyNotice, targetLabel, questionLabel, question, sendBar, aiResult, aiApply);
+  connection.append(aiBar, legacyNotice);
+  aiDetails.append(targetLabel, questionLabel, question, sendBar, aiMessage, aiResult, aiApply);
   host.append(aiDetails);
   let controller = null, aiAnswer = '', aiTarget = null;
-  function say(text) { message.textContent = text; }
+  let aiOpener = null;
+  function openAI(settings = false) {
+    aiOpener = document.activeElement;
+    connection.open = settings || !key.value;
+    aiMessage.textContent = '';
+    if (!aiDetails.open) aiDetails.showModal();
+    aiDetails.scrollTop = 0;
+    (settings ? provider : $('#ai-heading')).focus();
+  }
+  function closeAI() { if (pending) aiCancel.click(); aiDetails.close(); }
+  aiDetails.addEventListener('cancel', event => { event.preventDefault(); closeAI(); });
+  aiDetails.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = [...aiDetails.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]')]
+      .filter(node => node.tabIndex >= 0 && !node.disabled && node.getClientRects().length);
+    const first = controls[0], last = controls.at(-1);
+    if (!first) { event.preventDefault(); return; }
+    if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  });
+  aiDetails.addEventListener('close', () => {
+    if (pending) aiCancel.click();
+    let focus = aiOpener?.isConnected ? aiOpener : $('#step-heading');
+    const disclosure = focus?.closest('.disclosure-menu');
+    if (disclosure && !disclosure.open) focus = disclosure.querySelector('summary');
+    focus?.focus({preventScroll: true});
+  });
+  matchMedia('(min-width: 1024px)').addEventListener('change', event => { if (!event.matches && aiDetails.open) closeAI(); });
+  function say(text) { message.textContent = text; if (aiDetails.open) aiMessage.textContent = text; }
+
   function chooseAITarget(target) {
     aiEpoch++; controller?.abort(); pending = false; aiSend.disabled = false; aiCancel.disabled = true;
     aiTarget = target; aiAnswer = ''; aiApply.hidden = true; aiResult.replaceChildren();
@@ -136,6 +194,7 @@ function buildWorkspace() {
     const maxLength = f?.maxlength ?? LIMITS.text;
     if (typeof value === 'string' && value.length > maxLength) { say(`此字段最多 ${maxLength} 个字符，请缩短内容。`); return false; }
     if (f?.type === 'table' && value.length > LIMITS.rows) { say(`每张表最多 ${LIMITS.rows} 行。`); return false; }
+    try { normalizeImport({[id]: value}); } catch { say('字段或表格超出支持范围，已保留原内容。'); return false; }
     pushHistory(editKey); formData[id] = value;
     if (id === 'strategy-validation-逻辑校验报告') { metadata.validationReport = {content: value, savedAt: Date.now()}; formData['strategy-validation-completed'] = value.trim() ? 'true' : 'false'; }
     if (id === 'revision-修改建议列表') formData['revision-completed'] = value.trim() ? 'true' : 'false';
@@ -143,8 +202,8 @@ function buildWorkspace() {
   }
   function save() {
     if (storageBlocked) { status.textContent = '自动保存已暂停；原存储保留。请导出草稿备份或使用恢复选项。'; return false; }
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(structuredExport(formData, metadata))); status.textContent = `已自动保存到本机浏览器 · ${new Date().toLocaleTimeString('zh-CN')} · 无云端同步`; return true; }
-    catch { status.textContent = '保存失败：空间、格式限制或存储权限不足。请导出 JSON 备份，当前内容仍在内存。'; return false; }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(structuredExport(formData, metadata))); status.textContent = `已保存到本机 · ${new Date().toLocaleTimeString('zh-CN')}`; return true; }
+    catch { status.textContent = '保存失败 · 请导出 JSON 备份'; say('保存失败：空间、格式限制或存储权限不足，当前内容仍在内存。'); return false; }
   }
   function load() {
     try {
@@ -166,7 +225,7 @@ function buildWorkspace() {
         const step = localStorage.getItem('blm-strategy-step');
         if (/^(?:[0-9]|1[0-4])$/.test(step ?? '')) currentStep = Number(step);
       }
-      status.textContent = saved !== null || Object.keys(formData).length ? '已恢复本机草稿；旧版原件保留。' : '尚未填写；编辑后自动保存到本机浏览器。';
+      status.textContent = saved !== null || Object.keys(formData).length ? '已恢复本机草稿；旧版原件保留。' : '尚未填写 · 编辑后自动本机保存';
     } catch { storageBlocked = true; recoveryBox.hidden = false; status.textContent = '本地数据异常或存储不可用；未覆盖原件。当前可在内存中编辑并导出。'; }
     try {
       // Deliberately detect only presence. Never parse or reuse persisted legacy secrets.
@@ -183,8 +242,8 @@ function buildWorkspace() {
   endpoint.addEventListener('input', aiSettingsChanged); model.addEventListener('input', aiSettingsChanged); key.addEventListener('input', aiSettingsChanged);
   consent.addEventListener('change', () => { if (!consent.checked) aiSettingsChanged(); });
   function updateProgress() {
-    const hasContent = value => Array.isArray(value) ? value.some(row => row.some(cell => cell.trim())) : typeof value === 'string' && !!value.trim();
     const count = steps.filter(s => s.fields.some(f => hasContent(formData[`${s.id}-${f.name}`]))).length;
+    projectName.textContent = formData['company-info-企业名称']?.trim() || '未命名规划';
     progress.value = count; progressLabel.textContent = `${count} / 15 步已有内容`;
     stepButtons.forEach((b, i) => { if (i === currentStep) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
   }
@@ -192,38 +251,93 @@ function buildWorkspace() {
     currentStep = index;
     if (!storageBlocked) { try { localStorage.setItem(STEP_KEY, String(index)); } catch { say('步骤位置无法保存，规划内容仍可导出。'); } }
     renderStep();
-    $('#step-heading').focus({preventScroll: true});
+    body.scrollTop = 0; $('#step-heading').focus({preventScroll: true});
   }
   function renderStep() {
     for (const e of editors) e.toTextArea(); editors = [];
-    body.replaceChildren();
+    body.replaceChildren(); pager.replaceChildren();
     const step = steps[currentStep];
-    const title = el('h2', {id: 'step-heading', tabindex: '-1'}, `${currentStep + 1}. ${step.title}`);
-    body.append(title, el('p', {class: 'step-description'}, step.description));
-    const stepTools = el('div', {class: 'toolbar'});
-    stepTools.append(button('重置当前步骤', () => {
+    body.classList.toggle('company-step', currentStep === 0);
+    const title = el('h1', {id: 'step-heading', tabindex: '-1'}, step.title);
+    body.append(el('p', {class: 'step-breadcrumb'}, `${groupFor(currentStep)} / 第 ${currentStep + 1} 步`), title, el('p', {class: 'step-description'}, purposes[currentStep]));
+    if (returnPoint) body.append(button('返回检查结果', returnToReport, {id: 'return-report'}));
+    renderHints(step);
+    const stepTools = menu('撤销 / 重做 / 重置', 'step-tools');
+    stepTools.lastElementChild.append(undoBtn, redoBtn);
+    stepTools.lastElementChild.append(button('重置当前步骤', () => {
       if (!confirm(`确认重置“${step.title}”？可使用撤销恢复当前会话内容。`)) return;
       pushHistory(); for (const f of step.fields) delete formData[`${step.id}-${f.name}`];
       if (step.id === 'strategy-validation') { delete metadata.validationReport; delete formData['strategy-validation-completed']; }
       if (step.id === 'revision') delete formData['revision-completed'];
       save(); renderStep();
     }, {id: 'reset-step'}));
-    if (step.id === 'strategy-validation') stepTools.append(button('生成本地完整性报告', basicValidation, {id: 'basic-validation'}));
-    if (step.id === 'revision') stepTools.append(button('复制校验报告到修订草稿', () => {
+    const reportTools = el('div', {class: 'toolbar report-tools'});
+    if (step.id === 'strategy-validation') reportTools.append(button('生成本地完整性报告', basicValidation, {id: 'basic-validation'}));
+    if (step.id === 'revision') reportTools.append(button('复制校验报告到修订草稿', () => {
       if (formData['revision-修改建议列表'] && !confirm('确认替换现有修订草稿？')) return;
       commitField('revision-修改建议列表', formData['strategy-validation-逻辑校验报告'] || metadata.validationReport?.content || '请先完成战略逻辑校验，再记录修改项、责任人与处理结果。'); renderStep();
     }, {id: 'revision-from-report'}));
-    body.append(stepTools);
+    hints.append(stepTools);
+    if (reportTools.childElementCount) body.append(reportTools);
+    if (['strategy-validation', 'revision'].includes(step.id)) {
+      body.append(el('p', {class: 'validation-disclaimer'}, '本地检查只核对是否填写，不能证明战略逻辑正确。报告可手工编辑，也可按需使用 AI。'));
+    }
     if (step.id === 'revision') {
       body.append(el('p', {}, '手工记录修改建议与处理结果。通过下列链接回到对应步骤修改；关键决策须由你确认，AI 不会自动改写其他字段。'));
       const links = el('div', {class: 'revision-links'});
       steps.slice(0, 13).forEach((s, i) => links.append(button(s.title, () => goToStep(i)))); body.append(links);
     }
     for (const field of step.fields) renderField(step, field);
-    const pager = el('div', {class: 'step-pager'});
-    const prev = button('上一步', () => goToStep(currentStep - 1), {id: 'previous-step'}); prev.disabled = currentStep === 0;
-    const next = button('下一步', () => goToStep(currentStep + 1), {id: 'next-step', class: 'primary'}); next.disabled = currentStep === 14;
-    pager.append(prev, next); body.append(pager); updateProgress();
+    if (['strategy-validation', 'revision'].includes(step.id)) renderMissing();
+    const count = el('span', {class: 'field-count'}, `${step.fields.length} 项信息 · 可随时继续补充`);
+    const prev = button(`上一步：${steps[currentStep - 1]?.title || ''}`, () => goToStep(currentStep - 1), {id: 'previous-step'}); prev.hidden = currentStep === 0;
+    const next = button(`下一步：${steps[currentStep + 1]?.title || ''}`, () => goToStep(currentStep + 1), {id: 'next-step', class: 'primary'}); next.hidden = currentStep === 14;
+    if (returnPoint) pager.append(button('返回检查结果', returnToReport, {id: 'return-report-footer'}));
+    pager.append(count, prev, button('稍后继续', () => { if (save()) say('已保存到当前浏览器，可随时继续填写。建议导出 JSON 备份。'); }, {id: 'save-later'}), next); updateProgress();
+  }
+  function renderHints(step) {
+    hints.replaceChildren();
+    const context = el('details', {class: 'context-help', open: ''}); context.append(el('summary', {}, '填写提示'));
+    const tips = el('ol');
+    for (const tip of ['明确本次规划的业务范围', '先写事实，判断可以逐步补充', '不确定的内容可暂时留空']) tips.append(el('li', {}, tip));
+    const example = el('details', {id: 'writing-example'}); example.append(el('summary', {}, '查看填写示例'));
+    example.append(el('p', {}, currentStep === 0 ? '示例（虚构，仅供参考）：某制造服务企业，为中小工厂提供设备监测服务。当前处于业务验证阶段，需要补充客户续费数据。' : `示例（虚构，仅供参考）：围绕“${step.title}”，记录已知事实、证据来源和仍需核实的问题。`));
+    context.append(tips, example); hints.append(context);
+    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, 'AI 辅助（可选）'), el('p', {}, '自备 Key，按需启用，辅助生成内容建议。'), button('AI 辅助（可选）', () => { chooseAITarget(null); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
+  }
+  function renderMissing() {
+    const current = missingFields(steps, formData);
+    if (!reportEntries.length) reportEntries = current;
+    const box = el('section', {id: 'missing-fields', 'aria-label': '待补充字段'});
+    box.append(el('h2', {}, `填写完整性 · ${current.length} 项待补充`));
+    const list = el('ul');
+    // Keep resolved entries visible during this review session; derive status from current values.
+    const entries = [...reportEntries, ...current.filter(item => !reportEntries.some(old => old.id === item.id))];
+    for (const item of entries) {
+      const resolved = hasContent(formData[item.id]);
+      const row = el('li', {'data-missing-field': item.id, 'data-resolved': String(resolved)});
+      row.append(el('span', {}, `${item.step.title} / ${item.field.name} · ${resolved ? '已补充' : '待补充'}`), button(resolved ? '查看' : '去补充', () => {
+        returnPoint = {step: currentStep, scroll: body.scrollTop, field: item.id};
+        goToStep(item.index); focusField(item.id);
+      })); list.append(row);
+    }
+    if (!entries.length) box.append(el('p', {}, '前 13 步均有内容，仍需人工核验。'));
+    box.append(list); body.append(box);
+  }
+  function focusField(id) {
+    const box = [...body.querySelectorAll('[data-field]')].find(node => node.dataset.field === id);
+    if (!box) return;
+    requestAnimationFrame(() => {
+      const cm = box.querySelector('.CodeMirror')?.CodeMirror;
+      if (cm) cm.focus(); else box.querySelector('input:not([type=file]), textarea')?.focus({preventScroll: true});
+      box.scrollIntoView({block: 'center', behavior: 'instant'});
+    });
+  }
+  function returnToReport() {
+    const point = returnPoint; returnPoint = null; goToStep(point.step);
+    body.scrollTop = point.scroll;
+    const row = [...body.querySelectorAll('[data-missing-field]')].find(node => node.dataset.missingField === point.field);
+    row?.querySelector('button')?.focus({preventScroll: true});
   }
   function renderField(step, field) {
     const id = `${step.id}-${field.name}`;
@@ -231,8 +345,8 @@ function buildWorkspace() {
     const head = el('div', {class: 'field-heading'}), label = el('h3');
     label.append(el('label', {for: id}, field.name));
     if (field.type === 'table') label.firstChild.removeAttribute('for');
-    const actions = el('div', {class: 'field-actions'});
-    actions.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); aiDetails.open = true; question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; aiDetails.scrollIntoView({block: 'start'}); say('请核对 AI 设置、外部处理同意与上下文，然后主动发送。'); }, {'data-ai-field': id}));
+    const actions = menu('AI / 导入', `actions-${id}`); actions.classList.add('field-actions');
+    actions.lastElementChild.append(button('AI 辅助（可选）', () => { chooseAITarget({id, field, step}); openAI(); question.value = `${step.title} / ${field.name}：请基于已有内容提出建议。${field.type === 'table' ? '请只返回 JSON 二维数组，列依次为：' + field.columns.join('、') : ''}`; say('请核对 AI 设置、外部处理同意与上下文，然后主动发送。'); }, {'data-ai-field': id}));
     if (field.type !== 'table') {
       const file = el('input', {type: 'file', accept: '.txt,.md,text/plain,text/markdown', hidden: '', 'aria-label': `导入${field.name}文本`});
       file.addEventListener('change', async () => {
@@ -243,8 +357,9 @@ function buildWorkspace() {
           if ((formData[id] || '') && !confirm(`确认用文件文本替换“${field.name}”？`)) return;
           if (commitField(id, text, '')) renderStep();
         } catch { say('仅支持限长的 UTF-8 文本或 Markdown 文件；不支持 .docx。原字段未更改。'); }
+        finally { file.value = ''; }
       });
-      actions.append(button('导入文本', () => file.click()), file);
+      actions.lastElementChild.append(button('导入文本', () => file.click()), file);
     }
     head.append(label, actions); box.append(head);
     if (field.type === 'table') {
@@ -255,20 +370,28 @@ function buildWorkspace() {
       rows.forEach((row, r) => {
         const line = el('tr'); row.forEach((cell, c) => {
           const td = el('td'), input = el('textarea', {'aria-label': `${field.name} 第${r + 1}行 ${field.columns[c]}`, maxlength: String(LIMITS.cell), 'data-row': r, 'data-column': c}); input.value = cell;
-          input.addEventListener('input', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data[r][c] = input.value; commitField(id, data, `${id}-${r}-${c}`); }); td.append(input); line.append(td);
+          input.addEventListener('input', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data[r][c] = input.value; if (!commitField(id, data, `${id}-${r}-${c}`)) input.value = (formData[id]?.[r]?.[c] ?? rows[r][c]); }); td.append(input); line.append(td);
         });
         const operation = el('td'); operation.append(button('删除', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.splice(r, 1); commitField(id, data, ''); renderStep(); }, {'aria-label': `删除${field.name}第${r + 1}行`})); line.append(operation); tbody.append(line);
       });
       table.append(tbody); wrap.append(table); box.append(wrap, button('添加行', () => { const data = clone(formData[id]?.length ? formData[id] : rows); data.push(field.columns.map(() => '')); if (commitField(id, data, '')) renderStep(); }, {'data-add-row': id}));
     } else {
-      const columns = el('div', {class: 'editor-preview'}), editPane = el('div', {class: 'editor-pane'}), preview = el('div', {class: 'preview-pane'});
-      preview.append(el('h4', {}, '预览'));
-      const rich = el('div', {class: 'rich-content', id: `${id}-preview`}); preview.append(rich);
       const maxLength = field.maxlength ?? LIMITS.text;
-      const input = el('textarea', {id, 'aria-label': field.name, maxlength: String(maxLength), placeholder: field.placeholder || '支持 Markdown；可手工编辑并保存。'});
+      const input = el(field.type === 'input' ? 'input' : 'textarea', {id, 'aria-label': field.name, maxlength: String(maxLength), placeholder: field.placeholder || '支持 Markdown；可手工编辑并保存。'});
       input.value = formData[id] || '';
-      editPane.append(input); columns.append(editPane, preview); box.append(columns); body.append(box);
-      const editor = new window.EasyMDE({element: input, autoDownloadFontAwesome: false, spellChecker: false, autosave: {enabled: false}, status: ['lines', 'words'], toolbar: false, minHeight: field.type === 'input' ? '80px' : '140px', maxHeight: '430px', previewRender: renderMarkdown, renderingConfig: {sanitizerFunction: sanitizeRichHTML}, inputStyle: 'textarea', lineWrapping: true, forceSync: true, shortcuts: {togglePreview: null, toggleSideBySide: null, toggleFullScreen: null, drawImage: null, drawLink: null, undo: null, redo: null}});
+      if (simpleField(step, field)) {
+        input.classList.add('simple-input');
+        input.addEventListener('input', () => { if (!commitField(id, input.value)) input.value = formData[id] || ''; });
+        box.append(input); body.append(box); return;
+      }
+      const columns = el('div', {class: 'editor-preview'}), editPane = el('div', {class: 'editor-pane'}), preview = el('div', {class: 'preview-pane', hidden: ''});
+      const rich = el('div', {class: 'rich-content', id: `${id}-preview`}); preview.append(rich);
+      const toggle = button('预览', () => {
+        preview.hidden = !preview.hidden; toggle.setAttribute('aria-expanded', String(!preview.hidden)); toggle.textContent = preview.hidden ? '预览' : '收起预览';
+      }, {class: 'preview-toggle', 'aria-expanded': 'false', 'aria-controls': `${id}-preview`});
+      const format = el('div', {class: 'format-actions'}); format.append(el('span', {}, 'Markdown（可选）'), toggle);
+      editPane.append(input); columns.append(editPane, format, preview); box.append(columns); body.append(box);
+      const editor = new window.EasyMDE({element: input, autoDownloadFontAwesome: false, spellChecker: false, autosave: {enabled: false}, status: ['lines', 'words'], toolbar: false, minHeight: step.id === 'company-info' ? '100px' : '140px', previewRender: renderMarkdown, renderingConfig: {sanitizerFunction: sanitizeRichHTML}, inputStyle: 'textarea', lineWrapping: true, forceSync: true, shortcuts: {togglePreview: null, toggleSideBySide: null, toggleFullScreen: null, drawImage: null, drawLink: null, undo: null, redo: null}});
       editor.codemirror.getInputField().setAttribute('aria-label', `${field.name} Markdown 编辑`);
       editors.push(editor);
       const syncPreview = value => { rich.innerHTML = renderMarkdown(value); };
@@ -285,9 +408,11 @@ function buildWorkspace() {
     body.append(box);
   }
   function basicValidation() {
-    const incomplete = steps.slice(0, 13).flatMap(s => s.fields.filter(f => { const v = formData[`${s.id}-${f.name}`]; return Array.isArray(v) ? !v.some(row => row.some(c => c.trim())) : !v?.trim(); }).map(f => `- ${s.title} / ${f.name}：待补充`));
+    const missing = missingFields(steps, formData);
+    const incomplete = missing.map(item => `- ${item.step.title} / ${item.field.name}：待补充`);
     const report = `## 本地完整性检查\n\n${incomplete.length ? incomplete.join('\n') : '前 13 步均有内容。'}\n\n此检查仅核对是否填写，不能证明战略逻辑正确。请人工核验目标、业务设计、关键任务与资源之间的承接关系。`;
     if (formData['strategy-validation-逻辑校验报告'] && !confirm('用本地完整性检查替换现有报告？')) return;
+    reportEntries = missing;
     commitField('strategy-validation-逻辑校验报告', report, ''); renderStep(); say('已生成本地完整性报告，未调用 AI。');
   }
   importInput.addEventListener('change', async () => {
@@ -351,7 +476,7 @@ function buildWorkspace() {
     try {
       for (const k of TOOL_KEYS) localStorage.removeItem(k);
       aiEpoch++; controller?.abort(); key.value = ''; consent.checked = false; aiAnswer = ''; aiTarget = null; targetLabel.textContent = '当前目标：规划讨论（不会写入字段）'; aiResult.replaceChildren(); aiApply.hidden = true; question.value = ''; pending = false; aiSend.disabled = false; aiCancel.disabled = true;
-      formData = {}; metadata = {}; currentStep = 0; undo = []; redo = []; recovery.clear(); storageBlocked = false; configBlocked = false; recoveryBox.hidden = true; legacyNotice.hidden = true;
+      formData = {}; metadata = {}; currentStep = 0; undo = []; redo = []; returnPoint = null; reportEntries = []; recovery.clear(); storageBlocked = false; configBlocked = false; recoveryBox.hidden = true; legacyNotice.hidden = true;
       config = {provider: 'deepseek', ...PROVIDERS.deepseek}; writeConfig(); renderStep(); updateHistory(); status.textContent = '本工具本地数据已清除；下次编辑才会重新保存。'; say('已清除本工具数据。');
     } catch { say('清除未完成：浏览器拒绝存储操作，请使用浏览器设置检查；未清除其他应用数据。'); }
   }
