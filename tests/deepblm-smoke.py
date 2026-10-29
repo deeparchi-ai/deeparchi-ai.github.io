@@ -165,9 +165,12 @@ def check_desktop(browser, base, directory):
     assert page.locator('.simple-input').count() == 4
     assert page.locator('.simple-input').first.evaluate('e => e.tagName') == 'INPUT'
     assert page.locator('.simple-input').first.get_attribute('maxlength') == '40'
-    assert page.locator('.nav-group').count() == 4
-    assert [g.locator('h2').inner_text() for g in page.locator('.nav-group').all()] == ['现状与洞察', '战略选择', '执行与保障', '检查与修订']
-    assert [g.locator('button').count() for g in page.locator('.nav-group').all()] == [3, 3, 7, 2]
+    assert page.locator('.nav-group').count() == 5
+    assert [g.locator('h2').inner_text() for g in page.locator('.nav-group').all()] == ['现状与差距', '战略选择', '战略执行', '领导力与价值观', '检查与修订']
+    assert [g.locator('button').count() for g in page.locator('.nav-group').all()] == [2, 4, 5, 2, 2]
+    expect(page.locator('.nav-foundation .nav-group-note')).to_have_text('贯穿战略与执行')
+    assert page.locator('.nav-group').nth(1).locator('button').first.inner_text() == '3. 市场洞察'
+    assert [b.inner_text() for b in page.locator('.nav-foundation button').all()] == ['12. 领导力', '13. 价值观']
     expect(page.locator('#planning-name')).to_have_text('未命名规划')
     expect(page.locator('#next-step')).to_have_text('下一步：差距分析')
     expect(page.locator('.preview-pane')).not_to_be_visible()

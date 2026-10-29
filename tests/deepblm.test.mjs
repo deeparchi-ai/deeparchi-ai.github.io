@@ -118,9 +118,17 @@ test('public entry remains native and mobile loader has no storage, AI UI, analy
 
 test('workspace groups retain every step exactly once; completeness follows actual text and table values', async () => {
   const {groups, groupFor, missingFields, simpleField} = await import('../assets/deepblm-ui.mjs');
-  assert.deepEqual(groups.map(g => g.name), ['现状与洞察', '战略选择', '执行与保障', '检查与修订']);
+  assert.deepEqual(groups.map(g => g.name), ['现状与差距', '战略选择', '战略执行', '领导力与价值观', '检查与修订']);
+  assert.deepEqual(groups.map(g => g.end - g.start), [2, 4, 5, 2, 2]);
   assert.deepEqual(groups.flatMap(g => steps.slice(g.start, g.end).map(s => s.id)), steps.map(s => s.id));
-  assert.equal(groupFor(12), '执行与保障');
+  assert.equal(groupFor(1), '现状与差距');
+  assert.equal(groupFor(2), '战略选择');
+  assert.equal(groupFor(5), '战略选择');
+  assert.equal(groupFor(6), '战略执行');
+  assert.equal(groupFor(10), '战略执行');
+  assert.equal(groupFor(11), '领导力与价值观');
+  assert.equal(groupFor(12), '领导力与价值观');
+  assert.equal(groups[3].note, '贯穿战略与执行');
   assert.equal(groupFor(13), '检查与修订');
   assert.equal(steps[0].fields.filter(f => simpleField(steps[0], f)).length, 4);
   const empty = missingFields(steps, {});

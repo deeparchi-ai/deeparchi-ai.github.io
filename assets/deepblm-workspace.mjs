@@ -84,7 +84,8 @@ function buildWorkspace() {
   const progressLabel = el('p', {id: 'progress-label', class: 'small'}), progress = el('progress', {id: 'planning-progress', max: '15', value: '0', 'aria-label': '有内容的步骤数'});
   const nav = el('nav', {'aria-label': '15 步规划导航', id: 'step-nav'}), stepButtons = [];
   for (const group of groups) {
-    const section = el('section', {class: 'nav-group'}); section.append(el('h2', {}, group.name));
+    const section = el('section', {class: group.note ? 'nav-group nav-foundation' : 'nav-group'}); section.append(el('h2', {}, group.name));
+    if (group.note) section.append(el('p', {class: 'nav-group-note'}, group.note));
     steps.slice(group.start, group.end).forEach((step, offset) => {
       const i = group.start + offset;
       const b = button(`${i + 1}. ${step.title}`, () => goToStep(i), {'data-step': step.id});
