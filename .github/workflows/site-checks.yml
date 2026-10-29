@@ -38,3 +38,5 @@ jobs:
         run: .venv/bin/python tests/visual-smoke.py
       - name: Check Deep BLM desktop workbench and mobile companion
         run: .venv/bin/python tests/deepblm-smoke.py
+      - name: Check Deep BLM deep UX review and session workflows
+        run: .venv/bin/python tests/deepblm-deep-ux-smoke.py

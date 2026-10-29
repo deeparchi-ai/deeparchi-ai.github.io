@@ -136,3 +136,46 @@
 @media(prefers-reduced-motion:reduce){.deepblm *{scroll-behavior:auto!important;transition:none!important}}
 
 .deepblm-page-title{padding-top:24px}.deepblm-page-title h1{font-size:28px}.companion>h2:first-of-type{font-size:30px}
+
+/* Deep UX A: real per-step completion in the sidebar plus a current-step field outline. */
+.step-sidebar button .step-title{display:block}
+.step-sidebar button .step-completion{display:block;font-size:11px;line-height:1.45;color:var(--muted);margin-top:2px}
+.step-sidebar button[aria-current=step] .step-completion{color:#3f6dab}
+#field-outline{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.deepblm #field-outline h2{font-size:15px;margin:0 0 4px;font-weight:600}
+#field-outline ul{list-style:none;margin:8px 0 10px;padding:0;display:grid;gap:2px}
+#field-outline li{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#field-outline button{flex:1;text-align:left;border:0;background:none;border-radius:4px;padding:5px 6px;font-size:13px;color:#2f4a72;overflow-wrap:anywhere}
+#field-outline button:hover{background:#eef4fd}
+#field-outline .field-state{font-size:11px;color:var(--muted);white-space:nowrap}
+#field-outline button[data-filled=true]+.field-state{color:#426b52}
+#field-outline #next-missing-field{width:100%;border-color:var(--blue);color:#075fc5;min-height:34px;font-size:13px}
+#field-outline #next-missing-field:disabled{color:var(--muted);border-color:var(--line);cursor:default}
+#current-completion{margin:0;color:var(--muted)}
+
+/* Deep UX B: review, edit, compare and a footer that stays reachable for long suggestions. */
+.ai-review-bar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.workbench .ai-review-bar button{border-radius:6px;font-size:13px;min-height:32px;padding:4px 12px;color:#41506c}
+.workbench .ai-review-bar [aria-pressed=true]{background:#eaf3ff;color:#075fc5;border-color:#8bb7ef}
+#ai-panel #ai-edit-pane label{display:block;margin:0 0 6px;font-weight:500}
+.workbench #ai-draft-editor{min-height:220px;max-height:46vh;resize:vertical;border-radius:8px;font-size:14px;line-height:1.7}
+.ai-help{font-size:12px;color:var(--muted);margin:6px 0;line-height:1.6}
+#ai-compare-pane h4{font-size:13px;margin:0 0 6px;color:#41506c}
+#ai-compare-pane pre{max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f8fb;border:1px solid var(--line);border-radius:6px;padding:10px;font-size:13px;margin:0 0 8px}
+.ai-compare-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ai-compare-grid>section{min-width:0}
+#ai-manual-copy{margin-top:12px}
+#ai-manual-copy p{margin:0 0 6px}
+.workbench #ai-copy-fallback{min-height:96px;font-size:13px;background:#fffdf7;border-color:#d9b486}
+#ai-footer{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 28px;border-top:1px solid var(--line);background:#fff;flex:none}
+#ai-footer .ai-status{font-size:13px;color:#41506c;margin-right:auto;overflow-wrap:anywhere}
+.ai-result-card[data-state=stale]{border-color:#d9b486;background:#fffbf5}
+.ai-result-card[data-adopted=true]{border-color:#9cc7a8;background:#f7fcf8}
+#ai-panel #ai-apply{margin:0;color:#fff;border-color:#0668df;background:#0668df}
+#ai-panel #ai-apply:hover{background:#005dc9}
+@media(min-width:1280px){
+  #ai-panel{width:min(1080px,calc(100vw - 64px))}
+  .ai-scroll{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:30px;align-items:start}
+  .ai-writing,.ai-result-card{min-width:0}
+  .ai-result-card{margin-top:0}
+}

@@ -8,6 +8,18 @@ export const groups = [
 ];
 export const groupFor = index => groups.find(g => index >= g.start && index < g.end).name;
 export const hasContent = value => Array.isArray(value) ? value.some(row => row.some(cell => cell.trim())) : typeof value === 'string' && !!value.trim();
+export function stepCompletion(step, data) {
+  const filled = step.fields.filter(field => hasContent(data[`${step.id}-${field.name}`])).length;
+  const total = step.fields.length;
+  return {filled, total, label: !filled ? '未开始' : filled === total ? '已填写' : '填写中'};
+}
+// Rotates from the field after the last touched one so repeated use walks the whole step.
+// Only real blank fields of this step are returned; no invented required fields.
+export function nextMissingFieldId(step, data, afterId = null) {
+  const ids = step.fields.map(field => `${step.id}-${field.name}`);
+  const start = afterId && ids.includes(afterId) ? ids.indexOf(afterId) + 1 : 0;
+  return [...ids.slice(start), ...ids.slice(0, start)].find(id => !hasContent(data[id])) ?? null;
+}
 export const writingActions = [
   {id: 'draft', label: '起草内容'},
   {id: 'improve', label: '完善表达'},
