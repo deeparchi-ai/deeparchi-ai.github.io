@@ -320,7 +320,7 @@ def check_desktop(browser, base, directory):
     bounds = page.locator('#ai-panel').bounding_box()
     assert 0 <= bounds['y'] and bounds['y'] + bounds['height'] <= 1000
     assert page.locator('#ai-panel').get_attribute('aria-labelledby') == 'ai-heading'
-    expect(page.locator('#ai-disclosure')).to_contain_text('规划全文、已有校验报告')
+    expect(page.locator('#ai-panel #ai-disclosure, #ai-panel #ai-destination, #ai-panel #ai-consent')).to_have_count(0)
     # Escape closes and restores focus to the visible field disclosure summary.
     page.keyboard.press('Escape'); expect(page.locator('#ai-panel')).not_to_be_visible()
     expect(field(page, 'strategy-validation-逻辑校验报告').locator('summary')).to_be_focused()
@@ -354,7 +354,7 @@ def check_desktop(browser, base, directory):
     page.route(ENDPOINT_FIXTURE, fixture)
     page.locator('#ai-send').click()
     assert not calls
-    page.locator('#ai-consent').check()
+    approve_global(page)
     page.locator('#ai-send').click()
     expect(page.locator('#ai-apply')).to_be_visible()
     assert len(calls) == 1
@@ -479,6 +479,19 @@ def check_desktop(browser, base, directory):
     page.close()
 
 
+def approve_global(page):
+    # Confirm once in the visible global dialog, never inside a step.
+    if page.locator('#ai-consent').is_checked():
+        return
+    if page.locator('#ai-settings').is_visible():
+        page.locator('#ai-consent').check()
+        return
+    page.locator('#ai-open-settings').click()
+    expect(page.locator('#ai-settings #ai-disclosure')).to_contain_text('规划全文、已有校验报告')
+    page.locator('#ai-consent').check()
+    page.locator('#close-ai-settings').click()
+
+
 def configure_global(page, remember=False):
     # Call with the visible global dialog. Only explicit fake credentials are used.
     page.locator('#ai-provider').select_option('custom')
@@ -486,6 +499,7 @@ def configure_global(page, remember=False):
     page.locator('#ai-model').fill('fixture-model-not-live')
     page.locator('#ai-key').fill(KEY_FIXTURE)
     page.locator('#ai-remember-key').set_checked(remember)
+    page.locator('#ai-consent').check()
     page.locator('#save-ai-preferences').click()
 
 
@@ -539,12 +553,8 @@ def check_global_ai(browser, base, directory):
         assert page.locator('#ai-panel #ai-key, #ai-panel #ai-provider, #ai-panel #ai-endpoint, #ai-panel #ai-model, #ai-panel #save-ai-preferences').count() == 0
         expect(page.locator('#ai-config-status')).not_to_be_visible()
         expect(page.locator('#ai-open-settings')).not_to_be_visible()
-        expect(page.locator('#ai-destination')).to_contain_text(urlsplit(ENDPOINT_FIXTURE).hostname)
+        expect(page.locator('#ai-panel #ai-disclosure, #ai-panel #ai-destination, #ai-panel #ai-consent')).to_have_count(0)
         assert not any(text in page.locator('#ai-panel').inner_text() for text in ('API', 'Key', '模型 ID', 'CORS', '全局设置'))
-        if i == 0:
-            page.locator('#ai-send').click()
-            assert not calls
-            page.locator('#ai-consent').check()
         page.locator('#ai-send').click()
         expect(page.locator('#ai-apply')).to_be_visible()
         expect(page.locator('#ai-result')).to_contain_text('虚构全局建议')
@@ -581,7 +591,7 @@ def check_global_ai(browser, base, directory):
     page.locator('#open-ai').click()
     assert not page.locator('#ai-consent').is_checked()
     page.locator('#ai-send').click(); assert len(calls) == 15
-    expect(page.locator('#ai-message')).to_contain_text('勾选同意外部处理')
+    expect(page.locator('#ai-message')).to_contain_text('请先完成全局设置')
     page.locator('#close-ai').click()
     page.locator('#open-ai-settings').click()
     assert page.locator('#ai-key').input_value() == KEY_FIXTURE
@@ -594,7 +604,8 @@ def check_global_ai(browser, base, directory):
     other.goto(base + '/apps/deepblm.html?internal_test=1', wait_until='networkidle')
     other.locator('#open-ai').click()
     assert not other.locator('#ai-consent').is_checked()
-    expect(other.locator('#ai-open-settings')).not_to_be_visible()
+    expect(other.locator('#ai-open-settings')).to_be_visible()
+    expect(other.locator('#ai-config-status')).to_contain_text('请先完成全局设置')
     other.locator('#close-ai').click()
     other.locator('#open-ai-settings').click()
     assert other.locator('#ai-key').input_value() == KEY_FIXTURE
@@ -649,7 +660,7 @@ def check_global_ai(browser, base, directory):
     assert page.locator('#ai-target').inner_text() == target
     assert page.locator('#ai-question').input_value() == '虚构需要保留的问题'
     assert page.locator('dialog[open]').count() == 1
-    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    approve_global(page); page.locator('#ai-send').click()
     expect(page.locator('#ai-apply')).to_be_visible()
     count = len(calls)
     # Opening global settings cancels an in-flight request; even a fixture that
@@ -680,7 +691,7 @@ def check_global_ai(browser, base, directory):
     page.evaluate('''() => {window.__resolveGlobalFixture(); window.fetch = window.__originalGlobalFixtureFetch;}''')
     expect(page.locator('#ai-result')).not_to_contain_text('fixture-old-global-response')
     request_count = len(requests)
-    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    approve_global(page); page.locator('#ai-send').click()
     expect(page.locator('#ai-message')).to_contain_text('请先完成全局设置')
     assert len(calls) == count and len(requests) == request_count
     page.locator('#ai-open-settings').click()
@@ -692,7 +703,7 @@ def check_global_ai(browser, base, directory):
     page.locator('#close-ai-settings').click()
     assert not page.locator('#ai-consent').is_checked()
     expect(page.locator('#ai-apply')).not_to_be_visible()
-    page.locator('#ai-consent').check(); page.locator('#ai-send').click()
+    approve_global(page); page.locator('#ai-send').click()
     expect(page.locator('#ai-message')).to_contain_text('请先完成全局设置')
     assert len(calls) == count and len(requests) == request_count
     page.locator('#ai-open-settings').click()

@@ -97,14 +97,14 @@ function buildWorkspace() {
   const hints = el('aside', {class: 'context-sidebar', 'aria-label': '填写帮助'});
   center.append(body, pager); grid.append(sidebar, center, hints); host.append(grid);
   let returnPoint = null, reportEntries = [];
-  const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading', 'aria-describedby': 'ai-disclosure'});
+  const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading'});
   aiDetails.append(button('关闭 AI 辅助', closeAI, {id: 'close-ai'}), el('h2', {id: 'ai-heading', tabindex: '-1'}, 'AI 辅助（可选）'));
-  aiDetails.append(el('p', {id: 'ai-disclosure'}, '主动发送后，当前规划全文、已有校验报告和你的问题（包含全部 15 步）会交给所选服务方处理，费用由你的账户承担。请确认发送范围，不要发送敏感资料；建议需自行核验。'));
+  const aiDisclosure = el('p', {id: 'ai-disclosure'}, '主动发送后，当前规划全文、已有校验报告和你的问题（包含全部 15 步）会交给所选服务方处理，费用由你的账户承担。请确认发送范围，不要发送敏感资料；建议需自行核验。此处统一确认后，全部步骤共用；重新打开页面或修改连接设置后需重新确认。');
   const sharedStatus = el('p', {id: 'ai-config-status', class: 'small'});
   const destination = el('p', {id: 'ai-destination', class: 'small'});
   const configureAIButton = button('去全局设置', openGlobalAI, {id: 'ai-open-settings', 'aria-haspopup': 'dialog'});
-  aiDetails.append(sharedStatus, destination, configureAIButton);
-  const aiSettings = el('dialog', {id: 'ai-settings', 'aria-modal': 'true', 'aria-labelledby': 'ai-settings-heading', 'aria-describedby': 'ai-storage-disclosure'});
+  aiDetails.append(sharedStatus, configureAIButton);
+  const aiSettings = el('dialog', {id: 'ai-settings', 'aria-modal': 'true', 'aria-labelledby': 'ai-settings-heading', 'aria-describedby': 'ai-disclosure ai-storage-disclosure'});
   aiSettings.append(button('关闭全局设置', closeGlobalAI, {id: 'close-ai-settings'}), el('h2', {id: 'ai-settings-heading', tabindex: '-1'}, '全局 AI 设置'));
   aiSettings.append(el('p', {}, 'DeepBLM 工作台全部 15 步共用一份设置；导入或重置规划不影响它。仅支持 OpenAI 兼容 Chat Completions，请核对模型 ID、费用、权限与浏览器 CORS。保存设置不测试连接。'));
   const aiGrid = el('div', {class: 'ai-grid'});
@@ -122,7 +122,7 @@ function buildWorkspace() {
   const consentLabel = el('label');
   const consent = el('input', {type: 'checkbox', id: 'ai-consent'});
   consentLabel.append(consent, document.createTextNode('我同意向所选服务方发送规划上下文并承担费用。'));
-  aiDetails.append(consentLabel);
+  aiSettings.append(aiDisclosure, destination, consentLabel);
   const aiBar = el('div', {class: 'toolbar'});
   const settingsBar = el('div', {class: 'toolbar'});
   settingsBar.append(button('保存全局设置', saveAISettings, {id: 'save-ai-preferences', class: 'primary'}), button('忘记 Key', forgetKey, {id: 'forget-key'}));
@@ -276,13 +276,13 @@ function buildWorkspace() {
   function writeConfig() { provider.value = config.provider; endpoint.value = config.endpoint; model.value = config.model; }
   function readConfig() { return canonicalConfig({provider: provider.value, endpoint: endpoint.value.trim(), model: model.value.trim()}); }
   function updateAIStatus() {
-    const configured = !configDirty && matchesDestination(credential, config) && !!config.model;
+    const configured = !configDirty && matchesDestination(credential, config) && !!config.model && consent.checked;
     globalAIButton.textContent = `AI 设置 · ${configured ? '已配置' : '未配置'}`;
     sharedStatus.textContent = configured ? '' : '尚未配置 AI，请先完成全局设置。';
     sharedStatus.hidden = configured; configureAIButton.hidden = configured;
-    // Disclose the recipient for consent, without repeating technical settings.
-    destination.textContent = configured ? `内容接收方：${new URL(config.endpoint).hostname}` : '';
-    destination.hidden = !configured;
+    // Recipient and consent are shown only in global settings.
+    try { destination.textContent = `内容接收方：${new URL(endpoint.value).hostname}`; }
+    catch { destination.textContent = '请填写服务地址以确认内容接收方。'; }
     rememberedStatus.textContent = remembered ? '已在此浏览器记住 Key（明文）。' : '当前未启用已确认的浏览器记忆；本页可使用内存 Key。';
   }
   function invalidateAI() {
@@ -303,7 +303,9 @@ function buildWorkspace() {
       else if (remember.checked) throw new Error('Missing key');
     } catch { say('设置无效：请检查公共 HTTPS 接口、模型 ID 和 Key；原存储未更改。'); return; }
     if (configBlocked && !confirm('原设置无法读取。确认用当前全局设置替换？')) return;
-    invalidateAI(); config = next; credential = nextCredential ?? null; configDirty = false; remembered = false; writeConfig();
+    const approved = consent.checked;
+    invalidateAI(); consent.checked = approved;
+    config = next; credential = nextCredential ?? null; configDirty = false; remembered = false; writeConfig();
     // Remove the old secret first. If any write fails, keep only the explicitly applied
     // in-memory credential and report the uncertain/failed persistence without echoing it.
     let removed = false;
@@ -311,7 +313,7 @@ function buildWorkspace() {
       localStorage.removeItem(REMEMBERED_KEY); removed = true;
       localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); configBlocked = false;
       if (remember.checked) { localStorage.setItem(REMEMBERED_KEY, JSON.stringify(credential)); remembered = true; }
-      say(remembered ? '全局设置已保存；此浏览器已明文记住 Key。发送前仍须同意外部处理。' : '全局设置已应用，非秘密配置已保存；浏览器记忆 Key 已移除，Key 仅在本页内存。');
+      say(remembered ? '全局设置已保存；此浏览器已明文记住 Key。' : '全局设置已应用，非秘密配置已保存；浏览器记忆 Key 已移除，Key 仅在本页内存。');
     } catch {
       say(removed ? '本页已应用设置，但浏览器保存失败；未记住 Key。当前可用内存 Key，草稿仍可手工导出。' : '本页已应用设置，但浏览器拒绝删除旧记忆 Key；未确认已忘记，刷新可能恢复旧记录。请在浏览器设置中检查。');
     }
@@ -333,7 +335,7 @@ function buildWorkspace() {
   endpoint.addEventListener('input', () => editAISettings(true));
   model.addEventListener('input', () => editAISettings()); key.addEventListener('input', () => editAISettings());
   remember.addEventListener('change', () => editAISettings());
-  consent.addEventListener('change', () => { if (!consent.checked) invalidateAI(); });
+  consent.addEventListener('change', () => { if (!consent.checked) invalidateAI(); updateAIStatus(); });
   window.addEventListener('storage', event => {
     if (event.key !== null && ![REMEMBERED_KEY, CONFIG_KEY].includes(event.key)) return;
     // Never import another tab's credentials or silently change their destination.
@@ -591,7 +593,7 @@ function buildWorkspace() {
     try {
       settings = config;
       if (configDirty || !settings.model || !matchesDestination(credential, settings) || !validKey(credential?.key)) { say('请先完成全局设置。'); return; }
-      if (!consent.checked) { say('请先确认发送范围，并勾选同意外部处理。'); return; }
+      if (!consent.checked) { say('请先完成全局设置。'); return; }
       validateEndpoint(settings.endpoint);
       const requestKey = credential.key;
       // Limit the aggregate context and prompt before any network request.
