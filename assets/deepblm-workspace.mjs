@@ -2,6 +2,7 @@ import {steps, LIMITS, DRAFT_KEY, STEP_KEY, CONFIG_KEY, TOOL_KEYS, PROVIDERS, no
 import {REMEMBERED_KEY, canonicalConfig, validKey, matchesDestination, rememberedRecord, restoreRemembered} from './deepblm-credentials.mjs';
 import {groups, groupFor, hasContent, stepCompletion, nextMissingFieldId, missingFields, simpleField, purposes, wireMenu, writingActions, defaultWritingAction, defaultAITarget, canApplyWriting, writingPlaceholder, writingMessages} from './deepblm-ui.mjs';
 import {writingSessions, resultEligible} from './deepblm-sessions.mjs';
+import {studioStage, studioArt, studioIcon, studioIntents, appendStudioIntent} from './deepblm-studio.mjs';
 import {escapeHTML, renderMarkdown, sanitizeRichHTML} from './deepblm-security.mjs';
 const $ = selector => document.querySelector(selector);
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -23,6 +24,12 @@ function asset(path, kind) {
   });
 }
 let started = false;
+function studioPicture(index, className) {
+  const image = el('img', {src: studioArt(index), alt: '', width: '1600', height: '1000', decoding: 'async', class: className});
+  // Art is decorative: an unavailable image must not break editing or leave an error icon.
+  image.addEventListener('error', () => { image.hidden = true; });
+  return image;
+}
 export async function startWorkspace() {
   if (started || !matchMedia('(min-width: 1024px)').matches) return;
   started = true;
@@ -89,9 +96,9 @@ function buildWorkspace() {
     if (group.note) section.append(el('p', {class: 'nav-group-note'}, group.note));
     steps.slice(group.start, group.end).forEach((step, offset) => {
       const i = group.start + offset;
-      const b = button('', () => goToStep(i), {'data-step': step.id});
+      const b = button('', () => goToStep(i), {'data-step': step.id, title: step.title});
       // The main title stays in .step-title; the trailing span carries real per-step completion.
-      b.append(el('span', {class: 'step-title'}, `${i + 1}. ${step.title}`), el('span', {class: 'step-completion'}));
+      b.append(studioIcon(studioStage(i).icon), el('span', {class: 'step-title'}, `${i + 1}. ${step.title}`), el('span', {class: 'step-completion'}), el('span', {class: 'studio-step-meter', 'aria-hidden': 'true'}));
       section.append(b); stepButtons.push(b);
     }); nav.append(section);
   }
@@ -104,7 +111,8 @@ function buildWorkspace() {
   const aiDetails = el('dialog', {id: 'ai-panel', 'aria-modal': 'true', 'aria-labelledby': 'ai-heading'});
   const aiHeader = el('header', {class: 'ai-header'});
   const aiHeading = el('div');
-  aiHeading.append(el('p', {class: 'ai-eyebrow'}, '写作助手'), el('h2', {id: 'ai-heading', tabindex: '-1'}, '把想法写进规划'));
+  const aiEyebrow = el('p', {class: 'ai-eyebrow'}, '写作助手'); aiEyebrow.prepend(studioIcon());
+  aiHeading.append(aiEyebrow, el('h2', {id: 'ai-heading', tabindex: '-1'}, '把想法写进规划'));
   aiHeader.append(aiHeading, button('关闭', closeAI, {id: 'close-ai', 'aria-label': '关闭 AI 辅助'}));
   aiDetails.append(aiHeader);
   const aiScroll = el('div', {class: 'ai-scroll'});
@@ -164,6 +172,9 @@ function buildWorkspace() {
   actionBar.append(...actionButtons);
   const questionLabel = el('label', {for: 'ai-question'}, '补充要求（可选）');
   const question = el('textarea', {id: 'ai-question', maxlength: '8000', rows: '3'});
+  const intentBar = el('div', {class: 'studio-intents', role: 'group', 'aria-label': '准备写作要求'});
+  const intentHint = el('p', {id: 'ai-intent-hint', class: 'studio-intent-hint', role: 'status', 'aria-live': 'polite'}, '点选一个方向，先补充要求，再由你决定是否生成。');
+  question.setAttribute('aria-describedby', 'ai-intent-hint');
   question.addEventListener('input', rememberComposer);
   let composing = false;
   question.addEventListener('compositionstart', () => { composing = true; });
@@ -209,10 +220,10 @@ function buildWorkspace() {
   const resultFooter = el('footer', {id: 'ai-footer', class: 'ai-result-footer'});
   resultFooter.append(adoptedStatus, aiApply, copyButton, nextEmpty, button('返回字段', () => returnToField(), {id: 'ai-return'}));
   const resultCard = el('section', {class: 'ai-result-card', 'aria-labelledby': 'ai-result-heading', 'data-state': 'empty'});
-  resultCard.append(el('h3', {id: 'ai-result-heading'}, '审阅建议'), reviewBar, editPane, previewPane, originalPane, manualCopy);
+  resultCard.append(el('h3', {id: 'ai-result-heading'}, '审阅建议'), studioPicture(2, 'studio-ai-art'), reviewBar, editPane, previewPane, originalPane, manualCopy);
   const sendBar = el('div', {class: 'ai-sendbar'});
   sendBar.append(el('span', {class: 'ai-keyboard-hint'}, 'Ctrl / ⌘ + Enter 生成 · Enter 换行'), aiSend, aiCancel);
-  composer.append(actionBar, questionLabel, question, sendBar, aiMessage);
+  composer.append(actionBar, intentBar, intentHint, questionLabel, question, sendBar, aiMessage);
   const settingsMessage = el('p', {id: 'ai-settings-message', role: 'status', 'aria-live': 'polite'});
   aiSettings.append(settingsBar, legacyNotice, settingsMessage);
   const writingPane = el('div', {class: 'ai-writing'}); writingPane.append(aiSetup, targetBlock, composer);
@@ -378,6 +389,8 @@ function buildWorkspace() {
     pendingFieldFocus = aiTarget.id; closeAI();
   }
   function updatePending() {
+    aiDetails.dataset.pending = String(pending);
+    for (const node of intentBar.querySelectorAll('button')) node.disabled = pending;
     aiSend.disabled = pending;
     aiSend.textContent = pending ? '生成中…' : shownKind !== 'none' ? (aiTarget ? '重新生成建议' : '重新讨论') : aiTarget ? '生成建议' : '开始讨论';
     aiSend.classList.toggle('primary', !pending && shownKind === 'none');
@@ -400,7 +413,23 @@ function buildWorkspace() {
     actionBar.hidden = !aiTarget;
     actionButtons.forEach((node, i) => node.setAttribute('aria-pressed', String(writingActions[i].id === aiAction)));
     $('#ai-discussion').setAttribute('aria-pressed', String(!aiTarget));
-    question.placeholder = writingPlaceholder(aiTarget); updatePending();
+    question.placeholder = writingPlaceholder(aiTarget);
+    renderIntents(); updatePending();
+  }
+  function renderIntents() {
+    intentBar.replaceChildren();
+    intentHint.textContent = '点选一个方向，先补充要求，再由你决定是否生成。';
+    for (const intent of studioIntents(aiTarget, aiAction)) {
+      const node = button(intent.label, () => {
+        if (pending) return;
+        const next = appendStudioIntent(question.value, intent.text);
+        if (next.reason === 'limit') { intentHint.textContent = '补充要求已接近 8000 字符，请先精简；原有文字未改动。'; return; }
+        if (next.reason === 'duplicate') { intentHint.textContent = '这条要求已在输入框中；不会重复添加，也没有发送请求。'; }
+        else { question.value = next.value; rememberComposer(); intentHint.textContent = '已追加到补充要求，已有文字保留。仅下次主动生成时使用。'; }
+        question.focus(); question.setSelectionRange(question.value.length, question.value.length);
+      }, {'data-ai-intent': intent.id, title: intent.text});
+      node.prepend(studioIcon('sparkles')); intentBar.append(node);
+    }
   }
   function renderAISnapshot() {
     snapshotContent.replaceChildren();
@@ -608,6 +637,8 @@ function buildWorkspace() {
       if (i === currentStep) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
       const c = counts[i];
       b.querySelector('.step-completion').textContent = `${c.label} · ${c.filled}/${c.total}`;
+      b.querySelector('.studio-step-meter').textContent = `${c.filled}/${c.total}`;
+      b.dataset.completion = c.filled === c.total ? 'filled' : c.filled ? 'partial' : 'empty';
     });
     const c = counts[currentStep];
     const label = `${c.filled}/${c.total} 项已填写 · 仅按非空内容统计`;
@@ -682,7 +713,14 @@ function buildWorkspace() {
     const step = steps[currentStep];
     body.classList.toggle('company-step', currentStep === 0);
     const title = el('h1', {id: 'step-heading', tabindex: '-1'}, step.title);
-    body.append(el('p', {class: 'step-breadcrumb'}, `${groupFor(currentStep)} / 第 ${currentStep + 1} 步`), title, el('p', {class: 'step-description'}, purposes[currentStep]));
+    const stage = studioStage(currentStep);
+    host.dataset.stage = stage.art;
+    const intro = el('header', {class: 'studio-step-intro'}), introCopy = el('div', {class: 'studio-step-copy'});
+    intro.style.setProperty('--studio-accent', stage.accent);
+    introCopy.append(el('p', {class: 'step-breadcrumb'}, `${groupFor(currentStep)} / 第 ${currentStep + 1} 步`), title, el('p', {class: 'step-description'}, purposes[currentStep]));
+    const visual = el('figure', {class: 'studio-step-visual', 'aria-hidden': 'true'});
+    visual.append(studioPicture(currentStep, 'studio-step-art'));
+    intro.append(introCopy, visual); body.append(intro);
     if (returnPoint) body.append(button('返回检查结果', returnToReport, {id: 'return-report'}));
     renderHints(step);
     const stepTools = menu('撤销 / 重做 / 重置', 'step-tools');
@@ -713,6 +751,7 @@ function buildWorkspace() {
       steps.slice(0, 13).forEach((s, i) => links.append(button(s.title, () => goToStep(i)))); body.append(links);
     }
     for (const field of step.fields) renderField(step, field);
+    for (const node of body.querySelectorAll('[data-ai-field]')) node.prepend(studioIcon());
     if (['strategy-validation', 'revision'].includes(step.id)) renderMissing();
     const count = el('span', {class: 'field-count'}, `${step.fields.length} 项信息 · 可随时继续补充`);
     const prev = button(`上一步：${steps[currentStep - 1]?.title || ''}`, () => goToStep(currentStep - 1), {id: 'previous-step'}); prev.hidden = currentStep === 0;
@@ -747,7 +786,11 @@ function buildWorkspace() {
     const example = el('details', {id: 'writing-example'}); example.append(el('summary', {}, '查看填写示例'));
     example.append(el('p', {}, currentStep === 0 ? '示例（虚构，仅供参考）：某制造服务企业，为中小工厂提供设备监测服务。当前处于业务验证阶段，需要补充客户续费数据。' : `示例（虚构，仅供参考）：围绕“${step.title}”，记录已知事实、证据来源和仍需核实的问题。`));
     context.append(tips, example); hints.append(context);
-    const aiIntro = el('section', {class: 'ai-entry'}); aiIntro.append(el('h2', {}, '一起写好这一步'), el('p', {}, '从待补充的字段开始，也可切换到规划讨论。'), button('AI 帮写当前步骤', () => { chooseAITarget(defaultAITarget(step, formData)); openAI(); }, {id: 'open-ai'})); hints.append(aiIntro);
+    const aiIntro = el('section', {class: 'ai-entry'}), aiBadge = el('span', {class: 'studio-ai-badge', 'aria-hidden': 'true'});
+    aiBadge.append(studioIcon());
+    const aiOpen = button('AI 帮写当前步骤', () => { chooseAITarget(defaultAITarget(step, formData)); openAI(); }, {id: 'open-ai'});
+    aiOpen.append(studioIcon('arrow'));
+    aiIntro.append(aiBadge, el('h2', {}, '一起写好这一步'), el('p', {}, '从当前字段出发，把想法变成可审阅、可编辑的建议。'), aiOpen); hints.append(aiIntro);
   }
   function renderMissing() {
     const current = missingFields(steps, formData);

@@ -40,3 +40,5 @@ jobs:
         run: .venv/bin/python tests/deepblm-smoke.py
       - name: Check Deep BLM deep UX review and session workflows
         run: .venv/bin/python tests/deepblm-deep-ux-smoke.py
+      - name: Check Deep BLM AI Studio art, intents and accessible layouts
+        run: .venv/bin/python tests/deepblm-studio-smoke.py
