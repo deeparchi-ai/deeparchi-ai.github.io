@@ -20,6 +20,13 @@ VALID_HTML = """<!doctype html><html lang="zh-CN"><head>
 <img src="https://external.invalid/image.png" alt="">
 </main></body></html>"""
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/check_site.py"
+VALID_SPA = '''<!doctype html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="description" content="HTML slide editor">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Source Slide Editor</title>
+<script type="module" src="./assets/index-test123.js"></script>
+<link rel="stylesheet" href="./assets/index-test123.css">
+</head><body><div id="app"></div></body></html>'''
 
 
 class CheckSiteTests(unittest.TestCase):
@@ -93,6 +100,81 @@ class CheckSiteTests(unittest.TestCase):
         self.write("about.html", VALID_HTML.replace("#main", "#absent"))
         self.with_body('<a href="about.html">关于</a>')
         self.assertTrue(any("about.html: missing fragment" in error for error in check_site(self.root)))
+
+    def known_spa(self, content=VALID_SPA):
+        self.write("apps/source-slide-editor/index.html", content)
+        self.write("apps/source-slide-editor/assets/index-test123.js", "document.querySelector('#app');")
+        self.write("apps/source-slide-editor/assets/index-test123.css", "body {color:black}")
+        self.with_body('<a href="apps/source-slide-editor/">Editor</a>')
+
+    def test_known_spa_with_local_assets(self):
+        self.known_spa()
+        self.assertEqual(check_site(self.root), [])
+
+    def test_known_spa_requires_mount_and_module(self):
+        for before, after in (
+            ('<div id="app"></div>', ''),
+            ('<div id="app"></div>', '<main id="app"></main>'),
+            ('<div id="app"></div>', '<div id="app"></div><div id="app"></div>'),
+            ('type="module"', 'type="text/javascript"'),
+            ('./assets/index-test123.js', 'https://external.invalid/index-test123.js'),
+            ('<head>', '<head><base href="/">'),
+        ):
+            with self.subTest(before=before, after=after):
+                self.known_spa(VALID_SPA.replace(before, after))
+                errors = check_site(self.root)
+                self.assertTrue(any("invalid known SPA" in e for e in errors), errors)
+                self.assertTrue(any("expected one h1" in e for e in errors), errors)
+
+    def test_known_spa_requires_existing_module_and_stylesheet(self):
+        for asset in ("index-test123.js", "index-test123.css"):
+            with self.subTest(asset=asset):
+                self.known_spa()
+                (self.root / "apps/source-slide-editor/assets" / asset).unlink()
+                errors = check_site(self.root)
+                self.assertTrue(any("invalid known SPA" in e for e in errors), errors)
+                self.assertTrue(any("missing local target" in e for e in errors), errors)
+
+    def test_known_spa_still_requires_metadata_and_safe_resources(self):
+        for before, after, expected in (
+            ('lang="zh-CN"', '', 'missing html lang'),
+            ('<title>Source Slide Editor</title>', '<title> </title>', 'empty title'),
+            ('charset="UTF-8"', 'charset="GBK"', 'UTF-8 charset'),
+            ('name="description"', 'name="other"', 'missing meta description'),
+            ('name="viewport"', 'name="other"', 'missing meta viewport'),
+            ('</body>', '<img src="missing.png"></body>', 'missing local target'),
+            ('</body>', '<script src="http://external.invalid/a.js"></script></body>', 'HTTP embedded'),
+            ('</body>', '<img src="/%2e%2e/escape.png"></body>', 'leaves site root'),
+        ):
+            with self.subTest(expected=expected):
+                self.known_spa(VALID_SPA.replace(before, after))
+                self.assertTrue(any(expected in e for e in check_site(self.root)))
+
+    def test_arbitrary_spa_and_empty_pages_require_static_structure(self):
+        for name, content in (("other.html", VALID_SPA), ("empty.html", ""),
+                              ("apps/unregistered/index.html", VALID_SPA)):
+            with self.subTest(name=name):
+                self.write(name, content)
+                self.with_body(f'<a href="{name}">Page</a>')
+                errors = check_site(self.root)
+                self.assertTrue(any(f"{name}: expected one h1" in e for e in errors), errors)
+                self.assertTrue(any(f"{name}: expected one main" in e for e in errors), errors)
+
+    def test_symlinks_cannot_leave_site_tree(self):
+        with tempfile.TemporaryDirectory() as outside:
+            external = Path(outside) / "index.html"
+            external.write_text(VALID_HTML, encoding="utf-8")
+            (self.root / "linked").mkdir()
+            (self.root / "linked/index.html").symlink_to(external)
+            self.with_body('<a href="linked/">Escape</a>')
+            self.assertTrue(any("leaves site root" in e for e in check_site(self.root)))
+            self.known_spa()
+            module = self.root / "apps/source-slide-editor/assets/index-test123.js"
+            module.unlink()
+            module.symlink_to(external)
+            errors = check_site(self.root)
+            self.assertTrue(any("invalid known SPA" in e for e in errors), errors)
+            self.assertTrue(any("leaves site root" in e for e in errors), errors)
 
     def test_http_embedded_resources(self):
         for embedded in (

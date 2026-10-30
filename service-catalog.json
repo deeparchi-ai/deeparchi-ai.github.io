@@ -1,7 +1,7 @@
 {
   "version": "1",
   "kind": "service-catalog",
-  "description": "专业服务目录，包含概念样例、规划工具试用与人工联系的咨询服务；不是可运行的 Agent Card，不声明协议符合性。",
+  "description": "专业服务与在线工具目录：services 为人工联系的专业服务，tools 为可直接访问的独立工具。不是可运行的 Agent Card，不声明协议符合性或真实 A2A 服务。",
   "organization": {
     "name": "DeepArchi 深度架构",
     "legal_name": "上海申渡架固信息技术有限公司",
@@ -13,69 +13,44 @@
   },
   "services": [
     {
-      "id": "ip-guard",
-      "name": "IP 守护",
-      "availability": "concept-demo",
-      "production_ready": false,
-      "proposed_input": [
-        "创新主题",
-        "检索范围与约束"
-      ],
-      "proposed_output": [
-        "关注主题",
-        "检索路径",
-        "人工核验清单"
-      ],
-      "human_contact": "contact@deeparchi.com.cn"
-    },
-    {
-      "id": "deep-blm",
-      "name": "Deep BLM",
-      "availability": "web-trial",
-      "production_ready": false,
-      "proposed_input": [
-        "业务议题",
-        "客户与能力假设"
-      ],
-      "proposed_output": [
-        "BLM 议题图",
-        "关键假设",
-        "验证计划"
-      ],
-      "human_contact": "contact@deeparchi.com.cn",
-      "web_trial": {
-        "url": "apps/deepblm.html",
-        "desktop_min_width": 1024,
-        "mobile": "product-and-consultation",
-        "storage": "local-browser",
-        "ai": "optional-byo-key-experimental"
-      }
-    },
-    {
-      "id": "architecture",
-      "name": "技术架构规划",
-      "availability": "concept-demo",
-      "production_ready": false,
-      "proposed_input": [
-        "业务目标",
-        "系统现状与约束"
-      ],
-      "proposed_output": [
-        "方案比较",
-        "能力边界",
-        "演进路线"
-      ],
-      "human_contact": "contact@deeparchi.com.cn"
-    },
-    {
       "id": "tech-insight",
-      "name": "技术与竞争洞察服务",
+      "name": "技术与战略洞察服务",
       "availability": "manual-contact",
       "production_ready": false,
       "delivery_mode": "人工咨询；P1 标准订阅、P2 专业订阅、P3 定制服务",
       "description": "AI 驱动研究与专家专业判断；具体服务范围、交付周期与成果形式以双方约定为准。无自动在线订阅、支付或 A2A 服务。",
       "details_url": "index.html#insight-details",
       "human_contact": "contact@deeparchi.com.cn"
+    }
+  ],
+  "tools": [
+    {
+      "id": "deep-blm",
+      "name": "Deep BLM",
+      "url": "apps/deepblm.html",
+      "availability": "web-trial",
+      "boundaries": "推荐电脑端（≥1024px）；本地规划草稿，手工填写无需 AI，可选自备 Key；试用不代表 A2A 服务。"
+    },
+    {
+      "id": "patent-health",
+      "name": "专利体检",
+      "url": "apps/patent-health-selfcheck.html",
+      "availability": "web-tool",
+      "boundaries": "10 问专利布局健康度自评，本地计算；结果不构成法律意见或法律结论。"
+    },
+    {
+      "id": "sanctions-quickcheck",
+      "name": "制裁与出口管制速查",
+      "url": "apps/sanctions-quickcheck.html",
+      "availability": "web-tool",
+      "boundaries": "对照公开官方清单进行名称或别名匹配；未命中不等于不受限，不构成法律意见或合规放行结论。"
+    },
+    {
+      "id": "source-slide-editor",
+      "name": "Source Slide Editor",
+      "url": "apps/source-slide-editor/",
+      "availability": "web-tool",
+      "boundaries": "需 JavaScript，推荐电脑端；编辑并导出 HTML 幻灯片，仅打开可信文稿，预览会执行文稿脚本。"
     }
   ]
 }

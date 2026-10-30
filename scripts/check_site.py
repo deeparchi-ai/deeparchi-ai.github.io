@@ -13,6 +13,8 @@ from urllib.parse import unquote, urljoin, urlsplit
 EXPECTED_CNAME = "www.deeparchi.com.cn"
 SITE_HOSTS = {EXPECTED_CNAME, "deeparchi.com.cn"}
 RESOURCE_RELS = {"stylesheet", "icon", "preload", "modulepreload", "manifest"}
+# This built Vue entry intentionally renders h1/main after its local module loads.
+SPA_ENTRY = "apps/source-slide-editor/index.html"
 CSS_URL = re.compile(
     r"url\(\s*['\"]?([^)'\"]+)['\"]?\s*\)|@import\s+['\"]([^'\"]+)['\"]",
     re.IGNORECASE,
@@ -34,6 +36,9 @@ class SiteHTML(HTMLParser):
         self.charsets = []
         self.title = []
         self.references = []
+        self.app_mounts = []
+        self.module_sources = []
+        self.stylesheets = []
         self.base = ""
         self._in_title = False
         self._in_style = False
@@ -43,6 +48,12 @@ class SiteHTML(HTMLParser):
         self.tags[tag] += 1
         if attrs.get("id"):
             self.ids[attrs["id"]] += 1
+        if attrs.get("id") == "app":
+            self.app_mounts.append(tag)
+        if tag == "script" and attrs.get("type") == "module":
+            self.module_sources.append(attrs.get("src") or "")
+        if tag == "link" and "stylesheet" in (attrs.get("rel") or "").split():
+            self.stylesheets.append(attrs.get("href") or "")
         if tag == "html":
             self.lang = attrs.get("lang") or ""
         if tag == "meta":
@@ -123,7 +134,10 @@ def check_site(root):
             report(source, f"link leaves site root: {raw}")
             return
         if target.is_dir():
-            target = target / "index.html"
+            target = (target / "index.html").resolve()
+            if not target.is_relative_to(root):
+                report(source, f"link leaves site root: {raw}")
+                return
         if not target.is_file():
             report(source, f"missing local target: {raw}")
             return
@@ -157,7 +171,24 @@ def check_site(root):
             return
         checked.add(path)
         html = parse(path)
-        for tag in ("html", "title", "h1", "main"):
+        valid_spa = False
+        if path.relative_to(root).as_posix() == SPA_ENTRY:
+            def valid_asset(raw, extension):
+                if not re.fullmatch(r"\./assets/index-[A-Za-z0-9_-]+\." + extension, raw):
+                    return False
+                asset = (path.parent / raw).resolve()
+                return asset.is_relative_to(root) and asset.is_file()
+
+            valid_spa = (
+                not html.base and html.app_mounts == ["div"] and html.ids["app"] == 1
+                and len(html.module_sources) == 1
+                and valid_asset(html.module_sources[0], "js")
+                and len(html.stylesheets) == 1
+                and valid_asset(html.stylesheets[0], "css")
+            )
+            if not valid_spa:
+                report(path, "invalid known SPA entry: requires div#app, no base, one existing local hashed module and stylesheet")
+        for tag in (("html", "title") if valid_spa else ("html", "title", "h1", "main")):
             if html.tags[tag] != 1:
                 report(path, f"expected one {tag}, found {html.tags[tag]}")
         if not html.lang.strip():
