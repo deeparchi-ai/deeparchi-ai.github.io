@@ -3,7 +3,6 @@ from contextlib import contextmanager
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import os
-import re
 from threading import Thread
 from urllib.parse import parse_qs, urlsplit
 
@@ -65,46 +64,51 @@ def page_errors(page):
     return errors, failed_responses, failed_requests
 
 
+def close_dialog(page):
+    """Wait for the real close event before using controls restored by its handler."""
+    opened = page.locator('dialog[open]')
+    if not opened.count():
+        page.keyboard.press('Escape')
+        return
+    opened.evaluate("""el => {
+        window.__dialogClosed = false;
+        el.addEventListener('close', () => {window.__dialogClosed = true;}, {once:true});
+    }""")
+    opened.press('Escape')
+    page.wait_for_function("window.__dialogClosed && !document.querySelector('dialog[open]')")
+
+
+def wait_closed(page, selector, action):
+    page.locator(selector).evaluate("""el => {
+        window.__dialogClosed = false;
+        el.addEventListener('close', () => {window.__dialogClosed = true;}, {once:true});
+    }""")
+    action()
+    page.wait_for_function("window.__dialogClosed")
+    page.locator(selector).wait_for(state='hidden')
+
+
 def check_desktop(browser):
     page = browser.new_page(viewport={"width": 1440, "height": 960})
     errors, failed_responses, failed_requests = page_errors(page)
     try:
         page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
-        assert "让重要的专业服务" in page.locator("#hero-title").inner_text()
-        assert page.locator("main > section").count() == 4
+        assert page.locator("#hero-title").text_content() == "AI原生服务，全新体验"
+        assert page.locator("#capabilities .product").count() == 1
+        assert page.locator("main > section").count() == 5
         assert not page.locator("#a2a-dialog").is_visible()
         assert page.locator("main .a2a-workspace").count() == 0
-        concise_copy = page.locator('main > section').all_inner_texts()
-        assert len(re.findall(r"[\u3400-\u9fff]", ''.join(concise_copy))) <= 749 * .65
-        for card in page.locator(".product").all():
-            assert card.locator(":scope > p").count() == 2
+        assert page.locator("#online-tools .tool-card").count() == 4
+        for card in page.locator("#capabilities .product").all():
+            assert card.locator(":scope > p").count() == 3
             assert card.locator(".outcome, ul, ol").count() == 0
-            assert ("规划工具 · 试用" if card.get_attribute("id") == "deep-blm" else "订阅 / 定制服务" if card.get_attribute("id") == "tech-insight" else "概念 Demo") in card.inner_text()
+            assert ("订阅 / 定制服务" if card.get_attribute("id") == "tech-insight" else "概念 Demo") in card.inner_text()
         assert page.locator("#hero-title").evaluate("el => getComputedStyle(el).fontSize") == "56px"
-        page.get_by_role("link", name="查看服务 Demo").click()
+        page.get_by_role("link", name="了解专业服务").click()
         page.wait_for_function("location.hash === '#capabilities'")
-        products = {"ip-guard": "IP 守护", "deep-blm": "Deep BLM", "architecture": "技术架构规划"}
-        for service, name in products.items():
-            if service == "deep-blm":
-                continue  # Native tool entry is tested in deepblm-smoke.py; retain all three A2A samples below.
-            trigger = page.locator(f'[data-demo="{service}"]')
-            trigger.click()
-            dialog = page.locator("#demo-dialog")
-            assert dialog.is_visible()
-            assert page.locator("#demo-title").inner_text() == name
-            assert "演示样例，非真实客户交付" in dialog.inner_text()
-            assert "虚构团队" in page.locator("#demo-problem").inner_text()
-            assert page.locator("#demo-output li").count() == 3
-            page.keyboard.press("Escape")
-            assert not dialog.is_visible()
-            assert trigger.evaluate("element => element === document.activeElement")
-            trigger.click()
-            dialog.locator("[data-close]").click()
-            assert trigger.evaluate("element => element === document.activeElement")
-        page.locator('[data-demo="ip-guard"]').click()
-        page.mouse.click(2, 2)
-        assert not page.locator("#demo-dialog").is_visible()
-        assert page.locator('[data-demo="ip-guard"]').evaluate("el => el === document.activeElement")
+        products = {"deep-blm": "Deep BLM"}
+        assert page.locator('#a2a-product option').evaluate_all("els => els.map(el => el.value)") == ['deep-blm']
+        assert page.locator('#demo-dialog').is_hidden()
 
         opener = page.locator("#open-a2a")
         a2a = page.locator("#a2a-dialog")
@@ -117,11 +121,11 @@ def check_desktop(browser):
             page.keyboard.press("Tab")
             assert a2a.locator("[data-close]").evaluate("el => el === document.activeElement")
             if dismiss == "escape":
-                page.keyboard.press("Escape")
+                close_dialog(page)
             elif dismiss == "button":
-                a2a.locator("[data-close]").click()
+                wait_closed(page, "#a2a-dialog", lambda: a2a.locator("[data-close]").click())
             else:
-                page.mouse.click(2, 2)
+                wait_closed(page, "#a2a-dialog", lambda: page.mouse.click(2, 2))
             page.wait_for_function("!document.querySelector('#a2a-dialog').open && document.activeElement.id === 'open-a2a'")
 
         for service, name in products.items():
@@ -142,25 +146,25 @@ def check_desktop(browser):
             assert page.locator("dialog[open]").count() == 1
             assert name in page.locator("#demand-source").inner_text()
             assert "A2A 意向" in page.locator("#demand-source").inner_text()
-            page.keyboard.press("Escape")
+            close_dialog(page)
             page.wait_for_function("document.activeElement.id === 'open-a2a'")
             assert opener.is_visible()
             # Generic contact must not inherit the most recently selected sample service.
             page.locator("#contact-a2a").click()
             assert page.locator("#demand-source").inner_text() == "来源：A2A 意向"
-            page.keyboard.press("Escape")
+            close_dialog(page)
             page.wait_for_function("document.activeElement.id === 'contact-a2a'")
             opener.click()
             page.locator("#a2a-reset").click()
             assert "SAMPLE 1 / 5" in page.locator("#a2a-stage-label").inner_text()
             assert page.locator("#a2a-artifact").inner_text() == ""
-            a2a.locator("[data-close]").click()
+            wait_closed(page, "#a2a-dialog", lambda: a2a.locator("[data-close]").click())
             page.wait_for_function("document.activeElement.id === 'open-a2a'")
         opener.click()
         page.locator("#a2a-next").click()
-        page.locator("#a2a-product").select_option("ip-guard")
+        page.locator("#a2a-reset").click()
         assert "SAMPLE 1 / 5" in page.locator("#a2a-stage-label").inner_text()
-        page.keyboard.press("Escape")
+        close_dialog(page)
         page.wait_for_function("document.activeElement.id === 'open-a2a'")
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         assert not errors and not failed_responses and not failed_requests, (errors, failed_responses, failed_requests)
@@ -175,7 +179,7 @@ def check_mobile(browser):
         # Unavailable storage must not break interactions. No persistence is required.
         page.add_init_script("Object.defineProperty(window, 'localStorage', {get() { throw new Error('fixture: unavailable'); }});")
         page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
-        for width in (320, 390, 820, 1440):
+        for width in (320, 390, 820, 1440, 1920):
             page.set_viewport_size({"width": width, "height": 844})
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
             if width <= 600:
@@ -183,10 +187,9 @@ def check_mobile(browser):
                 assert menu.get_attribute("aria-expanded") == "false"
                 menu.click()
                 assert menu.get_attribute("aria-expanded") == "true"
-                page.keyboard.press("Escape")
+                close_dialog(page)
                 assert menu.get_attribute("aria-expanded") == "false"
-                menu.focus()
-                page.keyboard.press("Enter")
+                menu.press("Enter")
                 page.locator('#nav-links a[href="#capabilities"]').click()
                 page.wait_for_function("location.hash === '#capabilities'")
                 assert menu.get_attribute("aria-expanded") == "false"
@@ -198,13 +201,13 @@ def check_mobile(browser):
                 target = page.locator(f"#{anchor}")
                 target.scroll_into_view_if_needed()
                 assert target.is_visible()
-                target.focus()
-                page.keyboard.press("Enter")
+                target.press("Enter")
+                page.locator("#demand-dialog").wait_for(state="visible")
                 assert page.locator("#demand-dialog").is_visible()
-                page.keyboard.press("Escape")
-            page.locator('[data-demo="architecture"]').click()
+                close_dialog(page)
+            page.locator('#open-insight').click()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
-            page.keyboard.press("Escape")
+            close_dialog(page)
             page.locator("#open-a2a").click()
             assert page.locator("#a2a-dialog").is_visible()
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
@@ -215,7 +218,7 @@ def check_mobile(browser):
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
             page.locator("#a2a-intent").click()
             assert not page.locator("#a2a-dialog").is_visible()
-            page.keyboard.press("Escape")
+            close_dialog(page)
             page.wait_for_function("document.activeElement.id === 'open-a2a'")
         assert page.evaluate("getComputedStyle(document.documentElement).scrollBehavior") == "auto"
         assert not errors and not failed_responses and not failed_requests, (errors, failed_responses, failed_requests)
@@ -225,12 +228,12 @@ def check_mobile(browser):
     try:
         nojs = context.new_page()
         nojs.goto(BASE_URL, wait_until="networkidle")
-        assert nojs.locator(".product").count() == 4
-        assert nojs.locator("main > section").count() == 4
+        assert nojs.locator("#capabilities .product").count() == 1
+        assert nojs.locator("main > section").count() == 5
         assert not nojs.locator("#a2a-dialog").is_visible()
         assert not nojs.locator("#open-a2a").is_visible()
-        assert all(card.is_visible() for card in nojs.locator(".product").all())
-        assert nojs.locator("noscript").is_visible()
+        assert all(card.is_visible() for card in nojs.locator("#capabilities .product").all())
+        assert nojs.locator("#capabilities noscript").is_visible()
         assert nojs.locator('a[href="mailto:contact@deeparchi.com.cn"]').count() >= 1
         assert nojs.locator('#nav-links a[href="#contact"]').is_visible()
         assert nojs.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -255,9 +258,9 @@ def check_insight_services(browser):
             outbound = []
             page.on("request", lambda request: outbound.append(request.url) if request.method == "POST" else None)
             page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
-            assert page.locator('main > section').evaluate_all("els => els.map(el => el.id)") == ["top", "capabilities", "integrate", "contact"]
+            assert page.locator('main > section').evaluate_all("els => els.map(el => el.id)") == ["top", "capabilities", "online-tools", "integrate", "contact"]
             assert page.locator('#insight-services, #nav-links a[href="#insight-services"]').count() == 0
-            assert page.locator('#a2a-product option').evaluate_all("els => els.map(el => el.value)") == ['ip-guard', 'deep-blm', 'architecture']
+            assert page.locator('#a2a-product option').evaluate_all("els => els.map(el => el.value)") == ['deep-blm']
             assert "Tech M&A" not in page.locator('body').text_content()
             assert page.locator('#tech-ma, [data-service="tech-ma"], [data-demo="tech-insight"]').count() == 0
             card = page.locator('#tech-insight')
@@ -267,17 +270,39 @@ def check_insight_services(browser):
             dialog = page.locator('#insight-dialog')
             fallback = page.locator('#insight-details')
             assert not dialog.is_visible()
-            for width in (320, 390, 820, 1440):
+            for width in (320, 390, 820, 1440, 1920):
                 page.set_viewport_size({"width": width, "height": 960})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (javascript, width)
-                # The original grid stays two columns on desktop/tablet, one on phones.
-                boxes = [el.bounding_box() for el in page.locator('.product').all()]
-                if width >= 820:
-                    assert abs(boxes[0]['y'] - boxes[1]['y']) < 2
-                    assert abs(boxes[2]['y'] - boxes[3]['y']) < 2
-                    assert boxes[2]['y'] > boxes[0]['y']
+                # One centered, bounded service; tools remain two columns or one on mobile.
+                boxes = [el.bounding_box() for el in page.locator('#capabilities .product').all()]
+                tools = [el.bounding_box() for el in page.locator('#online-tools .tool-card').all()]
+                assert len(boxes) == 1 and len(tools) == 4
+                service_box = boxes[0]
+                assert service_box['width'] <= 840
+                assert abs(service_box['x'] + service_box['width'] / 2 - width / 2) < 2
+                if width > 900:
+                    assert abs(tools[0]['y'] - tools[1]['y']) < 2
+                    assert abs(tools[2]['y'] - tools[3]['y']) < 2
+                    assert tools[2]['y'] > tools[0]['y']
                 else:
-                    assert all(boxes[i+1]['y'] > boxes[i]['y'] for i in range(3))
+                    assert all(tools[i+1]['y'] > tools[i]['y'] for i in range(3))
+                assert page.locator('#hero-title').text_content() == 'AI原生服务，全新体验'
+                for selector in ('.hero', '.section-heading', '#tech-insight', '#integrate', '#contact'):
+                    for element in page.locator(selector).all():
+                        assert element.evaluate('el => getComputedStyle(el).textAlign') == 'center', (width, selector)
+                for selector in ('.hero .actions', '.signal-choice', '#tech-insight .actions', '#contact .actions', '.contact-shortcuts'):
+                    assert page.locator(selector).evaluate('el => getComputedStyle(el).justifyContent') == 'center', (width, selector)
+                assert page.locator('body').evaluate("el => getComputedStyle(el).getPropertyValue('--blue').trim()") == '#0066cc'
+                assert page.locator('body').evaluate("el => getComputedStyle(el).getPropertyValue('--hover').trim()") == '#0055ad'
+                assert page.locator('.hero .primary').evaluate('el => getComputedStyle(el).backgroundColor') == 'rgb(0, 102, 204)'
+                for cta in page.locator('#online-tools a.button').all():
+                    assert cta.get_attribute('class') == 'button outline'
+                    assert cta.evaluate('el => getComputedStyle(el).borderColor') == 'rgb(0, 102, 204)'
+                    assert cta.bounding_box()['height'] >= 44
+                assert page.locator('#online-tools .tool-card h3').all_text_contents() == ['Deep BLM', '专利体检', '制裁与出口管制速查', 'Source Slide Editor']
+                assert page.locator('#online-tools #deep-blm a.button').inner_text() == '打开规划工具（试用）'
+                for removed in ('技术架构规划', 'IP 守护', 'ip-guard', 'sourceIP', 'architecture'):
+                    assert removed not in page.locator('body').text_content()
                 opener.click()
                 if javascript:
                     assert dialog.is_visible() and not fallback.is_visible()
@@ -327,7 +352,7 @@ def check_insight_services(browser):
                                 () => {window.__insightClosed = true;}, {once:true});
                         }""")
                         if dismiss == 'escape':
-                            page.keyboard.press('Escape')
+                            close_dialog(page)
                         elif dismiss == 'button':
                             dialog.locator('[data-close]').click()
                         else:
@@ -343,7 +368,7 @@ def check_insight_services(browser):
                         assert page.locator('#demand-dialog').is_visible()
                         assert page.locator('dialog[open]').count() == 1
                         assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
-                        page.locator('#problem').fill('咨询技术与竞争洞察服务')
+                        page.locator('#problem').fill('咨询技术与战略洞察服务')
                         page.locator('#demand-form button[type="submit"]').click()
                         assert '咨询服务' in page.locator('#draft-text').inner_text()
                         assert 'Tech M&A' not in page.locator('#draft-text').inner_text()
@@ -352,7 +377,7 @@ def check_insight_services(browser):
                             document.querySelector('#demand-dialog').addEventListener('close',
                                 () => {window.__demandClosed = true;}, {once:true});
                         }""")
-                        page.keyboard.press('Escape')
+                        close_dialog(page)
                         target = 'open-insight' if selector == '#insight-consulting' else 'insight-card-consulting'
                         page.wait_for_function('(id) => window.__demandClosed && document.activeElement.id === id', arg=target)
                 else:
@@ -363,10 +388,14 @@ def check_insight_services(browser):
             page.goto(BASE_URL + '/?internal_test=1#insight-details', wait_until='networkidle')
             if javascript:
                 assert dialog.is_visible()
-                page.keyboard.press('Escape')
+                close_dialog(page)
                 page.wait_for_function("document.activeElement.id === 'open-insight'")
             else:
                 assert fallback.locator('summary').is_visible()
+            catalogue = page.request.get(BASE_URL + '/service-catalog.json').json()
+            assert [service['id'] for service in catalogue['services']] == ['tech-insight']
+            assert [tool['id'] for tool in catalogue['tools']] == ['deep-blm', 'patent-health', 'sanctions-quickcheck', 'source-slide-editor']
+            assert catalogue['a2a'] == {'available': False, 'endpoint': None}
             assert outbound == []
             assert not errors and not failed_responses and not failed_requests, (errors, failed_responses, failed_requests)
         finally:
@@ -382,8 +411,7 @@ def check_contact_paths(browser):
         page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
         # Clipboard denial is an explicit fixture, not a successful system clipboard claim.
         page.evaluate("Object.defineProperty(navigator, 'clipboard', {value: {writeText: async () => {throw new Error('fixture denial');}}, configurable:true})")
-        routes = [(f'.product [data-service="{service}"]', name) for service, name in [("ip-guard","IP 守护"),("deep-blm","Deep BLM"),("architecture","技术架构规划")]]
-        routes += [('#insight-card-consulting','咨询服务'),('.contact-shortcuts [data-intent="consulting"]','咨询服务'),('.contact-shortcuts [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
+        routes = [('#insight-card-consulting','咨询服务'),('.contact-shortcuts [data-intent="consulting"]','咨询服务'),('.contact-shortcuts [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
         user_text = '<img src=x onerror="window.BAD=true"> + 商业问题 & 第二行'
         for selector, source in routes:
             trigger = page.locator(selector)
@@ -420,7 +448,7 @@ def check_contact_paths(browser):
             page.locator("#result").fill("修改后需重新准备")
             assert not page.locator("#draft").is_visible()
             assert page.locator("#draft-mailto").get_attribute("href") is None
-            page.keyboard.press("Escape")
+            close_dialog(page)
             page.wait_for_function("document.querySelector('#problem').value === ''")
             assert trigger.evaluate("el => el === document.activeElement")
             assert page.locator("#problem").input_value() == ""
@@ -434,15 +462,15 @@ def check_contact_paths(browser):
         assert page.locator('#copy-draft').evaluate("el => el.classList.contains('primary')")
         assert 'body' not in parse_qs(urlsplit(page.locator('#draft-mailto').get_attribute('href')).query)
         assert '长' * 500 in page.locator('#draft-text').inner_text()
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.wait_for_function("document.querySelector('#demand-dialog').open === false")
-        page.locator('[data-demo="architecture"]').click()
-        page.locator("#demo-intent").click()
-        assert "产品需求 / 技术架构规划" in page.locator("#demand-source").inner_text()
+        page.locator('#open-insight').click()
+        page.locator("#insight-consulting").click()
+        assert page.locator("#demand-source").inner_text() == "来源：咨询服务"
         page.mouse.click(2, 2)
         assert not page.locator("#demand-dialog").is_visible()
-        page.wait_for_function("document.activeElement.dataset.demo === 'architecture'")
-        assert page.locator('[data-demo="architecture"]').evaluate("el => el === document.activeElement")
+        page.wait_for_function("document.activeElement.id === 'open-insight'")
+        assert page.locator("#open-insight").evaluate("el => el === document.activeElement")
         page.locator("#copy-email").click()
         assert "contact@deeparchi.com.cn" in page.locator("#email-status").inner_text()
         assert '请勿发送敏感数据、密码或密钥' in page.locator('#contact-data-warning').inner_text()
@@ -468,8 +496,8 @@ def check_contact_paths(browser):
         panel.locator('[data-consent="accept"]').click()
         assert "已允许" in panel.inner_text()
         assert '已允许' in page.locator('[data-analytics-feedback]').inner_text()
-        page.locator('[data-demo="ip-guard"]').click()
-        page.keyboard.press("Escape")
+        page.locator('#open-insight').click()
+        close_dialog(page)
         assert outbound == []
         # Reconfigure only in explicit internal-test mode with an in-memory fixture transport.
         # This records actual UI handlers (including a user-entered draft), not a live receiver.
@@ -481,69 +509,92 @@ def check_contact_paths(browser):
             }});
         }""")
         panel.locator('[data-consent="reject"]').click()
-        page.locator('[data-demo="architecture"]').click()
-        page.keyboard.press("Escape")
+        # Exercise a real tracked tool entry while preventing navigation in this fixture.
+        denied_entry = page.locator('#deep-blm [data-tool-entry="deep-blm"]')
+        denied_entry.evaluate("el => el.addEventListener('click', e => e.preventDefault(), {once:true})")
+        denied_entry.press('Enter')
         assert page.evaluate("window.fixtureEvents.length") == 0
-        page.locator('#capabilities').scroll_into_view_if_needed()
+        page.locator('#deep-blm').scroll_into_view_if_needed()
         # Invoke the actual consent handler without Playwright scrolling back to the footer.
-        assert page.locator('#ip-guard').evaluate("el => {const r=el.getBoundingClientRect();return Math.max(0,Math.min(innerHeight,r.bottom)-Math.max(0,r.top)) >= r.height*.5;}")
+        assert page.locator('#deep-blm').evaluate("el => {const r=el.getBoundingClientRect();return Math.max(0,Math.min(innerHeight,r.bottom)-Math.max(0,r.top)) >= r.height*.5;}")
         panel.locator('[data-consent="accept"]').evaluate("el => el.click()")
         assert any(event['event'] == 'product_view' for event in page.evaluate('window.fixtureEvents'))
         page.locator('#tech-insight').scroll_into_view_if_needed()
         panel.locator('[data-consent="accept"]').evaluate('el => el.click()')
         page.locator('#insight-card-consulting').click()
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'consulting' && e.surface === 'cards' && e.service === null)")
         # Opening a static sample is neither completed work nor confirmed intent.
         # Scrolling can legitimately produce card views; inspect only actions tied to the sample.
         sample_events = "window.fixtureEvents.filter(e => ['a2a_step','a2a_interest','intent_open','demo_complete'].includes(e.event))"
         before_sample = page.evaluate(sample_events)
         page.locator('#open-a2a').click()
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.wait_for_function("document.activeElement.id === 'open-a2a'")
         assert page.evaluate(sample_events) == before_sample
         page.locator('#open-a2a').click()
-        page.locator('#a2a-product').select_option('architecture')
+        page.locator('#a2a-product').select_option('deep-blm')
         for _ in range(4):
             page.locator('#a2a-next').click()
         page.locator('#a2a-intent').click()
-        assert page.locator('#demand-source').inner_text() == '来源：A2A 意向 / 技术架构规划'
+        assert page.locator('#demand-source').inner_text() == '来源：A2A 意向 / Deep BLM'
         assert not page.locator('#a2a-dialog').is_visible()
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.wait_for_function("document.activeElement.id === 'open-a2a'")
         page.locator('#open-a2a').click()
         assert 'SAMPLE 1 / 5' in page.locator('#a2a-stage-label').inner_text()
         assert not page.locator('#a2a-artifact').is_visible()
         assert not page.locator('#a2a-intent').is_visible()
-        page.keyboard.press('Escape')
-        page.locator('[data-demo="architecture"]').click()
-        page.locator("#demo-intent").click()
+        close_dialog(page)
+        page.locator('#open-insight').click()
+        page.locator("#insight-consulting").click()
         page.locator("#problem").fill(user_text)
         page.locator('#demand-form button[type="submit"]').click()
         page.locator("#draft-mailto").evaluate("el => el.addEventListener('click', e => e.preventDefault(), {once:true})")
         page.locator("#draft-mailto").click()
-        page.keyboard.press("Escape")
+        close_dialog(page)
         page.wait_for_function("document.querySelector('#demand-dialog').open === false")
         page.locator('#contact-a2a').click()
         assert page.locator('#demand-source').inner_text() == '来源：A2A 意向'
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.locator('button[data-intent="integration"]').click()
         assert page.locator('#demand-source').inner_text() == '来源：工具集成'
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.locator('#open-insight').click()
         page.locator('#insight-consulting').click()
         assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
-        page.keyboard.press('Escape')
+        close_dialog(page)
         page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'a2a' && e.service === null) && window.fixtureEvents.some(e => e.event === 'mailto_click') && window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'integration')")
         page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'consulting' && e.surface === 'support' && e.service === null)")
+        # Moving Deep BLM preserves its registered card and entry event identities.
+        # Prevent navigation only in this transport fixture; real routes are tested separately.
+        page.locator('#deep-blm').scroll_into_view_if_needed()
+        panel.locator('[data-consent="accept"]').evaluate('el => el.click()')
+        page.wait_for_function("window.fixtureEvents.some(e => e.event === 'product_view' && e.service === 'deep-blm')")
+        tool_entry = page.locator('#deep-blm [data-tool-entry="deep-blm"]')
+        assert tool_entry.get_attribute('data-demo') == 'deep-blm'
+        tool_entry.evaluate("el => el.addEventListener('click', e => e.preventDefault(), {once:true})")
+        tool_entry.press('Enter')
+        page.wait_for_function("window.fixtureEvents.some(e => e.event === 'demo_open' && e.service === 'deep-blm' && e.surface === 'cards')")
+        for identity in ('patent-health', 'sanctions-quickcheck', 'source-slide-editor'):
+            tool = page.locator(f'#online-tools #{identity}')
+            tool.scroll_into_view_if_needed()
+            panel.locator('[data-consent="accept"]').evaluate('el => el.click()')
+            assert tool.locator('[data-demo], [data-service], [data-intent]').count() == 0
+            link = tool.locator('a.button')
+            link.evaluate("el => el.addEventListener('click', e => e.preventDefault(), {once:true})")
+            link.press('Enter')
+        assert page.locator('dialog[open]').count() == 0
         recorded = page.evaluate("window.fixtureEvents")
+        assert all(event['service'] in (None, 'deep-blm') for event in recorded)
         assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] is None for event in recorded)
-        assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] == 'architecture' and event['surface'] == 'a2a' for event in recorded)
+        assert any(event['event'] == 'intent_open' and event['category'] == 'a2a' and event['service'] == 'deep-blm' and event['surface'] == 'a2a' for event in recorded)
         assert any(event['event'] == 'intent_open' and event['category'] == 'integration' and event['surface'] == 'contact' and event['service'] is None for event in recorded)
         assert not any(event['event'] == 'a2a_interest' and event['surface'] == 'contact' for event in recorded)
         assert {"demo_open", "intent_open", "mail_draft_ready", "mailto_click"}.issubset({event["event"] for event in recorded})
         assert all(event['event'] != 'demo_complete' for event in recorded)
-        assert all(event['service'] not in ('tech-ma', 'tech-insight') for event in recorded)
+        assert all(event['service'] not in ('ip-guard', 'architecture', 'tech-ma', 'tech-insight', 'patent-health', 'sanctions-quickcheck', 'source-slide-editor') for event in recorded)
+        assert {e['service'] for e in recorded if e['event'] == 'product_view'} <= {'deep-blm'}
         assert any(event['event'] == 'intent_open' and event['category'] == 'consulting' and event['service'] is None and event['surface'] == 'cards' for event in recorded)
         assert all(event['service'] is None for event in recorded if event['category'] == 'consulting')
         allowed = {"event", "service", "category", "surface", "version", "audience", "is_test", "session_id", "event_id", "step"}
@@ -551,8 +602,9 @@ def check_contact_paths(browser):
         assert user_text not in str(recorded) and "商业问题" not in str(recorded)
         panel.locator('[data-consent="reject"]').click()
         count = page.evaluate("window.fixtureEvents.length")
-        page.locator('[data-demo="ip-guard"]').click()
-        page.keyboard.press("Escape")
+        # A fresh intent identity must still be suppressed after consent is revoked.
+        page.locator('#contact [data-intent="general"]').click()
+        close_dialog(page)
         assert page.evaluate("window.fixtureEvents.length") == count
         assert "未获同意" in panel.inner_text()
         assert outbound == []
@@ -572,11 +624,65 @@ def check_contact_paths(browser):
             assert "DNT/GPC" in protected.locator("footer [data-analytics]").inner_text()
             assert not protected.locator("footer [data-analytics-options]").is_visible()
             assert not protected.locator("[data-analytics-banner]").is_visible()
-            protected.locator('[data-demo="ip-guard"]').click()
-            protected.keyboard.press("Escape")
+            protected.locator('#open-a2a').click()
+            protected.locator('#a2a-next').click()
+            close_dialog(protected)
             assert requests == []
         finally:
             context.close()
+
+
+def check_tool_routes(browser):
+    tools = [
+        ('deep-blm', '/apps/deepblm.html', '#workspace', 'Deep BLM'),
+        ('patent-health', '/apps/patent-health-selfcheck.html', '#form input', '专利体检'),
+        ('sanctions-quickcheck', '/apps/sanctions-quickcheck.html', '#companyName', '制裁与出口管制速查'),
+        ('source-slide-editor', '/apps/source-slide-editor/', '#app #welcome', 'Source Slide Editor'),
+    ]
+    context = browser.new_context(viewport={'width':1440, 'height':960}, reduced_motion='reduce')
+    outbound = []
+    origin = urlsplit(BASE_URL).netloc
+    def local_shell_only(route):
+        request = route.request
+        if urlsplit(request.url).netloc != origin or request.method != 'GET':
+            outbound.append(request.url)
+            route.abort()
+        else:
+            route.continue_()
+    context.route('**/*', local_shell_only)
+    try:
+        page = context.new_page()
+        errors, responses, failures = page_errors(page)
+        for identity, path, shell, title in tools:
+            page.goto(BASE_URL + '/?internal_test=1', wait_until='networkidle')
+            link = page.locator(f'#online-tools #{identity} a.button')
+            assert link.count() == 1
+            link.press('Enter')
+            page.wait_for_url(lambda url: urlsplit(str(url)).path == path)
+            page.wait_for_load_state('networkidle')
+            assert title in page.title()
+            page.locator(shell).first.wait_for(state='visible')
+            assert not outbound, outbound
+        assert not errors and not responses and not failures, (errors, responses, failures)
+    finally:
+        context.close()
+
+
+def check_forced_colors(browser):
+    context = browser.new_context(forced_colors='active', reduced_motion='reduce', viewport={'width':390,'height':844})
+    try:
+        page = context.new_page()
+        page.goto(BASE_URL + '/?internal_test=1', wait_until='networkidle')
+        assert page.evaluate("matchMedia('(forced-colors: active)').matches")
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        for card in page.locator('#capabilities .product, #online-tools .tool-card').all():
+            assert card.evaluate("el => getComputedStyle(el).borderTopStyle") == 'solid'
+        page.locator('#open-insight').press('Enter')
+        page.locator('#insight-dialog').wait_for(state='visible')
+        close_dialog(page)
+        assert page.locator('#open-insight').evaluate('el => el === document.activeElement')
+    finally:
+        context.close()
 
 
 def check_official_brand(browser):
@@ -604,7 +710,7 @@ def check_official_brand(browser):
                 return {status: response.status, signature: Array.from(bytes.slice(0, 8))};
             }""", favicon.get_attribute("href"))
             assert loaded == {"status": 200, "signature": [137, 80, 78, 71, 13, 10, 26, 10]}, document
-            for width in (320, 390, 820, 1440):
+            for width in (320, 390, 820, 1440, 1920):
                 page.set_viewport_size({"width": width, "height": 960})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (document, width)
                 bounds = logo.bounding_box()
@@ -641,13 +747,17 @@ if __name__ == "__main__":
             browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
             try:
                 check_insight_services(browser)
-                print("PASS: fourth consulting card — full details, native dialog/close/Escape/focus, generic consultation, original grid, 320/390/820/1440, no-JS disclosure/email", flush=True)
+                print("PASS: one centered professional service + four tools + one A2A sample — full insight dialog, generic consultation, responsive grids at 320/390/820/1440/1920, no-JS", flush=True)
                 check_official_brand(browser)
                 print("PASS: official logo and favicon — all three pages, image decode, proportional sizing, 320/390/820/1440", flush=True)
                 check_desktop(browser)
                 print("PASS: desktop — two labelled sample dialogs and native Deep BLM entry, focus restoration, all A2A sample stages/reset/product changes", flush=True)
                 check_mobile(browser)
-                print("PASS: 320/390/820/1440 — no overflow, navigation, keyboard, reduced motion, unavailable storage, no-JS", flush=True)
+                print("PASS: 320/390/820/1440/1920 — no overflow, navigation, keyboard, reduced motion, unavailable storage, no-JS", flush=True)
+                check_tool_routes(browser)
+                print("PASS: all four native tool routes render their real local shells; no query/upload/provider calls", flush=True)
+                check_forced_colors(browser)
+                print("PASS: forced colors, reduced motion and keyboard dialog entry", flush=True)
                 check_contact_paths(browser)
                 print("PASS: demand sources, validation, safe mail drafts, clipboard fallback, consent/DNT/GPC fixtures; no real analytics transport", flush=True)
             finally:

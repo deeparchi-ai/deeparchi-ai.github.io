@@ -4,34 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="DeepArchi 技术与竞争洞察服务：AI 驱动研究与专家专业判断，提供持续洞察与技术雷达、深度洞察与专家决策支持、专项决策与行动支持；另有 AI 原生服务概念 Demo 与规划工具试用。">
-  <title>DeepArchi 深度架构 · AI 原生服务</title>
+  <meta name="description" content="DeepArchi 深度架构：技术与战略洞察服务，以专家判断支持决策；在线工具支持战略规划、专利自评、官方清单速查与 HTML 幻灯片编辑。">
+  <title>DeepArchi 深度架构 · 专业服务与在线工具</title>
   <link rel="icon" type="image/png" sizes="128x128" href="assets/deeparchi-favicon.png">
   <link rel="stylesheet" href="assets/site.css?v=738eb81c4c95">
   <link rel="stylesheet" href="assets/insight-services.css?v=cc40c4fd49fb">
-  <style>
-    #online-tools .tools-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-    #online-tools .tool-card{display:block;min-width:0;padding:28px;background:var(--soft);border:1px solid var(--line);border-radius:20px;color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
-    #online-tools .tool-card h3{font-size:24px;margin:0 0 16px}
-    #online-tools .tool-card p{margin:0;color:var(--muted)}
-    #online-tools .tool-card:hover,#online-tools .tool-card:focus-visible{border-color:var(--blue);color:var(--blue)}
-    @media(max-width:850px){#online-tools .tools-grid{grid-template-columns:minmax(0,1fr)}}
-  </style>
-  <script type="module" src="assets/site.mjs?v=770a8a357600"></script>
+  <link rel="stylesheet" href="assets/homepage.css?v=b37ecad52c15">
+  <script type="module" src="assets/site.mjs?v=0e256468b8c0"></script>
 </head>
-<body>
+<body class="homepage">
 <a class="skip-link" href="#main-content">跳到主要内容</a>
 <header class="site-header"><nav class="nav" aria-label="主导航">
   <a class="brand" href="#top" aria-label="DeepArchi 深度架构首页"><img class="brand-logo" src="assets/deeparchi-logo.png" width="498" height="512" alt="DeepArchi 公司标志"><small>深度架构</small></a>
   <button class="menu-button" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="打开导航菜单" data-js hidden>菜单</button>
-  <div class="nav-links" id="nav-links"><a href="#capabilities">服务产品</a><a href="#integrate">为 Agent</a><a href="#collaborate">咨询与集成</a><a href="#contact">联系 DeepArchi</a></div>
+  <div class="nav-links" id="nav-links"><a href="#capabilities">专业服务</a><a href="#online-tools">在线工具</a><a href="#integrate">协作接入</a><a href="#contact">联系我们</a></div>
 </nav></header>
 <main id="main-content">
 <section class="hero" id="top" aria-labelledby="hero-title"><div class="wrap">
-  <p class="eyebrow">AI 原生服务 · 专家专业判断</p>
-  <h1 id="hero-title">让重要的专业服务，<br>更容易获得。</h1>
-  <p class="hero-sub">为你，也为你的 Agent。</p>
-  <div class="actions"><a class="button primary" href="#capabilities">查看服务 Demo</a><a class="button outline" href="#contact">描述我的需求</a></div>
+  <p class="eyebrow">DeepArchi · 深度架构</p>
+  <h1 id="hero-title">AI原生服务，<br>全新体验</h1>
+  <p class="hero-sub">复杂问题，与专家一起解答。<br>日常任务，用在线工具自主完成。</p>
+  <div class="actions"><a class="button primary" href="#capabilities">了解专业服务</a><a class="button outline" href="#online-tools">使用在线工具</a></div>
   <aside class="signal-choice" data-analytics data-analytics-banner hidden aria-label="可选匿名统计">
     <p>可选匿名交互统计，不含需求正文。</p>
     <div class="analytics-options" data-analytics-options hidden><button type="button" data-consent="accept">允许</button><button type="button" data-consent="reject">拒绝</button></div>
@@ -41,34 +34,31 @@
 </div></section>
 <section class="services section" id="capabilities" aria-labelledby="capability-title">
   <div class="wrap">
-  <div class="section-heading"><h2 id="capability-title">专业服务，新的可能。</h2><p>探索专业服务，找到适合你的支持。</p></div>
+  <div class="section-heading"><p class="eyebrow">专业服务 / EXPERT SERVICES</p><h2 id="capability-title">重要问题，与专家共同推进。</h2><p>结合研究与专业判断解决具体问题，服务范围与交付成果由双方约定。</p></div>
   <div class="product-grid">
-    <article class="product" id="ip-guard"><p class="badge">概念 Demo · 招募试点</p><h3>IP 守护</h3><p>更早看清创新中的知识产权问题。</p><div class="actions"><button type="button" class="button primary" data-demo="ip-guard" aria-label="查看 IP 守护演示" data-js hidden>查看演示</button><button type="button" class="button outline" data-intent="product" data-service="ip-guard" aria-label="我有IP 守护需求" data-surface="cards" data-js hidden>我有这个需求</button></div></article>
-    <article class="product" id="deep-blm"><p class="badge">规划工具 · 试用</p><h3>Deep BLM</h3><p>把增长议题，转化为可验证的战略选择。</p><div class="actions"><a class="button primary" href="apps/deepblm.html" data-demo="deep-blm" data-tool-entry="deep-blm" aria-label="打开 Deep BLM 规划工具（试用）">打开规划工具（试用）</a><button type="button" class="button outline" data-intent="product" data-service="deep-blm" aria-label="我有Deep BLM需求" data-surface="cards" data-js hidden>我有这个需求</button></div></article>
-    <article class="product" id="architecture"><p class="badge">概念 Demo · 招募试点</p><h3>技术架构规划</h3><p>为业务目标，找到合适的架构路径。</p><div class="actions"><button type="button" class="button primary" data-demo="architecture" aria-label="查看技术架构规划演示" data-js hidden>查看演示</button><button type="button" class="button outline" data-intent="product" data-service="architecture" aria-label="我有技术架构规划需求" data-surface="cards" data-js hidden>我有这个需求</button></div></article>
-    <article class="product" id="tech-insight"><p class="badge">订阅 / 定制服务</p><h3>技术与竞争洞察服务</h3><p>持续洞察技术与竞争变化，支持业务决策。</p><div class="actions"><a class="button primary" id="open-insight" href="#insight-details" aria-label="了解技术与竞争洞察服务">了解服务</a><button type="button" class="button outline" id="insight-card-consulting" data-intent="consulting" data-surface="cards" aria-label="咨询技术与竞争洞察服务" data-js hidden>咨询服务</button></div></article>
+    <article class="product" id="tech-insight"><p class="badge available">订阅 / 定制服务</p><h3>技术与战略洞察服务</h3><p>持续跟踪技术与竞争变化，结合业务背景开展研究，为方向选择与专项行动提供专家建议。</p><p class="service-scope">持续订阅或专项定制 · 范围与交付以约定为准</p><div class="actions"><a class="button primary" id="open-insight" href="#insight-details" aria-label="了解技术与战略洞察服务">了解服务</a><button type="button" class="button outline" id="insight-card-consulting" data-intent="consulting" data-surface="cards" aria-label="咨询技术与战略洞察服务" data-js hidden>咨询服务</button></div></article>
   </div>
   <noscript><p>启用 JavaScript 可体验演示，也可直接 <a href="mailto:contact@deeparchi.com.cn">邮件描述需求</a>。</p></noscript>
   </div>
 </section>
 <section class="section" id="online-tools" aria-labelledby="online-tools-title">
   <div class="wrap">
-    <div class="section-heading"><h2 id="online-tools-title">在线工具 / Online Tools</h2></div>
+    <div class="section-heading"><p class="eyebrow">在线工具 / SELF-SERVICE TOOLS</p><h2 id="online-tools-title">手边的任务，<span class="keep-phrase">打开工具就开始。</span></h2><p>按场景自主使用，无需先咨询服务。各工具的使用条件与结果边界见下方说明。</p></div>
     <div class="tools-grid">
-      <a class="tool-card" href="/apps/patent-health-selfcheck.html" aria-label="打开专利布局健康度自评"><h3>专利布局健康度自评</h3><p>10 个问题，看清专利是在保护技术，还是只在交年费</p></a>
-      <a class="tool-card" href="/apps/sanctions-quickcheck.html" aria-label="打开制裁与出口管制速查"><h3>制裁与出口管制速查</h3><p>输入企业名称，对照 OFAC、BIS、DoD 1260H 等官方清单</p></a>
-      <a class="tool-card" href="/apps/source-slide-editor/" aria-label="打开 Source Slide Editor"><h3>Source Slide Editor</h3><p>源码保持式 HTML 幻灯片编辑器，打开浏览器即可改稿导出</p></a>
+      <article class="tool-card" id="deep-blm"><div class="tool-meta"><p class="tool-category">战略规划</p><span class="badge">规划工具 · 试用</span></div><h3>Deep BLM</h3><p>用 BLM 业务领先模型，逐步梳理现状、战略选择与执行路径，形成可继续修订的规划草稿。</p><p class="tool-hint">推荐电脑端（≥1024px）；手机和平板展示使用说明。手工填写无需 AI。</p><a class="button outline" href="apps/deepblm.html" data-demo="deep-blm" data-tool-entry="deep-blm" aria-label="打开 Deep BLM 规划工具（试用）">打开规划工具（试用）</a></article>
+      <article class="tool-card" id="patent-health"><div class="tool-meta"><p class="tool-category">知识产权自评</p><span class="badge">本地计算</span></div><h3>专利体检</h3><p>通过 10 个问题梳理保护覆盖、权利要求质量、地域布局、维护决策与运用能力。</p><p class="tool-hint">结果仅供自我评估，不构成法律意见或法律结论。</p><a class="button outline" href="apps/patent-health-selfcheck.html" aria-label="使用专利体检">使用自评工具</a></article>
+      <article class="tool-card" id="sanctions-quickcheck"><div class="tool-meta"><p class="tool-category">官方清单速查</p><span class="badge">名称匹配</span></div><h3>制裁与出口管制速查</h3><p>按企业名称对照 OFAC、BIS、DoD 1260H 等公开官方清单，查看名称或别名匹配情况。</p><p class="tool-hint">未命中不等于不受限；不构成法律意见或合规放行结论。</p><a class="button outline" href="apps/sanctions-quickcheck.html" aria-label="打开制裁与出口管制速查">打开速查工具</a></article>
+      <article class="tool-card" id="source-slide-editor"><div class="tool-meta"><p class="tool-category">HTML 幻灯片编辑</p><span class="badge">需 JavaScript</span></div><h3>Source Slide Editor</h3><p>在浏览器中打开 HTML 幻灯片，编辑内容并导出修改后的 HTML 文件，保留源码结构。</p><p class="tool-hint">推荐电脑端；仅打开可信 HTML 文稿，预览会执行文稿脚本。</p><a class="button outline" href="apps/source-slide-editor/" aria-label="打开 Source Slide Editor">打开编辑器</a></article>
     </div>
+    <noscript><p class="small">以上链接可直接访问。交互工具需要 JavaScript；Deep BLM 仍可阅读使用说明。</p></noscript>
   </div>
 </section>
-<section class="integration" id="integrate" aria-labelledby="integration-title"><div class="wrap section">
-  <h2 id="integration-title">为 Agent</h2>
-  <p class="panel-copy">从发现服务到交付，探索 Agent 之间的专业协作。</p>
-  <p class="concept-note">概念演示 · 尚未连接真实 A2A 服务</p>
-  <button class="button primary" type="button" id="open-a2a" aria-haspopup="dialog" aria-controls="a2a-dialog" data-js hidden>查看协作演示</button>
+<section class="integration" id="integrate" aria-labelledby="integration-title"><div class="wrap integration-band">
+  <div><p class="eyebrow">协作接入 / AGENT COLLABORATION</p><h2 id="integration-title">也为你的 Agent，探索协作方式。</h2><p class="panel-copy">了解发现服务、确认范围与交付的五步本地样例。</p><p class="concept-note">概念演示 · 未连接真实 A2A 服务</p></div>
+  <div class="integration-actions"><button class="button outline" type="button" id="open-a2a" aria-haspopup="dialog" aria-controls="a2a-dialog" data-js hidden>查看协作样例</button><a href="developers.html">开发者说明 ↗</a></div>
 </div></section>
 <section class="contact" id="contact" aria-labelledby="contact-title"><div class="wrap section">
-  <h2 id="contact-title">你需要什么专业服务？</h2><p>从一个重要的问题，开始一次专业对话。</p>
+  <h2 id="contact-title">从一个具体问题，开始对话。</h2><p>咨询服务、讨论试点或工具集成，都可以从这里联系。</p>
   <div class="actions"><button type="button" class="button primary" data-intent="general" data-surface="contact" data-js hidden>描述我的需求</button><a href="mailto:contact@deeparchi.com.cn">contact@deeparchi.com.cn</a><button type="button" id="copy-email" data-js hidden>复制邮箱</button></div>
   <p class="small" id="email-status" role="status">也可直接邮件联系。</p><p class="small" id="contact-data-warning">请勿发送敏感数据、密码或密钥。</p>
   <div class="contact-shortcuts" id="collaborate" aria-label="其他合作需求">
@@ -82,11 +72,11 @@
 <footer class="wrap footer"><p>© 2026 DeepArchi · 上海申渡架固信息技术有限公司</p><div><details class="analytics-panel" data-analytics><summary>匿名统计设置</summary><p data-analytics-status role="status">匿名统计未连接，未收集事件。</p><div class="analytics-options" data-analytics-options hidden><button type="button" data-consent="accept">允许匿名统计</button><button type="button" data-consent="reject">拒绝 / 关闭统计</button></div><p>默认关闭；如启用，需你主动同意。本页有效，可随时关闭，尊重 DNT/GPC。</p></details><a href="privacy.html">隐私说明</a><a href="developers.html">开发者</a><a href="service-catalog.json">服务目录</a><a href="#top">返回顶部 ↑</a></div></footer>
 <!-- One authoritative copy: native disclosure without JS, moved into the dialog with JS. -->
 <details id="insight-details" class="wrap">
-  <summary>技术与竞争洞察服务：完整服务详情</summary>
+  <summary>技术与战略洞察服务：完整服务详情</summary>
   <div id="insight-content">
     <header class="insight-heading">
       <p class="eyebrow">AI 驱动研究 · 专家专业判断</p>
-      <h2 id="insight-title">技术与竞争洞察服务</h2>
+      <h2 id="insight-title">技术与战略洞察服务</h2>
       <p class="insight-lead">持续洞察变化，支持科学决策，推动业务创新</p>
       <p class="insight-intro" id="insight-intro">依托 AI 驱动的持续研究能力与专家经验，为企业提供从趋势洞察、深度分析到专项决策与行动支持的系列服务，帮助企业识别机会、把握技术方向、优化竞争策略。</p>
     </header>
@@ -130,7 +120,7 @@
     <div class="insight-contact">
       <p class="insight-boundary">P1、P2采用持续订阅模式；P3根据具体项目需求定制。具体服务范围、交付周期与成果形式以双方约定为准。</p>
       <div class="actions">
-        <button type="button" class="button primary" id="insight-consulting" data-intent="consulting" data-surface="support" data-js hidden aria-label="咨询技术与竞争洞察服务">咨询服务</button>
+        <button type="button" class="button primary" id="insight-consulting" data-intent="consulting" data-surface="support" data-js hidden aria-label="咨询技术与战略洞察服务">咨询服务</button>
         <a href="mailto:contact@deeparchi.com.cn">邮件咨询：contact@deeparchi.com.cn</a>
       </div>
     </div>
@@ -142,9 +132,9 @@
 <dialog id="a2a-dialog" aria-labelledby="a2a-title" aria-describedby="a2a-note">
   <button type="button" class="close" data-close aria-label="关闭协作演示" autofocus>关闭 ×</button>
   <p class="eyebrow">A2A · 概念演示</p><h2 id="a2a-title">一次协作，五步样例。</h2>
-  <p class="local-note" id="a2a-note">本地样例演示，未连接真实 A2A 服务，不会执行真实任务或上传业务内容。</p>
+  <p class="local-note" id="a2a-note">本地样例演示，未连接真实 A2A 服务，不会执行真实任务或上传业务内容。仅保留 Deep BLM 一个虚构场景，演示样例，非真实客户交付；Deep BLM 工具试用不代表 A2A 服务可用。</p>
   <div class="a2a-workspace">
-    <div class="a2a-toolbar"><label for="a2a-product">选择样例服务</label><select id="a2a-product"><option value="ip-guard">IP 守护</option><option value="deep-blm">Deep BLM</option><option value="architecture">技术架构规划</option></select><button type="button" id="a2a-reset">重置样例</button></div>
+    <div class="a2a-toolbar"><label for="a2a-product">样例领域</label><select id="a2a-product"><option value="deep-blm">Deep BLM</option></select><button type="button" id="a2a-reset">重置样例</button></div>
     <ol class="stages" aria-label="五个 SAMPLE 阶段"><li>发现服务</li><li>描述需求</li><li>确认范围与授权</li><li>查看进度</li><li>接收交付样例</li></ol>
     <div class="sample-panel" aria-live="polite"><p class="eyebrow" id="a2a-stage-label"></p><h3 id="a2a-stage-title"></h3><p id="a2a-stage-copy"></p><pre id="a2a-artifact" hidden></pre></div>
     <div class="actions"><button type="button" class="button primary" id="a2a-next">下一步样例 →</button><button type="button" class="button primary" id="a2a-intent" data-intent="a2a" data-surface="a2a" hidden>希望我的 Agent 使用这项服务</button></div>

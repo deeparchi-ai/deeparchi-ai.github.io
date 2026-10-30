@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 
 const read = file => readFile(new URL(`../${file}`, import.meta.url), 'utf8');
@@ -26,19 +27,19 @@ const services = [
   }
 ];
 
-test('only fourth card is replaced, with honest badge and concise actions in original layout', () => {
+test('insight is the only professional service with honest subscription and consulting actions', () => {
   const main = html.match(/<main[^>]*>([\s\S]*?)<\/main>/)[1];
-  assert.deepEqual([...main.matchAll(/<section\b[^>]*id="([^"]+)"/g)].map(m => m[1]), ['top', 'capabilities', 'integrate', 'contact']);
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*id="([^"]+)"/g)].map(m => m[1]), ['top', 'capabilities', 'online-tools', 'integrate', 'contact']);
   assert.doesNotMatch(html, /id="insight-services"|href="#insight-services"|tech-ma|Tech M(?:&amp;|&)A/);
   const cards = [...main.matchAll(/<article class="product" id="([^"]+)">([\s\S]*?)<\/article>/g)];
-  assert.deepEqual(cards.map(m => m[1]), ['ip-guard', 'deep-blm', 'architecture', 'tech-insight']);
-  const card = cards[3][2];
-  assert.match(card, /<p class="badge">订阅 \/ 定制服务<\/p>/);
-  assert.match(card, /<h3>技术与竞争洞察服务<\/h3>/);
+  assert.deepEqual(cards.map(m => m[1]), ['tech-insight']);
+  const card = cards[0][2];
+  assert.match(card, /<p class="badge available">订阅 \/ 定制服务<\/p>/);
+  assert.match(card, /<h3>技术与战略洞察服务<\/h3>/);
   assert.match(card, /href="#insight-details"[^>]*>了解服务<\/a>/);
   assert.match(card, /data-intent="consulting" data-surface="cards"[^>]*>咨询服务<\/button>/);
   assert.doesNotMatch(card, /概念 Demo|data-demo|data-service|<ul|<details/);
-  assert.match(html, /<meta name="description" content="[^"]*技术与竞争洞察服务[^"]*概念 Demo[^"]*">/);
+  assert.match(html, /<meta name="description" content="[^"]*技术与战略洞察服务[^"]*在线工具[^"]*">/);
 });
 
 test('single canonical full text progressively moves from no-JS details into accessible native dialog', () => {
@@ -46,7 +47,7 @@ test('single canonical full text progressively moves from no-JS details into acc
   assert.doesNotMatch(dialog[1] + details[1], /\bopen\b/);
   assert.match(dialog[1], /aria-labelledby="insight-title" aria-describedby="insight-intro"/);
   assert.match(dialog[2], /data-close aria-label="关闭服务详情" autofocus/);
-  assert.match(details[0], /<summary>技术与竞争洞察服务：完整服务详情<\/summary>/);
+  assert.match(details[0], /<summary>技术与战略洞察服务：完整服务详情<\/summary>/);
   assert.equal((html.match(/id="insight-content"/g) || []).length, 1);
   assert.match(js, /insight.append\(\$\('#insight-content'\)\)/);
   assert.match(js, /\$\('#insight-details'\).hidden = true/);
@@ -91,7 +92,7 @@ test('both consulting CTAs keep generic service=null routing and static email fa
   assert.doesNotMatch(js, /track\([^\n]*(?:tech-insight|tech-ma)/);
 });
 
-test('service CSS is scoped to fourth card/dialog/disclosure and maintains responsive readable content', () => {
+test('service CSS is scoped to insight card/dialog/disclosure and maintains responsive readable content', () => {
   assert.match(html, /<link rel="stylesheet" href="assets\/insight-services.css\?v=[a-f0-9]{12}">/);
   assert.doesNotMatch(developers + privacy, /insight-services.css/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
@@ -104,4 +105,12 @@ test('service CSS is scoped to fourth card/dialog/disclosure and maintains respo
     assert.match(line, /^(?:#tech-insight|#insight-dialog|#insight-details|:is\(#insight-dialog,#insight-details\))/);
   }
   assert.doesNotMatch(css, /@import|url\(|font-family:|overflow:hidden|line-clamp|[;{]height:\d/);
+});
+
+test('canonical insight details remains byte-identical', () => {
+  assert.equal(createHash('sha256').update(details[0]).digest('hex'), '2e92344a7ce0c709c4ef6c84a0574d5f74884bbb5e16c446ccac01c59830be78');
+});
+
+test('canonical insight dialog remains byte-identical', () => {
+  assert.equal(createHash('sha256').update(dialog[0]).digest('hex'), '154b217c981b63d69baea7fba695d9432d25eb5b8b0ff24bbb3a3e6815b89dea');
 });

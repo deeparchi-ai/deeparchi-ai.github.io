@@ -1,9 +1,7 @@
 import {createSignals, mailDraft, EMAIL} from './signals.mjs';
 
 export const PRODUCTS = Object.freeze({
-  'ip-guard': {name: 'IP 守护', problem: '虚构团队正在设计一款模块化设备，希望先整理创新点与待核实的知识产权问题。', output: ['创新主题与检索范围（待确认）', '检索路径与证据记录模板', '风险问题与人工核验清单']},
   'deep-blm': {name: 'Deep BLM', problem: '虚构团队考虑进入一个新业务方向，需要梳理客户假设、能力差距与验证顺序。', output: ['基于 BLM 的战略议题图', '客户与价值主张假设清单', '能力差距与分阶段验证计划']},
-  architecture: {name: '技术架构规划', problem: '虚构团队准备扩展一个业务系统，希望比较模块拆分、数据边界与演进顺序。', output: ['业务目标与系统约束表', '候选架构比较与取舍记录', '能力边界与演进路线草案']}
 });
 const CATEGORIES = {product: '产品需求', a2a: 'A2A 意向', consulting: '咨询服务', integration: '工具集成', general: '通用需求', partnership: '伙伴合作'};
 const $ = selector => document.querySelector(selector);
@@ -38,7 +36,7 @@ export async function initAnalytics({transport} = {}) {
     decisionMade = true;
     render();
     // Measure only cards visible NOW after opt-in, never replay pre-consent views.
-    if (accept) $$('.product').forEach(card => {
+    if (accept) $$('#capabilities .product, #online-tools #deep-blm').forEach(card => {
       if (!Object.hasOwn(PRODUCTS, card.id)) return;
       const rect = card.getBoundingClientRect();
       const visible = Math.max(0, Math.min(innerHeight, rect.bottom) - Math.max(0, rect.top));
@@ -140,7 +138,8 @@ function initHome() {
   $$('[data-intent]').forEach(button => button.addEventListener('click', () => {
     const category = button.dataset.intent;
     if (!CATEGORIES[category]) return;
-    const service = category === 'a2a' && button.dataset.surface === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
+    const requestedService = category === 'a2a' && button.dataset.surface === 'a2a' ? $('#a2a-product').value : button.dataset.service || null;
+    const service = category === 'consulting' || !Object.hasOwn(PRODUCTS, requestedService) ? null : requestedService;
     const product = PRODUCTS[service];
     const source = `${CATEGORIES[category]}${product ? ` / ${product.name}` : ''}`;
     demandTrigger = demo.open ? demoTrigger : a2a.open ? a2aTrigger : insight.open ? insightTrigger : button;
@@ -219,7 +218,7 @@ function initHome() {
     const observer = new IntersectionObserver(entries => entries.forEach(entry => {
       if (entry.isIntersecting) track('product_view', entry.target.id, 'product', 'cards');
     }), {threshold: .5});
-    $$('.product').forEach(card => {
+    $$('#capabilities .product, #online-tools #deep-blm').forEach(card => {
       if (Object.hasOwn(PRODUCTS, card.id)) observer.observe(card);
     });
   }

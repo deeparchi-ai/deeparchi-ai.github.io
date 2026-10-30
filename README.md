@@ -1,29 +1,30 @@
 # DeepArchi 需求验证 Demo
 
-无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页第四张产品卡为技术与竞争洞察咨询服务；前三张为 IP 守护、Deep BLM、技术架构规划，Deep BLM 提供桌面规划工具试用。无框架、外部字体或永久服务器；不新增付费第三方依赖或基础设施；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
+无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页提供一项专业服务（技术与战略洞察服务）与四项在线工具（Deep BLM、专利体检、制裁与出口管制速查、Source Slide Editor）。无框架、外部字体或永久服务器；不新增付费第三方依赖或基础设施；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
 
 ## 文件
 
-- `index.html`：首页原四个主区块、四张产品卡、洞察服务详情弹窗、三个本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
-- `assets/insight-services.css`：仅作用于首页第四卡、详情弹窗及无 JS 原生折叠详情的样式；服务全文只存一份，JS 将其移入原生 dialog，适配 320/390/820/1440 宽度。
+- `index.html`：首页 hero、专业服务、在线工具、协作接入、联系五个主区块、洞察服务详情弹窗、一个 Deep BLM 本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
+- `assets/insight-services.css`：仅作用于首页洞察卡、详情弹窗及无 JS 原生折叠详情的样式；服务全文只存一份，JS 将其移入原生 dialog，适配 320/390/820/1440 宽度。
+- `assets/homepage.css`：首页独立视觉覆盖，专业服务居中且最大宽度 840px、桌面工具 2×2，900px 以下单列，保留系统字体、原比例 logo、键盘焦点及强制颜色支持。
 - `assets/site.css`：共用视觉、移动导航、dialog 和减少动态效果设置。
-- `assets/site.mjs`：三个虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
+- `assets/site.mjs`：一个 Deep BLM 虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
 - `assets/signals.mjs`：纯配置/事件校验、RFC6068 草稿编码、默认拒绝的匿名事件适配器。
-- `service-catalog.json`：四项服务的同源机器目录；不是可运行的 Agent Card。
+- `service-catalog.json`：保留原四项 ID 的兼容机器目录（含独立 Deep BLM 工具条目）；不是可运行的 Agent Card。
 - `analytics-config.json`：已配置经授权的 CloudBase HTTPS 接收端，`enabled=true`、`consent_required=true`；访客仍默认不发送，须逐页主动同意。
 - `developers.html` / `privacy.html`：能力边界、官方文档、公开仓库、浏览器数据行为与统计状态。
 - `tests/landing-page.test.mjs` / `tests/insight-services.test.mjs` / `tests/signals.test.mjs`：首页、洞察服务全文/交付/边界与统计的 Node 内置离线测试；无外部包。
-- `tests/visual-smoke.py`：使用既有 Playwright 的实际交互测试，保留原临时服务器生命周期与错误记录助手。
-- `scripts/check_site.py` / `tests/test_check_site.py`：原静态检查器与 9 项单元测试，未修改。
+- `tests/visual-smoke.py`：实际交互、三项服务/四项工具、320/390/820/1440/1920 布局、无 JS、键盘与强制颜色检查；四个工具真实路由仅加载本地壳，不查询、不上传、不配置模型凭据。保留临时服务器生命周期与错误记录助手。
+- `scripts/check_site.py` / `tests/test_check_site.py`：静态结构、元数据、链接及资源检查。唯一已知 SPA `apps/source-slide-editor/index.html` 须验证 div#app、无 base、存在的本地 hashed module/CSS 后才豁免静态 h1/main；其他页面继续完整检查。单测覆盖失效 mount/module/resource、元数据、未知 SPA 与路径逃逸。
 - `.github/workflows/site-checks.yml`：仅将 Node 命令改为运行所有 `tests/*.test.mjs`，仍只检查、不发布。
 
 ## 概念边界
 
-首页保留 hero、capabilities、integrate、contact 四个主区块和原 2×2 产品卡网格，仅将第四张 Tech M&A 替换为 `tech-insight` 技术与竞争洞察服务，标识为“订阅 / 定制服务”。“了解服务”打开默认关闭的原生 dialog，支持关闭、Escape、焦点约束与恢复；无 JS 时链接到原生 details，展开即可阅读同一份全文并邮件联系，无重复服务文案或独立大型主区块。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。不提供自动在线订阅、支付或 A2A。咨询入口沿用通用 `consulting` 和 `cards` / `support`，`service=null`，不记录产品或档位归属；详情打开不发产品事件。
+首页使用 `#capabilities` 仅展示技术与战略洞察服务，明确专家支持与约定交付。`#online-tools` 展示四个原生工具入口，Deep BLM 只在此出现一次，保留 `data-demo="deep-blm"` / `data-tool-entry="deep-blm"` 及原事件身份。其他工具不计入 product_view。专业服务居中、最大宽度 840px；工具桌面 2×2，900px 以下单列。首屏标题为“AI原生服务，全新体验”，标题、说明、操作与隐私提示居中，继承共享样式的原品牌蓝色 `#0066cc` / hover `#0055ad`。`#integrate` 缩为次要浅色协作卡片，`#collaborate` 等既有联系锚点保留。“了解服务”打开默认关闭的原生 dialog，支持关闭、Escape、焦点约束与恢复；无 JS 时链接到原生 details，展开即可阅读同一份全文并邮件联系，无重复服务文案或独立大型主区块。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。不提供自动在线订阅、支付或 A2A。咨询入口沿用通用 `consulting` 和 `cards` / `support`，`service=null`，不记录产品或档位归属；详情打开不发产品事件。
 
-下方概念 Demo 样例均为虚构场景与拟议交付结构，Deep BLM 另提供规划工具试用。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
+概念 Demo 样例均为虚构场景与拟议交付结构。Deep BLM 是独立规划工具，推荐 ≥1024px 电脑端，手机和平板显示说明；不新增 Deep BLM 咨询产品。专利自评不构成法律结论；速查仅为官方清单名称匹配，不构成合规放行；Slide Editor 编辑/导出 HTML，不宣称支持 PPTX，并标注需要 JavaScript、只打开可信文稿。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
 
-A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。切换产品或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。目录共四项：Deep BLM 为 `availability=web-trial`，IP 守护和技术架构规划为 `concept-demo`，洞察服务为 `manual-contact`，通过邮件人工洽谈；全部保持 `production_ready=false`、`a2a.available=false`、`a2a.endpoint=null`。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
+A2A 仅保留一个 Deep BLM 本地虚构样例，明确“演示样例，非真实客户交付”，不将工具试用推广为 A2A 服务，也不把真实专利体检工具作为虚构样例。展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。重开或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。机器目录保持 `version=1` / `kind=service-catalog`，`services` 仅含原洞察服务 `manual-contact` 对象；新增 `tools` 数组描述四个工具的真实 ID、名称、URL、可用状态及事实边界。`a2a.available=false`、`a2a.endpoint=null`；可打开工具不代表生产自动化或在线咨询接口可用。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
 
 需求表单只要求业务问题，期望结果与约束可选，不收集个人邮箱或电话。不要输入敏感数据、密码或密钥。打开/准备草稿都不发信、不上传；用户必须主动点邮件链接，并在本机邮件客户端确认发送。mailto 使用 RFC6068 百分号编码，空格为 `%20`，不是 `+`。复制失败时可手动复制；关闭窗口清空字段与草稿；不依赖 localStorage。文本通过 `textContent` 显示，不插入用户 HTML。短草稿仅在用户主动打开的本机 mailto 中携带正文；编码 URI 超过 1800 字符时保留完整可复制文本，邮件链接不带正文，并提示先复制再粘贴，避免客户端截断。统计和目录不包含正文。
 
@@ -41,7 +42,7 @@ A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与�
 | --- | --- |
 | `version` | `"1"` |
 | `event` | `product_view`, `demo_open`, `demo_complete`, `intent_open`, `mail_draft_ready`, `mailto_click`, `a2a_step`, `a2a_interest` |
-| `service` | `ip-guard`, `deep-blm`, `architecture`；旧 `tech-ma` 仅保留为兼容枚举，实时 UI 不发送；通用入口及新洞察咨询为 `null` |
+| `service` | 当前 UI 仅发送 `deep-blm` 或 `null`（通用入口与洞察咨询）；接收端冻结枚举仍含历史 ID，前端不发送 |
 | `category` | `product`, `a2a`, `consulting`, `integration`, `general`, `partnership` |
 | `surface` | `cards`, `demo`, `a2a`, `support`, `contact`, `demand` |
 | `audience` | `"browser_interaction"`（浏览器交互，无法据此核验自然人或自动化） |
@@ -49,7 +50,7 @@ A2A 展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与�
 | `session_id`, `event_id` | 随机临时 ID，仅用于去重 |
 | `step` | 仅 `a2a_step` 的 1–5 整数 |
 
-未知事件/服务/字段全部拒绝。`PRODUCTS` 和 A2A 仅含原前三个虚构样例；卡片可见性统计在观察及同意时都跳过未注册 ID，不发送 `tech-insight` 产品事件。旧 `tech-ma` 已从公开首页、样例定义、A2A 选项和目录移除，接收端与冻结 schema 保持不变。不包含输入、邮箱、完整 URL/query/hash/referrer、个人标识或持久指纹。去重键为事件/服务/分类/界面/步骤的本页组合；会话不等于独立人数，不能报告为 UV。浏览器交互不等于已核实的自然人访问，已知内部验证单独标记 `is_test=true`。GitHub Pages 的静态目录读取目前没有可用访问日志，Agent/爬虫读取量是未知，不是零。`product_view` 只表示卡片至少一半进入视口；`demo_complete` 仅为旧接口兼容枚举，本版不发送，也不据此计算完成率；打开样例只记 `demo_open`，不声称访客看完。通用 A2A 意向只记 `intent_open` 且 service=null，不归属默认产品；产品样例中的 A2A 意向才另记 `a2a_interest`。A2A 步骤是样例操作。有效场景、试点与付费意向须通过真实沟通人工确认，不从页面动作自动推断，也不设置未经用户批准的立项阈值。
+未知事件/服务/字段全部拒绝。`PRODUCTS` 和 A2A 仅含 `deep-blm` 一个虚构样例；卡片可见性统计在观察及同意时都跳过未注册 ID，不发送 `tech-insight` 产品事件。旧 `tech-ma` 已从公开首页、样例定义、A2A 选项和目录移除，接收端与冻结 schema 保持不变。不包含输入、邮箱、完整 URL/query/hash/referrer、个人标识或持久指纹。去重键为事件/服务/分类/界面/步骤的本页组合；会话不等于独立人数，不能报告为 UV。浏览器交互不等于已核实的自然人访问，已知内部验证单独标记 `is_test=true`。GitHub Pages 的静态目录读取目前没有可用访问日志，Agent/爬虫读取量是未知，不是零。`product_view` 只表示卡片至少一半进入视口；`demo_complete` 仅为旧接口兼容枚举，本版不发送，也不据此计算完成率；打开样例只记 `demo_open`，不声称访客看完。通用 A2A 意向只记 `intent_open` 且 service=null，不归属默认产品；产品样例中的 A2A 意向才另记 `a2a_interest`。A2A 步骤是样例操作。有效场景、试点与付费意向须通过真实沟通人工确认，不从页面动作自动推断，也不设置未经用户批准的立项阈值。
 
 必须区分：**意向入口点击 ≠ 草稿准备 ≠ 邮件实际发出/送达 ≠ 已核实的合格需求**。`mailto_click` 也不能证明邮件发出；页面无法确认邮箱投递或需求质量。
 
@@ -69,7 +70,7 @@ git diff --check
 
 浏览器脚本默认仅监听 `127.0.0.1` 的临时随机端口，并在成功/失败时关闭服务器、线程与浏览器；无常驻进程。可传 `BASE_URL` 使用父流程提供的预览，脚本不会管理该外部服务器；`CHROME_PATH` 可指向既有 Chromium。所有测试页面使用测试标识，正式文件不注入测试配置。
 
-浏览器覆盖：320/390/820/1440 无溢出、导航与锚点、键盘/减少动态效果、原前三项 A2A 虚构样例、IP/架构演示按钮的样例内容及 Deep BLM 原生工具入口、第四卡详情与无 JS 全文、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
+浏览器用例覆盖（本轮因沙箱 socket 拒绝尚待重跑）：320/390/820/1440/1920 无溢出、导航与锚点、键盘/减少动态效果、原前三项 A2A 虚构样例、IP/架构演示按钮的样例内容及 Deep BLM 原生工具入口、首项洞察服务详情与无 JS 全文、四个工具原生路由/本地壳及强制颜色、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
 
 编码子进程的沙箱可能禁止创建本地 socket，不能据此宣称浏览器通过；应在已授权的父流程环境中真跑交互。实际发布状态以对应 PR 的 CI、Pages 构建及发布后核验报告为准，本机测试不代表线上发布成功或真实手机蜂窝网可达。
 
@@ -94,7 +95,7 @@ Deep BLM 集成基线为 `b83271a83c5cb0a155b7c57bb32c49526ebd3a16`，实现分�
 - 更改提供方/接口须重新输入 Key 并保存；配置变动使同意、在途请求与旧结果失效。另一标签页更改相关存储也会丢弃本页凭据，避免静默重定向。异常/被拒绝/超额存储不影响手工编辑与导出，不把秘密记录放入恢复副本。不读取其他应用配置，不自动使用 `blm-ai-config` 的旧 Key，检测存在后提供显式删除按钮。
 - 自定义接口只接受公共域名的 HTTPS URL，拒绝 URL 凭据、查询、片段、非标准端口、本地名称与 IP 字面量；静态浏览器应用不能审计提供方的 DNS 配置或数据处理，请自行核对所填接口。请求不携带 Cookie，不跟随重定向；错误仅显示通用说明/HTTP 状态，不显示或记录原始提供方响应。
 - 公共链接导入、AllOrigins、自动网络搜索、共享 Key/Cursor 配置桥接均未纳入新版。全部运行依赖在 `assets/vendor`，版本、字节数和 SHA256 见 `manifest.json`；保留上游许可。EasyMDE 禁用字体自动下载与拼写检查，不用 CDN 回退。Font Awesome 资产保留但工作台未使用图标字体。
-- 工具不导入 `site.mjs`/`signals.mjs`，不初始化首页统计。首页 Deep BLM 卡为普通链接，保留 `data-demo="deep-blm"` 身份与需求按钮；用户同意后的现有 `demo_open` 仅说明入口兴趣，不是规划完成。
+- 工具不导入 `site.mjs`/`signals.mjs`，不初始化首页统计。首页 Deep BLM 卡为普通链接，保留 `data-demo="deep-blm"` 身份及“打开规划工具（试用）”标签；用户同意后的现有 `demo_open` 仅说明入口兴趣，不是规划完成。
 - 内容安全入口为 `deepblm-security.mjs`：真实 DOMPurify 严格标签白名单，去除图片等自动外载、事件、样式、SVG、表单、框架等；只允许显式 HTTP(S)/mailto 链接并加 `noopener noreferrer`。文本/表格使用 DOM 文本或转义；预览、AI 回复、报告、修订与 Word HTML 共用净化路径。新版不保留旧内联事件处理器；CSP 的脚本限同源，无 `unsafe-eval` 或内联脚本许可。样式仍允许 `unsafe-inline` 以兼容编辑器布局，AI 的动态 HTTPS 接口使 `connect-src` 为 `https:`，不宣称是完全锁定的 CSP。浏览器端存储与 Key 仍受同源其他页面代码及浏览器扩展的安全边界限制。
 
 ### 深度填写与审阅 UX
@@ -120,6 +121,21 @@ node --test tests/*.test.mjs
 
 浏览器脚本复用既有回环 HTTP helper；AI 请求只使用显式 `fixture-only` 路由与非真实 Key，不调用收费模型。保留 1440/1024 下全部步骤、五组导航及归属、原生控件超限拒绝、只读示例、净化预览、检查清单、导入原子性、存储失败和全局 AI 配置/凭据安全回归。新增写作面板用例覆盖直接字段入口、侧栏首空/全填默认、只读文本/表格快照及目标切换、三个动作不自动请求、空补充要求的实际载荷、同目标重开与设置往返、讨论/检查无采用、Ctrl/Cmd+Enter/换行及模拟 IME 事件、生成中重复提交/取消/迟到结果拒绝、结构化表格拒绝/确认采用/撤销，以及 1024/1440 的长原文和长结果滚动。设置 `DEEPBLM_SCREENSHOT_DIR` 后会额外保存 `writing-composer-{1024,1440}.png` 与 `writing-result-{1024,1440}.png`。
 
-本轮父流程真实运行 Node 49 项、Python 9 项、站点静态检查及 `deepblm-smoke.py`、`deepblm-deep-ux-smoke.py`、`visual-smoke.py`；并检查 1024/1440 宽度及 1440×560、1024×600 短高场景。前后测量确认：长表单返回由滚动归零变为恢复原位置和焦点；关闭重开由丢掉结果变为保留编辑稿，且请求数不增加；长结果采用按钮由视口外变为常驻可见。新增用例覆盖最新编辑稿预览/对照/采用/撤销、畸形表格拒绝、剪贴板失败及迟到结果隔离、跨目标恢复和规划/连接变更失效、导入/重置/清除位置记忆、真实双标签导航/等价保存/内容冲突与在途响应只读保留。首访断言标题焦点，回访断言明确字段 ID，表格进一步断言行列，不能用“焦点在区域内”放过错误目标。测试仅用非真实 Key 和显式模拟接口；不将网络或沙箱失败视为通过。新增主要选择器：`#field-outline` / `[data-outline-field]` / `#next-missing-field`、`#ai-draft-editor`、`[data-ai-view]`、`#ai-original` / `#ai-compare-draft`、`#ai-footer` / `#ai-copy` / `#ai-copy-fallback` / `#ai-return`；原字段、编辑器、导航、导入/导出与全局设置选择器保留。
+此前 Deep BLM 改版的父流程记录：真实运行 Node 49 项、Python 9 项、站点静态检查及 `deepblm-smoke.py`、`deepblm-deep-ux-smoke.py`、`visual-smoke.py`；并检查 1024/1440 宽度及 1440×560、1024×600 短高场景。前后测量确认：长表单返回由滚动归零变为恢复原位置和焦点；关闭重开由丢掉结果变为保留编辑稿，且请求数不增加；长结果采用按钮由视口外变为常驻可见。新增用例覆盖最新编辑稿预览/对照/采用/撤销、畸形表格拒绝、剪贴板失败及迟到结果隔离、跨目标恢复和规划/连接变更失效、导入/重置/清除位置记忆、真实双标签导航/等价保存/内容冲突与在途响应只读保留。首访断言标题焦点，回访断言明确字段 ID，表格进一步断言行列，不能用“焦点在区域内”放过错误目标。测试仅用非真实 Key 和显式模拟接口；不将网络或沙箱失败视为通过。新增主要选择器：`#field-outline` / `[data-outline-field]` / `#next-missing-field`、`#ai-draft-editor`、`[data-ai-view]`、`#ai-original` / `#ai-compare-draft`、`#ai-footer` / `#ai-copy` / `#ai-copy-fallback` / `#ai-return`；原字段、编辑器、导航、导入/导出与全局设置选择器保留。
 
 验收应同时运行上述纯逻辑、静态与真实浏览器命令；受限编码沙箱的 socket 拒绝不等于浏览器验收成功。模型请求验收仅使用显式非真实夹具，不证明真实提供方的 CORS、账户权限或生成质量；Word 实际排版也需单独核验。同一浏览器请勿在多个标签页同时编辑同一规划，以免后保存的草稿覆盖先前版本；开始研讨前请先导出 JSON 备份。
+
+## 本轮首页工作树预览（2026-10-30）
+
+基于 `origin/master=b453dde`，仅预览，未提交/推送/发布；父流程另提供公开文件暂存区的临时外网预览。共享 `site.css`、vendor、统计接收端/配置、CNAME、DNS 及机器设置不变。专利体检应用仅修改名称与介绍文字，评分与业务逻辑不变；其他工具不变。洞察 P1/P2/P3 全文和无 JS 回退保持原文。下方保留修正前验证记录，最新定点修正的验证状态另列。
+
+在此工作树运行 `python -m http.server 8765 --bind 127.0.0.1`，访问 `http://127.0.0.1:8765/?internal_test=1`。同一解释器可运行 `scripts/check_site.py`、`-m unittest discover -s tests -p 'test_*.py'`、`tests/visual-smoke.py` 与未改动的 `tests/deepblm-smoke.py`；Node 使用 `node --test tests/*.test.mjs`。
+
+修正前预览的父环境验证记录（不代表下述修正已通过浏览器）：Node 51 项、Python 15 项单测、静态检查、`visual-smoke.py`、未修改的 `deepblm-smoke.py` 与 `git diff --check` 均通过。Codex 沙箱最初受本地 socket 权限限制，父环境已实际启动预览并补跑浏览器，不再视为待验。另独立核验 320/390/820/1440/1920 五档宽度、三服务/四工具分类、导航和首屏双路径、详情关闭及焦点恢复、无 JS 完整正文和邮件入口；四个工具页面均实际加载且无页面错误，未发起真实 AI 或清单查询。桌面与手机截图及 JSON 证据保存于当前工程 profile 的 `cache/scratch/homepage-service-tool-ux-evidence/`。洞察 details/dialog、共享 CSS、洞察 CSS、工具内部、统计配置/接收端与 CNAME 均与基线逐字一致。父环境当前预览地址为 `http://127.0.0.1:4181/?internal_test=1`，仍未发布。
+
+
+### 最新定点修正（2026-10-30）
+
+保留现有未提交工作；首页恢复原品牌蓝与居中布局，主标题改为“AI原生服务，全新体验”。专业服务仅保留技术与战略洞察服务；在线工具为 Deep BLM、专利体检、制裁与出口管制速查、Source Slide Editor。原概念服务已从前端、样例、选择器和机器目录移除，接收端冻结 schema 不变。洞察 details/dialog 原始字节保持一致；专利应用仅文字改名，原十题评分不变。Node 与视觉测试按一服务、四工具和一个 Deep BLM A2A 样例更新。浏览器 socket 在编码沙箱受限，本次不尝试浏览器或启动服务器；视觉、DeepBLM 和公开移动截图由父流程另行验证与刷新现有预览。本次无提交、推送或发布。
+
+本次修正父环境验证：Node 54 项、Python unittest 15 项、`scripts/check_site.py`、`visual-smoke.py`、未修改的 `deepblm-smoke.py` 和 `git diff --check` 均通过。共享 CSS、冻结统计配置、洞察 details/dialog 全文均逐字一致；专利应用脚本仅变更名称和介绍字符串，评分与运行逻辑不变。独立在本地与公网预览真验 320/390/820/1440/1920 五档：原蓝色 `rgb(0, 102, 204)`、精确主标题、居中布局、一服务/四工具、删除旧服务、详情与焦点恢复、无 JS 全文/邮件入口、专利应用改名均通过，零页面错误与 POST。截图与 JSON 位于当前 profile `cache/scratch/homepage-centered-revision-evidence/`。现有临时预览链接已刷新：`https://camping-conviction-maine-indoor.trycloudflare.com/?internal_test=1`，统计关闭、禁止索引，不改正式首页。Cloudflare 会移除 `email_off` 标记；比较时仅忽略该标记，HTML 内容一致，CSS/JS/JSON 精确字节一致。该标记仅加在预览暂存文件，避免邮箱被自动改写而破坏无 JS 邮件入口。
