@@ -70,6 +70,17 @@ const html = read('index.html');
 const js = read('assets/site.mjs');
 const css = read('assets/homepage.css');
 
+test('transfer has one native primary entry and catalog targets its enclosed body', () => {
+  const card = html.match(/<article class="product" id="tech-transfer-poc">[\s\S]*?<\/article>/)[0];
+  assert.match(card, /<summary class="button primary"[^>]*>了解服务<\/summary>/);
+  assert.equal((card.match(/<summary\b/g) || []).length, 1);
+  assert.doesNotMatch(card, /<a\b[^>]*href="#transfer/);
+  const service = JSON.parse(read('service-catalog.json')).services.find(s => s.id === 'tech-transfer-poc');
+  assert.equal(service.details_url, 'index.html#transfer-details-body');
+  assert.match(card, /<details[^>]*id="transfer-details"[^>]*>[\s\S]*<p id="transfer-details-body">[\s\S]*?<\/details>/);
+  assert.doesNotMatch(html, /\son\w+\s*=/i);
+});
+
 test('PR15 production script and dialog transition order are frozen', () => {
   assert.equal(sha(js), '603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e');
   const transition = js.slice(js.indexOf("activeSource = {category, service, source}"), js.indexOf("track('intent_open'"));

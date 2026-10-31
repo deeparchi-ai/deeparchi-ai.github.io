@@ -6,7 +6,7 @@
 
 - `index.html`：首页 top、capabilities、service-method、online-tools、contact 五个主区块；integrate 作为体验区内的旧锚点保留；包含洞察服务详情弹窗、一个 Deep BLM 本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
 - `assets/insight-services.css`：仅作用于首页洞察卡、详情弹窗及无 JS 原生折叠详情的样式；服务全文只存一份，JS 将其移入原生 dialog，适配 320/390/820/1440 宽度。
-- `assets/homepage.css`：首页独立视觉覆盖，两项主业桌面等宽双列、900px 以下单列；工具桌面紧凑四列、900px 以下两列，保留系统字体、原比例 logo、键盘焦点及强制颜色支持。
+- `assets/homepage.css`：首页独立视觉覆盖，两项主业桌面等宽双列、900px 以下单列；工具桌面紧凑四列、900px 以下两列，各宽度工具正文至少 14px、风险提示至少 13px、CTA 至少 14px，以间距保持 A2A 次级层级，保留系统字体、原比例 logo、键盘焦点及强制颜色支持。
 - `assets/site.css`：共用视觉、移动导航、dialog 和减少动态效果设置。
 - `assets/site.mjs`：一个 Deep BLM 虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
 - `assets/signals.mjs`：纯配置/事件校验、RFC6068 草稿编码、默认拒绝的匿名事件适配器。
@@ -23,7 +23,7 @@
 
 首页以“让技术看得清，让成果走得通。”为居中大标题，主按钮指向两项服务，次按钮沟通项目需求。`#capabilities` 包含两张等权 `article.product`：技术与战略洞察（`tech-insight`）和技术成果转移及概念验证（`tech-transfer-poc`），说明、适合问题与典型交付来自已展示的设计稿；桌面等宽双列、900px 以下单列。`#service-method` 为明确问题、形成判断与方案、分阶段验证与推进三步。后置的 `#online-tools` 标题为“A2A 体验区”，四项真实工具的 URL、ID 和风险说明保留；桌面四列，900px 以下两列。Deep BLM 只有一个原生工具入口，保留 `data-demo="deep-blm"` / `data-tool-entry="deep-blm"`；其他工具不计入 product_view。`#integrate` 和 `#open-a2a` 位于体验区内，明确网页工具和本地虚构样例未连接真实 A2A 服务，不是运行中的端点。`#collaborate` 等联系锚点保留。
 
-白底及品牌蓝 `#0066cc` / hover `#0055ad` 保持；视觉仅通过作用于 `.homepage` 的独立 CSS 覆盖。基于 PR15 `779d1e1` 合并，`site.mjs` 完整 SHA256 为 `603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e`；三页引用仍为 `site.mjs?v=603651731d9c`。来源 dialog 先关闭再打开需求 dialog 的顺序保持。洞察完整 details/dialog 原块字节不变；无 JS 可展开同一份 P1/P2/P3 全文并邮件联系。P1、P2 持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。成果转移用原生 `#transfer-details` 说明范围及 PoC 边界，不承诺交易达成、验证通过或转化成功。两项业务的目录均为 manual-contact、production_ready=false，提供原生详情锚点，不提供自动订阅、支付或 A2A。咨询入口沿用 `consulting` 和 `cards` / `support`，`service=null`，不新增事件或服务枚举；详情打开不发产品事件。
+白底及品牌蓝 `#0066cc` / hover `#0055ad` 保持；视觉仅通过作用于 `.homepage` 的独立 CSS 覆盖。基于 PR15 `779d1e1` 合并，`site.mjs` 完整 SHA256 为 `603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e`；三页引用仍为 `site.mjs?v=603651731d9c`。来源 dialog 先关闭再打开需求 dialog 的顺序保持。洞察完整 details/dialog 原块字节不变；无 JS 可展开同一份 P1/P2/P3 全文并邮件联系。P1、P2 持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。成果转移的原生 `#transfer-details` 仅保留一个 `summary#open-transfer`“了解服务”主 CTA，与洞察主 CTA 同级，咨询按钮独立；无额外折叠入口、inline 事件或新增 JS。目录链接 `index.html#transfer-details-body` 定位到 details 内正文，由浏览器展开祖先 details，覆盖首次目录片段、同页 hashchange 和重复片段导航；主 CTA 支持鼠标、Enter / Space 与重复开合。范围及 PoC 风险全文保留，不承诺交易达成、验证通过或转化成功。两项业务的目录均为 manual-contact、production_ready=false，提供原生详情锚点，不提供自动订阅、支付或 A2A。咨询入口沿用 `consulting` 和 `cards` / `support`，`service=null`，不新增事件或服务枚举；详情打开不发产品事件。
 
 概念 Demo 样例均为虚构场景与拟议交付结构。Deep BLM 是独立规划工具，推荐 ≥1024px 电脑端，手机和平板显示说明；不新增 Deep BLM 咨询产品。专利自评不构成法律结论；速查仅为官方清单名称匹配，不构成合规放行；Slide Editor 编辑/导出 HTML，不宣称支持 PPTX，并标注需要 JavaScript、只打开可信文稿。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
 
@@ -73,7 +73,9 @@ git diff --check
 
 浏览器脚本默认仅监听 `127.0.0.1` 的临时随机端口，并在成功/失败时关闭服务器、线程与浏览器；无常驻进程。可传 `BASE_URL` 使用父流程提供的预览，脚本不会管理该外部服务器；`CHROME_PATH` 可指向既有 Chromium。所有测试页面使用测试标识，正式文件不注入测试配置。
 
-本地合并验收已由父流程实际执行：57 项 Node 测试、15 项 Python 单测、站点静态检查、首页 visual-smoke、Deep BLM smoke 和 deep-ux-smoke 均通过。首页浏览器用例覆盖两项主业等宽、工具四列/两列降级、320/390/820/1440/1920 无溢出、导航、无 JS 全文、洞察详情、原生工具路由、强制颜色、关闭/Escape/焦点、A2A 五步样例及重置、两项业务通用咨询、需求草稿、剪贴板拒绝、同意/拒绝/DNT/GPC。统计验证使用明确 fixture，无真实远端收件或模型调用；本地通过不代表已经发布。
+此前合并验收记录（不代表本次修复的浏览器结果）：父流程实际执行了57 项 Node 测试、15 项 Python 单测、站点静态检查、首页 visual-smoke、Deep BLM smoke 和 deep-ux-smoke 均通过。首页浏览器用例覆盖两项主业等宽、工具四列/两列降级、320/390/820/1440/1920 无溢出、导航、无 JS 全文、洞察详情、原生工具路由、强制颜色、关闭/Escape/焦点、A2A 五步样例及重置、两项业务通用咨询、需求草稿、剪贴板拒绝、同意/拒绝/DNT/GPC。统计验证使用明确 fixture，无真实远端收件或模型调用；本地通过不代表已经发布。
+
+本次 B 档本地修复先补真实主 CTA 与 computed font-size 回归，再改 HTML/CSS。离线验收：58 项 Node 测试（`node --test --experimental-test-isolation=none tests/*.test.mjs`，沙箱内同进程运行）、15 项 Python 单测、站点静态检查与 `git diff --check` 均通过；受保护文件字节指纹及 CSS 哈希引用通过。Python 命令使用已安装 Playwright 的项目虚拟环境。浏览器回归新增 JS/无 JS 主入口重复开合、目录首次 hash、同页 hashchange、重复同片段导航、桌面主 CTA 对齐和独立咨询检查；字体在 320/390/820/1440/1920 下读取实际 computed font-size，不缩减原有断言。`tests/landing-page.test.mjs` 的四入口/唯一可访问名称断言保留，仅将成果转移链接匹配更新为原生 summary。编码沙箱在临时 HTTP 服务器创建 socket 时返回 `PermissionError: [Errno 1] Operation not permitted`，未绕过沙箱。父流程随后使用上述 Python 环境实际补跑并通过：58 项 Node 测试（标准命令 `node --test tests/*.test.mjs`）、15 项 Python 单测、站点静态检查、首页 visual-smoke、Deep BLM smoke 与 deep-ux-smoke。独立浏览器复验覆盖五档宽度、JS/无 JS 共 10 个组合：真实主入口鼠标/键盘/重复开合、目录片段、computed font-size、无溢出与体验区次级层级均通过；另核对两张主业卡的主 CTA 对齐及咨询按钮间距一致。未推送或发布。
 
 编码子进程的沙箱可能禁止创建本地 socket，不能据此宣称浏览器通过；应在已授权的父流程环境中真跑交互。实际发布状态以对应 PR 的 CI、Pages 构建及发布后核验报告为准，本机测试不代表线上发布成功或真实手机蜂窝网可达。
 

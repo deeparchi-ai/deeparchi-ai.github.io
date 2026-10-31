@@ -241,6 +241,70 @@ def check_mobile(browser):
         context.close()
 
 
+def check_transfer_entry(browser):
+    for javascript in (True, False):
+        context = browser.new_context(java_script_enabled=javascript, reduced_motion='reduce', viewport={'width':1440, 'height':960})
+        try:
+            page = context.new_page()
+            errors, responses, failures = page_errors(page)
+            page.goto(BASE_URL + '/?internal_test=1', wait_until='networkidle')
+            details = page.locator('#transfer-details')
+            body = details.locator('p')
+            primary = page.locator('#tech-transfer-poc .button.primary')
+            assert not details.evaluate('el => el.open')
+            # Use the actual main CTA, never a second disclosure as a workaround.
+            for activation in ('click', 'Enter', 'Space'):
+                if activation == 'click':
+                    primary.click()
+                else:
+                    primary.press(activation)
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                assert '不承诺交易达成、技术验证通过或转化成功' in body.inner_text()
+                details.locator('summary').press('Space')
+                assert not details.evaluate('el => el.open')
+            assert primary.evaluate("el => el.tagName") == 'SUMMARY'
+            assert page.locator('#tech-transfer-poc a[href^="#transfer"]').count() == 0
+            if javascript:
+                # Both primary actions share a desktop baseline and visual hierarchy.
+                boxes = [page.locator(selector).bounding_box() for selector in ('#open-insight', '#tech-transfer-poc .primary')]
+                assert abs(boxes[0]['y'] - boxes[1]['y']) < 2, boxes
+                assert abs(boxes[0]['height'] - boxes[1]['height']) < 2, boxes
+                consulting_boxes = [page.locator(selector).bounding_box() for selector in ('#insight-card-consulting', '#transfer-card-consulting')]
+                gaps = [consulting_boxes[i]['x'] - (boxes[i]['x'] + boxes[i]['width']) for i in range(2)]
+                assert abs(gaps[0] - gaps[1]) < 2, gaps
+                consulting = page.locator('#transfer-card-consulting')
+                consulting.click()
+                assert not details.evaluate('el => el.open')
+                assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
+                close_dialog(page)
+            catalog = page.request.get(BASE_URL + '/service-catalog.json').json()
+            href = next(s['details_url'] for s in catalog['services'] if s['id'] == 'tech-transfer-poc')
+            page.goto(BASE_URL + '/' + href.replace('#', '?internal_test=1#'), wait_until='networkidle')
+            assert details.evaluate('el => el.open')
+            assert body.is_visible()
+            # Real native links drive same-document hash changes, including reopening.
+            for _ in range(2):
+                details.locator('summary').click()
+                page.locator('#nav-links a[href="#capabilities"]').click()
+                page.wait_for_function("location.hash === '#capabilities'")
+                page.locator('#nav-links').evaluate("(el, href) => { const a = document.createElement('a'); a.href = href; a.textContent = '目录详情回归'; el.append(a); }", '#' + href.split('#')[1])
+                link = page.get_by_role('link', name='目录详情回归')
+                link.click()
+                page.wait_for_function('(hash) => location.hash === hash', arg='#' + href.split('#')[1])
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                details.locator('summary').click()
+                # A repeat activation of the current fragment must also reveal it.
+                link.click()
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                link.evaluate('el => el.remove()')
+            assert not errors and not responses and not failures, (errors, responses, failures)
+        finally:
+            context.close()
+
+
 def check_insight_services(browser):
     services = [
         ("持续洞察与技术雷达服务", "P1 标准订阅", ["季度技术与竞争雷达报告", "重点变化与趋势分析", "业务机会提示", "季度成果交流"]),
@@ -308,6 +372,12 @@ def check_insight_services(browser):
                     assert cta.get_attribute('class') == 'button outline'
                     assert cta.evaluate('el => getComputedStyle(el).borderColor') == 'rgb(0, 102, 204)'
                     assert cta.bounding_box()['height'] >= 44
+                for selector, minimum in (('#online-tools .tool-card > p:not(.tool-hint)', 14), ('#online-tools .tool-hint', 13), ('#online-tools a.button, #online-tools button.button', 14), ('#online-tools .section-heading > p:last-child, #integrate .panel-copy', 14), ('#integrate .concept-note', 13)):
+                    elements = page.locator(selector).all()
+                    assert elements, selector
+                    for element in elements:
+                        size = element.evaluate('el => parseFloat(getComputedStyle(el).fontSize)')
+                        assert size >= minimum, (javascript, width, selector, size, minimum)
                 assert page.locator('#online-tools .tool-card h3').all_text_contents() == ['Deep BLM', '专利体检', '制裁与出口管制速查', 'Source Slide Editor']
                 assert page.locator('#online-tools #deep-blm a.button').inner_text() == '打开规划工具（试用）'
                 for removed in ('技术架构规划', 'IP 守护', 'ip-guard', 'sourceIP', 'architecture'):
@@ -761,6 +831,8 @@ if __name__ == "__main__":
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
             try:
+                check_transfer_entry(browser)
+                print('PASS: real native transfer CTA, repeated opening, catalog initial fragment and same-page/repeated fragments, JS/no-JS', flush=True)
                 check_insight_services(browser)
                 print("PASS: two equal professional services + compact four/two-column tools + one A2A sample — full insight dialog, generic consultation, responsive grids at 320/390/820/1440/1920, no-JS", flush=True)
                 check_official_brand(browser)

@@ -38,15 +38,15 @@
 .homepage .tool-card:last-child{padding-right:0}
 .homepage .tool-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 16px;width:100%}
 .homepage .tool-category{font-size:13px;color:var(--blue);margin:0}
-.homepage .tool-card>p{font-size:13px;color:var(--muted);line-height:1.85;margin:0 0 9px}
-.homepage .tool-card>p.tool-hint{font-size:12px;margin:auto 0 8px;padding-top:2px}
-.homepage .tool-card .button{margin-top:0;font-size:12px;padding:8px 0;border:0;border-radius:0;color:var(--blue);background:transparent;text-align:start}
+.homepage .tool-card>p{font-size:14px;color:var(--muted);line-height:1.85;margin:0 0 9px}
+.homepage .tool-card>p.tool-hint{font-size:13px;margin:auto 0 8px;padding-top:2px}
+.homepage .tool-card .button{margin-top:0;font-size:14px;padding:8px 0;border:0;border-radius:0;color:var(--blue);background:transparent;text-align:start}
 .homepage .integration{background:var(--paper);color:var(--ink);text-align:center;padding:0}
 .homepage .integration-band{margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-direction:row;gap:20px;padding:16px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:transparent}
 .homepage .integration .eyebrow{font-size:12px;margin:0 0 10px;color:var(--muted);letter-spacing:.06em}
 .homepage .integration h3{font-size:16px;margin:0 0 6px}
-.homepage .panel-copy{font-size:12px;margin:0 0 5px;max-width:none}
-.homepage .concept-note{font-size:12px;margin:0;color:var(--muted)}
+.homepage .panel-copy{font-size:14px;margin:0 0 5px;max-width:none}
+.homepage .concept-note{font-size:13px;margin:0;color:var(--muted)}
 .homepage .integration-actions{display:flex;align-items:center;justify-content:center;flex-direction:row;gap:8px;flex-shrink:0;font-size:14px}
 .homepage .integration :focus-visible{outline-color:var(--blue)}
 .homepage .contact{text-align:center}
@@ -65,6 +65,12 @@
 .homepage .service-details{font-size:14px;line-height:1.85;margin-bottom:12px;scroll-margin-top:124px}
 .homepage .service-details summary{cursor:pointer;color:var(--blue);min-height:44px;display:list-item;padding-block:10px}
 .homepage .service-details p{color:var(--muted)}
+.homepage .product .transfer-actions{align-items:flex-start;flex-wrap:nowrap}
+.homepage .transfer-actions .service-details{flex:0 1 auto;min-width:0;margin:0;width:max-content;max-width:100%}
+.homepage .transfer-actions .service-details[open]{flex:1;width:auto}
+.homepage .transfer-actions summary.button{display:flex;width:max-content;max-width:100%;color:var(--paper)}
+.homepage .transfer-actions>button{flex-shrink:0}
+.homepage #transfer-details-body{scroll-margin-top:124px}
 .homepage .scope-note{font-size:13px;line-height:1.85;color:var(--muted);text-align:center;margin:24px 0 0}
 .homepage .method{border-block:1px solid var(--line)}
 .homepage .method-flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
@@ -78,7 +84,7 @@
 .homepage .experience .section-heading{max-width:900px;margin-bottom:24px}
 .homepage .experience .section-heading .eyebrow{font-size:11px;margin-bottom:6px}
 .homepage .experience .section-heading h2{font-size:24px;margin-bottom:9px}
-.homepage .experience .section-heading>p:last-child{font-size:12px;line-height:1.9}
+.homepage .experience .section-heading>p:last-child{font-size:14px;line-height:1.9}
 @media(max-width:1100px){
   .homepage .product{padding:22px}
   .homepage .product h3,.homepage #tech-insight h3{font-size:22px}
@@ -110,10 +116,7 @@
   .homepage .tool-card:nth-child(odd){padding-left:0;border-left:0}
   .homepage .tool-card:nth-child(even){padding-right:0}
   .homepage .tool-card h3{font-size:16px}
-  .homepage .tool-card>p{font-size:12px}
-  .homepage .tool-card>p.tool-hint{font-size:11px}
   .homepage .tool-meta .badge{font-size:11px}
-  .homepage .tool-card .button{font-size:11px;padding-inline:0}
   .homepage .method-flow{grid-template-columns:1fr}
   .homepage .product-grid{gap:16px}
   .homepage .tools-grid{row-gap:20px}

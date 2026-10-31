@@ -145,7 +145,7 @@ test('compact consent prompt retains explicit choices, optional scope and access
 
 test('both services have labelled detail and generic consulting actions', () => {
   const cards = [...html.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)].map(match => match[1]).join('');
-  const actions = [...cards.matchAll(/<(?:button|a)\b[^>]*(?:data-demo=|data-intent="(?:product|consulting)"|id="open-insight"|href="#transfer-details")[^>]*>/g)];
+  const actions = [...cards.matchAll(/<(?:button|a|summary)\b[^>]*(?:data-demo=|data-intent="(?:product|consulting)"|id="open-insight"|id="open-transfer")[^>]*>/g)];
   assert.equal(actions.length,4);
   const names = actions.map(([tag]) => tag.match(/aria-label="([^"]+)"/)?.[1]);
   assert.ok(names.every(Boolean));
