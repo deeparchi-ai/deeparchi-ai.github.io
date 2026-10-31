@@ -146,10 +146,10 @@ function initHome() {
     activeSource = {category, service, source};
     form.reset(); clearDraft();
     $('#demand-source').textContent = `来源：${source}`;
-    demand.showModal();
     if (demo.open) demo.close();
     if (a2a.open) a2a.close();
     if (insight.open) insight.close();
+    demand.showModal();
     track('intent_open', service, category, button.dataset.surface);
     if (category === 'a2a' && product) track('a2a_interest', service, category, button.dataset.surface);
   }));
