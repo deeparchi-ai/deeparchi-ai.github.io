@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
+import {canonicalReferrer, observeSource, validatePayload, createSignals} from '../assets/signals.mjs';
 // Frozen byte fingerprints from PR15 779d1e1775ed838c6b573f655f7c14f2404dfc78.
 const frozenFiles = {
   ".github/workflows/site-checks.yml": "68f0fac3f2bccc4bc64382562be5a2cef5a6ee70978fdf7d3da8710e25830198",
@@ -30,7 +31,7 @@ const frozenFiles = {
   "assets/deepblm-workspace.mjs": "59b18a3a1abb45b5a300edb971f28526d3563b6b1ce8c21062c8c5401e2ff93a",
   "assets/deepblm.css": "55eae809814bf51ba1bf6ca0d9dbd796cd9f7228221cbee7d38bf54226afa0fe",
   "assets/insight-services.css": "cc40c4fd49fb0dbec564e6bd84168f54ff43bc2701bc585c38f387936e398d5f",
-  "assets/signals.mjs": "1bf9982ccf02f6a5f827c72c7b3d0427853a9ac5c3308d3ff0284c6544ac31c4",
+  "assets/signals.mjs": "d72684815971275d5d1ec242966825caa900d4ca8f78e13cc91815b62bdedc59",
   "assets/site.css": "738eb81c4c95dd36cb7ba7e8a7caf8ba5341f4f30bf457dc1d7ab168b5df5597",
   "assets/site.mjs": "603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e",
   "assets/vendor/dompurify/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
@@ -150,4 +151,140 @@ test('both businesses have equal card actions, native details and consulting ser
   assert.match(experience, /未连接真实 A2A 服务或运行中的 A2A 端点/);
   assert.equal((html.match(/href="apps\/deepblm.html"/g)||[]).length,1);
   assert.equal((html.match(/class="method-step"/g)||[]).length,3);
+});
+
+test('analytics canonicalReferrer retains only an HTTP(S) origin and rejects credentials', () => {
+  for (const [raw, expected] of [
+    ['https://Example.ORG/private/path?secret=query#fragment', 'https://example.org'],
+    ['http://Example.ORG:8080/private?secret=query#fragment', 'http://example.org:8080'],
+    [' https://example.org:443/path?q=secret#fragment ', 'https://example.org'],
+    ['http://localhost:3000/private?secret=query#fragment', 'http://localhost:3000']
+  ]) assert.equal(canonicalReferrer(raw), expected, raw);
+  for (const raw of [
+    'https://user:password@example.org/private', 'https://user@example.org/',
+    'https://:password@example.org/', 'not a URL', '/relative/path',
+    'https://bad host.example/', 'ftp://example.org/private',
+    'javascript:alert(1)', 'data:text/plain,secret', '', '   ', null, undefined, 42
+  ]) assert.equal(canonicalReferrer(raw), '', String(raw));
+});
+
+test('analytics observeSource distinguishes missing evidence, empty referrers and invalid input', () => {
+  for (const doc of [undefined, null]) {
+    assert.deepEqual(observeSource(doc), {state:'no_doc', origin:''});
+  }
+  const throwing = Object.defineProperty({}, 'referrer', {get() {throw new Error('unavailable');}});
+  for (const doc of [{}, {referrer:undefined}, {referrer:null}, {referrer:42}, throwing]) {
+    assert.deepEqual(observeSource(doc), {state:'no_prop', origin:''});
+  }
+  for (const referrer of ['', ' \t\n ']) {
+    assert.deepEqual(observeSource({referrer}), {state:'empty', origin:''});
+  }
+  const prefix = 'https://example.org/';
+  const atLimit = prefix + 'x'.repeat(2048 - prefix.length);
+  assert.equal(atLimit.length, 2048);
+  assert.deepEqual(observeSource({referrer:atLimit}), {state:'ok', origin:'https://example.org'});
+  const longHostname = `${'a'.repeat(60)}.org`;
+  assert.equal(longHostname.length, 64);
+  for (const referrer of [
+    `${atLimit}x`, `https://${longHostname}/`, 'https://bad host.example/',
+    'not a URL', '/relative', 'https://user:password@example.org/private',
+    'ftp://example.org/private', 'javascript:alert(1)', 'data:text/plain,secret'
+  ]) assert.deepEqual(observeSource({referrer}), {state:'invalid', origin:''}, referrer);
+  for (const [referrer, origin] of [
+    ['https://example.org/private?secret=query#fragment', 'https://example.org'],
+    ['http://example.org/private', 'http://example.org'],
+    ['http://localhost:3000/private', 'http://localhost:3000']
+  ]) assert.deepEqual(observeSource({referrer}), {state:'ok', origin});
+});
+
+const analyticsFields = {event:'demo_open', service:'ip-guard', category:'product', surface:'cards'};
+const analyticsPayload = {
+  ...analyticsFields, version:'1', audience:'browser_interaction', is_test:true,
+  session_id:'session-123', event_id:'event-123'
+};
+
+test('analytics payload validation enforces source state/origin consistency and keeps legacy payloads valid', () => {
+  assert.equal(validatePayload(analyticsPayload), true);
+  assert.equal(validatePayload({...analyticsPayload, source_state:'ok', source_origin:'https://example.org'}), true);
+  for (const state of ['empty', 'no_doc', 'no_prop', 'invalid']) {
+    assert.equal(validatePayload({...analyticsPayload, source_state:state, source_origin:''}), true, state);
+    assert.equal(validatePayload({...analyticsPayload, source_state:state, source_origin:'https://example.org'}), false, state);
+  }
+  assert.equal(validatePayload({...analyticsPayload, source_state:'ok', source_origin:''}), false);
+  for (const state of ['ok', 'empty', 'no_doc', 'no_prop', 'invalid']) {
+    assert.equal(validatePayload({...analyticsPayload, source_state:state}), false, state);
+  }
+  for (const state of ['unknown', 'internal', 'external', '', null, 42]) {
+    for (const origin of ['', 'https://example.org']) {
+      assert.equal(validatePayload({...analyticsPayload, source_state:state, source_origin:origin}), false);
+    }
+  }
+});
+
+function analyticsAdapter() {
+  const calls = [];
+  let sequence = 0;
+  const adapter = createSignals({
+    version:'1', enabled:true, endpoint:'https://metrics.example.org/receive', consent_required:true
+  }, {
+    isTest:true,
+    idFactory:() => `analytics-${++sequence}`,
+    transport:async (endpoint, body) => {calls.push({endpoint, body}); return {ok:true};}
+  });
+  adapter.setConsent(true);
+  return {adapter, calls};
+}
+
+function analyticsDocument(t, doc) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  t.after(() => {
+    if (original) Object.defineProperty(globalThis, 'document', original);
+    else delete globalThis.document;
+  });
+  Object.defineProperty(globalThis, 'document', {configurable:true, writable:true, value:doc});
+}
+
+test('analytics track emits only source evidence through the explicit in-memory transport', async t => {
+  for (const [name, doc, state, origin] of [
+    ['HTTPS strips private URL parts', {referrer:'https://Example.ORG/private?secret=query#fragment'}, 'ok', 'https://example.org'],
+    ['HTTP remains evidence', {referrer:'http://example.org/private'}, 'ok', 'http://example.org'],
+    ['localhost remains evidence', {referrer:'http://localhost:3000/private'}, 'ok', 'http://localhost:3000'],
+    ['missing document', undefined, 'no_doc', ''],
+    ['missing property', {}, 'no_prop', ''],
+    ['empty referrer', {referrer:''}, 'empty', ''],
+    ['malformed referrer', {referrer:'https://bad host.example/private?secret=query#fragment'}, 'invalid', ''],
+    ['credentials rejected', {referrer:'https://user:password@example.org/private'}, 'invalid', ''],
+    ['oversized raw referrer', {referrer:`https://example.org/${'x'.repeat(2048)}`}, 'invalid', '']
+  ]) {
+    await t.test(name, async t => {
+      analyticsDocument(t, doc);
+      const {adapter, calls} = analyticsAdapter();
+      assert.equal(await adapter.track(analyticsFields), true);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].endpoint, 'https://metrics.example.org/receive');
+      const body = calls[0].body;
+      assert.deepEqual(body, {
+        ...analyticsFields, version:'1', audience:'browser_interaction', is_test:true,
+        session_id:'analytics-1', event_id:'analytics-2', source_state:state, source_origin:origin
+      });
+      assert.deepEqual(Object.keys(body).filter(key => key.startsWith('source_')).sort(), ['source_origin', 'source_state']);
+      for (const key of ['source_class', 'source_reason', 'source_src']) assert.equal(Object.hasOwn(body, key), false);
+      for (const label of ['internal', 'external']) assert.equal(Object.values(body).includes(label), false);
+      assert.equal(validatePayload(body), true);
+      assert.doesNotMatch(JSON.stringify(body), /private|secret|fragment|password|bad host/);
+    });
+  }
+});
+
+test('analytics track refuses caller-supplied source fields before invoking transport', async t => {
+  analyticsDocument(t, {referrer:'https://example.org/private'});
+  for (const [key, value] of [
+    ['source_state', 'ok'], ['source_origin', 'https://forged.example.org'],
+    ['source_class', 'external'], ['source_reason', 'caller'], ['source_src', 'internal'],
+    ['source_custom', 'invented']
+  ]) {
+    const {adapter, calls} = analyticsAdapter();
+    assert.equal(await adapter.track({...analyticsFields, [key]:value}), false, key);
+    assert.deepEqual(calls, [], key);
+  }
 });

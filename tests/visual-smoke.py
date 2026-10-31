@@ -682,7 +682,7 @@ def check_contact_paths(browser):
         assert {e['service'] for e in recorded if e['event'] == 'product_view'} <= {'deep-blm'}
         assert any(event['event'] == 'intent_open' and event['category'] == 'consulting' and event['service'] is None and event['surface'] == 'cards' for event in recorded)
         assert all(event['service'] is None for event in recorded if event['category'] == 'consulting')
-        allowed = {"event", "service", "category", "surface", "version", "audience", "is_test", "session_id", "event_id", "step"}
+        allowed = {"event", "service", "category", "surface", "version", "audience", "is_test", "session_id", "event_id", "step", "source_origin", "source_state"}
         assert all(set(event) <= allowed and event["is_test"] is True and event["audience"] == "browser_interaction" for event in recorded)
         assert user_text not in str(recorded) and "商业问题" not in str(recorded)
         panel.locator('[data-consent="reject"]').click()

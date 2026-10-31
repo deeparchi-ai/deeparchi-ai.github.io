@@ -6,6 +6,35 @@ export const SURFACES = Object.freeze(['cards', 'demo', 'a2a', 'support', 'conta
 export const EVENTS = Object.freeze(['product_view', 'demo_open', 'demo_complete', 'intent_open', 'mail_draft_ready', 'mailto_click', 'a2a_step', 'a2a_interest']);
 const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key => keys.includes(key));
 const token = value => typeof value === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(value);
+const SOURCE_MAX = 120;
+const RAW_MAX = 2048;
+const SOURCE_RE = /^https?:\/\/[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?(?::[0-9]{1,5})?$/;
+export const SOURCE_STATES = Object.freeze(['ok', 'empty', 'no_prop', 'no_doc', 'invalid']);
+
+// 只取站点身份：scheme + host（+端口），去掉路径/查询/片段/userinfo；解析失败即空串（由 observeSource 判 invalid）。
+export function canonicalReferrer(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return '';
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.username || url.password) return '';
+    const origin = `${url.protocol}//${url.hostname.toLowerCase()}${url.port ? `:${url.port}` : ''}`;
+    return origin.length <= SOURCE_MAX && SOURCE_RE.test(origin) ? origin : '';
+  } catch { return ''; }
+}
+
+// v3：来源「证据状态」—— 把「没来源」与「没证据」分开，空串不再被当作直接可得结论。
+// 返回 {state, origin}；state ∈ SOURCE_STATES，origin 仅在 state==='ok' 时非空。
+export function observeSource(doc) {
+  if (doc === undefined || doc === null) return Object.freeze({state: 'no_doc', origin: ''});
+  let raw;
+  try { raw = doc.referrer; } catch { return Object.freeze({state: 'no_prop', origin: ''}); }
+  if (typeof raw !== 'string') return Object.freeze({state: 'no_prop', origin: ''});
+  if (raw.trim() === '') return Object.freeze({state: 'empty', origin: ''});
+  if (raw.length > RAW_MAX) return Object.freeze({state: 'invalid', origin: ''}); // 超长原串不裁成 host，直接判无证据
+  const origin = canonicalReferrer(raw);
+  return origin ? Object.freeze({state: 'ok', origin}) : Object.freeze({state: 'invalid', origin: ''});
+}
 
 export function validateConfig(config) {
   if (!exactKeys(config, ['version', 'enabled', 'endpoint', 'site_id', 'consent_required']) || config.version !== VERSION || typeof config.enabled !== 'boolean' || config.consent_required !== true) return null;
@@ -20,7 +49,12 @@ export function validateConfig(config) {
 }
 
 export function validatePayload(payload) {
-  return Boolean(exactKeys(payload, ['version', 'event', 'service', 'category', 'surface', 'audience', 'is_test', 'session_id', 'event_id', 'step']) &&
+  return Boolean(exactKeys(payload, ['version', 'event', 'service', 'category', 'surface', 'audience', 'is_test', 'session_id', 'event_id', 'step', 'source_origin', 'source_state']) &&
+    (payload.source_origin === undefined || (typeof payload.source_origin === 'string' && (payload.source_origin === '' || (payload.source_origin.length <= SOURCE_MAX && SOURCE_RE.test(payload.source_origin))))) &&
+    // v3：state 与 origin 必须互证 —— ok 必带非空 origin，其余 state 必为空 origin；不一致一律不校验通过。
+    (payload.source_state === undefined ||
+      (SOURCE_STATES.includes(payload.source_state) && payload.source_origin !== undefined &&
+        (payload.source_state === 'ok') === (payload.source_origin !== ''))) &&
     payload.version === VERSION && EVENTS.includes(payload.event) && (payload.service === null || SERVICES.includes(payload.service)) &&
     CATEGORIES.includes(payload.category) && SURFACES.includes(payload.surface) && payload.audience === 'browser_interaction' && typeof payload.is_test === 'boolean' && token(payload.session_id) && token(payload.event_id) &&
     (payload.event === 'a2a_step' ? Number.isInteger(payload.step) && payload.step >= 1 && payload.step <= 5 : payload.step === undefined) &&
@@ -53,7 +87,8 @@ export function createSignals(rawConfig, {navigatorLike = {}, isTest = false, lo
       if ((isTest || local) && !transport) return false;
       try {
         session ??= idFactory();
-        const payload = {...fields, version: VERSION, audience: 'browser_interaction', is_test: Boolean(isTest || local), session_id: session, event_id: idFactory()};
+        const source = observeSource(globalThis.document);
+        const payload = {...fields, version: VERSION, audience: 'browser_interaction', is_test: Boolean(isTest || local), session_id: session, event_id: idFactory(), source_origin: source.origin, source_state: source.state};
         if (!validatePayload(payload)) return false;
         const key = JSON.stringify([fields.event, fields.service, fields.category, fields.surface, fields.step]);
         if (sent.has(key)) return false;
