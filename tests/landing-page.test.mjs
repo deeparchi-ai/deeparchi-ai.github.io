@@ -11,30 +11,30 @@ const servicesHTML = html.match(/<section[^>]*id="capabilities"[\s\S]*?<\/sectio
 const toolsHTML = html.match(/<section[^>]*id="online-tools"[\s\S]*?<\/section>/)[0];
 const cards = [...servicesHTML.matchAll(/<article class="product" id="([^"]+)">([\s\S]*?)<\/article>/g)];
 
-test('hero and navigation offer distinct service and self-service paths', () => {
-  assert.equal(html.match(/<h1 id="hero-title">(.*?)<\/h1>/)[1].replace(/<br>/g, ''), 'AI原生服务，全新体验');
-  assert.match(html, /复杂问题，与专家一起解答。<br>日常任务，用在线工具自主完成。/);
-  assert.match(html, /href="#capabilities">了解专业服务/);
-  assert.match(html, /href="#online-tools">使用在线工具/);
+test('hero and navigation prioritize both services and direct contact', () => {
+  assert.equal(html.match(/<h1 id="hero-title">(.*?)<\/h1>/)[1].replace(/<br>/g, ''), '让技术看得清，让成果走得通。');
+  assert.match(html, /从技术与战略判断，到成果转移与可验证的下一步。<br>AI 辅助研究，专家参与关键判断。/);
+  assert.match(html, /href="#capabilities">了解两项服务/);
+  assert.match(html, /href="#contact">沟通项目需求/);
   const nav = html.match(/<div class="nav-links"[^>]*>([\s\S]*?)<\/div>/)[1];
   assert.deepEqual([...nav.matchAll(/href="([^"]+)">([^<]+)/g)].map(m => [m[1], m[2]]), [
-    ['#capabilities','专业服务'], ['#online-tools','在线工具'], ['#integrate','协作接入'], ['#contact','联系我们']
+    ['#capabilities','专业服务'], ['#service-method','服务方式'], ['#online-tools','A2A 体验区'], ['#contact','联系我们']
   ]);
   assert.doesNotMatch(html, /创始人|邝谧|WHY DEEPARCHI|已上线|节省\d|真实客户案例/);
   assert.match(html, /上海申渡架固信息技术有限公司/);
   assert.match(html, /<noscript>[\s\S]*mailto:contact@deeparchi.com.cn/);
 });
 
-test('catalogue describes one manual service, four real tools and only one local A2A sample', () => {
+test('catalogue describes two manual services, four real tools and only one local A2A sample', () => {
   assert.equal(catalog.version, '1');
   assert.equal(catalog.kind, 'service-catalog');
   assert.deepEqual(catalog.organization, {name:'DeepArchi 深度架构', legal_name:'上海申渡架固信息技术有限公司', human_contact:'contact@deeparchi.com.cn'});
-  assert.deepEqual(catalog.services.map(s => s.id), ['tech-insight']);
+  assert.deepEqual(catalog.services.map(s => s.id), ['tech-insight','tech-transfer-poc']);
   assert.deepEqual(Object.keys(PRODUCTS), ['deep-blm']);
   assert.match(js, /category === 'consulting' \|\| !Object.hasOwn\(PRODUCTS, requestedService\) \? null : requestedService/);
   // Frozen receiver schema keeps its legacy enum; the UI emits only registered PRODUCTS.
   assert.deepEqual(SERVICES, ['ip-guard', 'deep-blm', 'architecture', 'tech-ma']);
-  assert.deepEqual(cards.map(card => card[1]), ['tech-insight']);
+  assert.deepEqual(cards.map(card => card[1]), ['tech-insight','tech-transfer-poc']);
   assert.deepEqual([...html.matchAll(/<option value="([^"]+)"/g)].map(m => m[1]), ['deep-blm']);
   const service = catalog.services[0];
   assert.equal(service.name, '技术与战略洞察服务');
@@ -73,19 +73,21 @@ test('Chinese typography and responsive/reduced-motion contracts remain local', 
 
 test('homepage hierarchy keeps details in the dialog and A2A in a compact secondary band', () => {
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)[1];
-  assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]), ['top','capabilities','online-tools','integrate','contact']);
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*\bid="([^"]+)"/g)].map(m => m[1]), ['top','capabilities','service-method','online-tools','contact']);
   assert.doesNotMatch(main, /insight-grid|insight-p[123]-title|a2a-workspace/);
-  assert.equal(cards.length, 1);
+  assert.equal(cards.length, 2);
   for (const [, id, card] of cards) {
-    assert.equal(id, 'tech-insight');
-    assert.match(card, /订阅 \/ 定制服务/);
-    assert.doesNotMatch(card, /<ul|<ol|<details/);
+    assert.ok(['tech-insight','tech-transfer-poc'].includes(id));
+    assert.match(card, /class="badge available"/);
+    assert.equal((card.match(/<li>/g)||[]).length, 3);
+    assert.match(card, /适合什么问题/);
+    assert.match(card, /典型交付/);
   }
-  assert.match(servicesHTML, /研究与专业判断解决具体问题，服务范围与交付成果由双方约定/);
+  assert.match(servicesHTML, /一项帮助看清技术与战略方向，一项推动技术成果找到应用与验证路径/);
   assert.doesNotMatch(servicesHTML, /deep-blm|Deep BLM/);
   assert.match(main, /id="open-a2a"[^>]*aria-controls="a2a-dialog"/);
   assert.match(main, /概念演示 · 未连接真实 A2A 服务/);
-  assert.match(homeCSS, /\.homepage \.integration h2\{font-size:24px/);
+  assert.match(homeCSS, /\.homepage \.integration h3\{font-size:16px/);
   const dialog = html.match(/<dialog id="a2a-dialog"([^>]*)>([\s\S]*?)<\/dialog>/);
   assert.doesNotMatch(dialog[1], /\bopen\b/);
   assert.match(dialog[2], /仅保留 Deep BLM 一个虚构场景，演示样例，非真实客户交付；Deep BLM 工具试用不代表 A2A 服务可用/);
@@ -122,12 +124,12 @@ test('homepage styles are local, responsive and isolated from shared documents',
   assert.match(html, /assets\/homepage.css\?v=[a-f0-9]{12}/);
   assert.doesNotMatch(html, /<style|style=|\son(?:click|keydown|load)=/);
   assert.doesNotMatch(dev + privacy, /homepage.css/);
-  assert.match(homeCSS, /\.homepage \.product-grid\{display:block;max-width:840px;margin-inline:auto/);
+  assert.match(homeCSS, /\.homepage \.product-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /--blue:#0066cc;--hover:#0055ad/);
   assert.doesNotMatch(homeCSS, /--(?:blue|hover|ink|muted|line|soft):|#(?:075cb5|044a94|064f9b)/);
   for (const selector of ['hero', 'section-heading', 'contact']) assert.match(homeCSS, new RegExp(`\\.homepage \\.${selector}\\{text-align:center`));
   assert.match(homeCSS, /min-height:44px/);
-  assert.match(homeCSS, /\.homepage \.tools-grid\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(homeCSS, /\.homepage \.tools-grid\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
   assert.match(homeCSS, /@media\(max-width:900px\)[\s\S]*grid-template-columns:minmax\(0,1fr\)/);
   assert.match(homeCSS, /@media\(forced-colors:active\)/);
   assert.doesNotMatch(homeCSS, /url\(|@import|gradient|animation:/);
@@ -141,13 +143,13 @@ test('compact consent prompt retains explicit choices, optional scope and access
   assert.match(banner, /href="privacy.html"/);
 });
 
-test('single service has two distinct labelled actions with generic consulting attribution', () => {
+test('both services have labelled detail and generic consulting actions', () => {
   const cards = [...html.matchAll(/<article class="product"[^>]*>([\s\S]*?)<\/article>/g)].map(match => match[1]).join('');
-  const actions = [...cards.matchAll(/<(?:button|a)\b[^>]*(?:data-demo=|data-intent="(?:product|consulting)"|id="open-insight")[^>]*>/g)];
-  assert.equal(actions.length,2);
+  const actions = [...cards.matchAll(/<(?:button|a|summary)\b[^>]*(?:data-demo=|data-intent="(?:product|consulting)"|id="open-insight"|id="open-transfer")[^>]*>/g)];
+  assert.equal(actions.length,4);
   const names = actions.map(([tag]) => tag.match(/aria-label="([^"]+)"/)?.[1]);
   assert.ok(names.every(Boolean));
-  assert.equal(new Set(names).size,2);
+  assert.equal(new Set(names).size,4);
   assert.match(html,/id="contact-data-warning">请勿发送敏感数据、密码或密钥/);
 });
 

@@ -27,18 +27,18 @@ const services = [
   }
 ];
 
-test('insight is the only professional service with honest subscription and consulting actions', () => {
+test('insight is one of two professional services with honest subscription and consulting actions', () => {
   const main = html.match(/<main[^>]*>([\s\S]*?)<\/main>/)[1];
-  assert.deepEqual([...main.matchAll(/<section\b[^>]*id="([^"]+)"/g)].map(m => m[1]), ['top', 'capabilities', 'online-tools', 'integrate', 'contact']);
+  assert.deepEqual([...main.matchAll(/<section\b[^>]*id="([^"]+)"/g)].map(m => m[1]), ['top', 'capabilities', 'service-method', 'online-tools', 'contact']);
   assert.doesNotMatch(html, /id="insight-services"|href="#insight-services"|tech-ma|Tech M(?:&amp;|&)A/);
   const cards = [...main.matchAll(/<article class="product" id="([^"]+)">([\s\S]*?)<\/article>/g)];
-  assert.deepEqual(cards.map(m => m[1]), ['tech-insight']);
+  assert.deepEqual(cards.map(m => m[1]), ['tech-insight', 'tech-transfer-poc']);
   const card = cards[0][2];
   assert.match(card, /<p class="badge available">订阅 \/ 定制服务<\/p>/);
-  assert.match(card, /<h3>技术与战略洞察服务<\/h3>/);
+  assert.match(card, /<h3>技术与战略洞察<\/h3>/);
   assert.match(card, /href="#insight-details"[^>]*>了解服务<\/a>/);
   assert.match(card, /data-intent="consulting" data-surface="cards"[^>]*>咨询服务<\/button>/);
-  assert.doesNotMatch(card, /概念 Demo|data-demo|data-service|<ul|<details/);
+  assert.doesNotMatch(card, /概念 Demo|data-demo|data-service|<details/);
   assert.match(html, /<meta name="description" content="[^"]*技术与战略洞察服务[^"]*在线工具[^"]*">/);
 });
 

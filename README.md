@@ -1,30 +1,33 @@
 # DeepArchi 需求验证 Demo
 
-无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页提供一项专业服务（技术与战略洞察服务）与四项在线工具（Deep BLM、专利体检、制裁与出口管制速查、Source Slide Editor）。无框架、外部字体或永久服务器；不新增付费第三方依赖或基础设施；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
+无需构建的静态网站，沿用白色、浅灰、蓝色与系统中文字体。首页提供两项专业服务（技术与战略洞察、技术成果转移及概念验证），后置的 A2A 体验区提供四项在线工具（Deep BLM、专利体检、制裁与出口管制速查、Source Slide Editor）。无框架、外部字体或永久服务器；不新增付费第三方依赖或基础设施；工具依赖为本地固定版本，AI 为可选自备 Key 功能，详见下文。
 
 ## 文件
 
-- `index.html`：首页 hero、专业服务、在线工具、协作接入、联系五个主区块、洞察服务详情弹窗、一个 Deep BLM 本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
+- `index.html`：首页 top、capabilities、service-method、online-tools、contact 五个主区块；integrate 作为体验区内的旧锚点保留；包含洞察服务详情弹窗、一个 Deep BLM 本地 A2A 样例、咨询/工具集成入口、需求草稿 dialog；无 JavaScript 时仍可阅读并使用通用邮件联系。
 - `assets/insight-services.css`：仅作用于首页洞察卡、详情弹窗及无 JS 原生折叠详情的样式；服务全文只存一份，JS 将其移入原生 dialog，适配 320/390/820/1440 宽度。
-- `assets/homepage.css`：首页独立视觉覆盖，专业服务居中且最大宽度 840px、桌面工具 2×2，900px 以下单列，保留系统字体、原比例 logo、键盘焦点及强制颜色支持。
+- `assets/homepage.css`：首页独立视觉覆盖，两项主业桌面等宽双列、900px 以下单列；工具桌面紧凑四列、900px 以下两列，各宽度工具正文至少 14px、风险提示至少 13px、CTA 至少 14px，以间距保持 A2A 次级层级，保留系统字体、原比例 logo、键盘焦点及强制颜色支持。
 - `assets/site.css`：共用视觉、移动导航、dialog 和减少动态效果设置。
 - `assets/site.mjs`：一个 Deep BLM 虚构样例、五步演示、dialog/焦点、需求草稿与同意界面。
 - `assets/signals.mjs`：纯配置/事件校验、RFC6068 草稿编码、默认拒绝的匿名事件适配器。
-- `service-catalog.json`：保留原四项 ID 的兼容机器目录（含独立 Deep BLM 工具条目）；不是可运行的 Agent Card。
+- `service-catalog.json`：两项人工服务与四项原生工具的机器目录（保留原工具 ID）；不是可运行的 Agent Card。
 - `analytics-config.json`：已配置经授权的 CloudBase HTTPS 接收端，`enabled=true`、`consent_required=true`；访客仍默认不发送，须逐页主动同意。
 - `developers.html` / `privacy.html`：能力边界、官方文档、公开仓库、浏览器数据行为与统计状态。
 - `tests/landing-page.test.mjs` / `tests/insight-services.test.mjs` / `tests/signals.test.mjs`：首页、洞察服务全文/交付/边界与统计的 Node 内置离线测试；无外部包。
-- `tests/visual-smoke.py`：实际交互、三项服务/四项工具、320/390/820/1440/1920 布局、无 JS、键盘与强制颜色检查；四个工具真实路由仅加载本地壳，不查询、不上传、不配置模型凭据。保留临时服务器生命周期与错误记录助手。
+- `tests/visual-smoke.py`：两项专业服务、洞察 P1/P2/P3 详情与四项工具的实际交互，320/390/820/1440/1920 布局、无 JS、键盘与强制颜色检查；四个工具真实路由仅加载本地壳，不查询、不上传、不配置模型凭据。保留临时服务器生命周期与错误记录助手。
+- `tests/homepage-merge.test.mjs`：PR15 脚本、来源弹窗切换顺序、受保护文件和弹窗的字节保护；两项服务、原工具链接/风险边界及新 CSS 版本校验。
 - `scripts/check_site.py` / `tests/test_check_site.py`：静态结构、元数据、链接及资源检查。唯一已知 SPA `apps/source-slide-editor/index.html` 须验证 div#app、无 base、存在的本地 hashed module/CSS 后才豁免静态 h1/main；其他页面继续完整检查。单测覆盖失效 mount/module/resource、元数据、未知 SPA 与路径逃逸。
 - `.github/workflows/site-checks.yml`：仅将 Node 命令改为运行所有 `tests/*.test.mjs`，仍只检查、不发布。
 
 ## 概念边界
 
-首页使用 `#capabilities` 仅展示技术与战略洞察服务，明确专家支持与约定交付。`#online-tools` 展示四个原生工具入口，Deep BLM 只在此出现一次，保留 `data-demo="deep-blm"` / `data-tool-entry="deep-blm"` 及原事件身份。其他工具不计入 product_view。专业服务居中、最大宽度 840px；工具桌面 2×2，900px 以下单列。首屏标题为“AI原生服务，全新体验”，标题、说明、操作与隐私提示居中，继承共享样式的原品牌蓝色 `#0066cc` / hover `#0055ad`。`#integrate` 缩为次要浅色协作卡片，`#collaborate` 等既有联系锚点保留。“了解服务”打开默认关闭的原生 dialog，支持关闭、Escape、焦点约束与恢复；无 JS 时链接到原生 details，展开即可阅读同一份全文并邮件联系，无重复服务文案或独立大型主区块。P1、P2 为持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。文案依据《DeepArchi_产品服务介绍_统一配色版.pdf》的授权摘录，不在仓库放置 PDF。不提供自动在线订阅、支付或 A2A。咨询入口沿用通用 `consulting` 和 `cards` / `support`，`service=null`，不记录产品或档位归属；详情打开不发产品事件。
+首页以“让技术看得清，让成果走得通。”为居中大标题，主按钮指向两项服务，次按钮沟通项目需求。`#capabilities` 包含两张等权 `article.product`：技术与战略洞察（`tech-insight`）和技术成果转移及概念验证（`tech-transfer-poc`），说明、适合问题与典型交付来自已展示的设计稿；桌面等宽双列、900px 以下单列。`#service-method` 为明确问题、形成判断与方案、分阶段验证与推进三步。后置的 `#online-tools` 标题为“A2A 体验区”，四项真实工具的 URL、ID 和风险说明保留；桌面四列，900px 以下两列。Deep BLM 只有一个原生工具入口，保留 `data-demo="deep-blm"` / `data-tool-entry="deep-blm"`；其他工具不计入 product_view。`#integrate` 和 `#open-a2a` 位于体验区内，明确网页工具和本地虚构样例未连接真实 A2A 服务，不是运行中的端点。`#collaborate` 等联系锚点保留。
+
+白底及品牌蓝 `#0066cc` / hover `#0055ad` 保持；视觉仅通过作用于 `.homepage` 的独立 CSS 覆盖。基于 PR15 `779d1e1` 合并，`site.mjs` 完整 SHA256 为 `603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e`；三页引用仍为 `site.mjs?v=603651731d9c`。来源 dialog 先关闭再打开需求 dialog 的顺序保持。洞察完整 details/dialog 原块字节不变；无 JS 可展开同一份 P1/P2/P3 全文并邮件联系。P1、P2 持续订阅，P3 按项目定制；具体范围、周期与成果形式以双方约定为准。成果转移的原生 `#transfer-details` 仅保留一个 `summary#open-transfer`“了解服务”主 CTA，与洞察主 CTA 同级，咨询按钮独立；无额外折叠入口、inline 事件或新增 JS。目录链接 `index.html#transfer-details-body` 定位到 details 内正文，由浏览器展开祖先 details，覆盖首次目录片段、同页 hashchange 和重复片段导航；主 CTA 支持鼠标、Enter / Space 与重复开合。范围及 PoC 风险全文保留，不承诺交易达成、验证通过或转化成功。两项业务的目录均为 manual-contact、production_ready=false，提供原生详情锚点，不提供自动订阅、支付或 A2A。咨询入口沿用 `consulting` 和 `cards` / `support`，`service=null`，不新增事件或服务枚举；详情打开不发产品事件。
 
 概念 Demo 样例均为虚构场景与拟议交付结构。Deep BLM 是独立规划工具，推荐 ≥1024px 电脑端，手机和平板显示说明；不新增 Deep BLM 咨询产品。专利自评不构成法律结论；速查仅为官方清单名称匹配，不构成合规放行；Slide Editor 编辑/导出 HTML，不宣称支持 PPTX，并标注需要 JavaScript、只打开可信文稿。没有真实客户案例、检索或公司/市场研究结论、价格、节省量或交付承诺。咨询和工具集成为独立入口，无需先购买咨询才能表达产品需求。
 
-A2A 仅保留一个 Deep BLM 本地虚构样例，明确“演示样例，非真实客户交付”，不将工具试用推广为 A2A 服务，也不把真实专利体检工具作为虚构样例。展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。重开或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。机器目录保持 `version=1` / `kind=service-catalog`，`services` 仅含原洞察服务 `manual-contact` 对象；新增 `tools` 数组描述四个工具的真实 ID、名称、URL、可用状态及事实边界。`a2a.available=false`、`a2a.endpoint=null`；可打开工具不代表生产自动化或在线咨询接口可用。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
+A2A 仅保留一个 Deep BLM 本地虚构样例，明确“演示样例，非真实客户交付”，不将工具试用推广为 A2A 服务，也不把真实专利体检工具作为虚构样例。展示五个 SAMPLE 阶段：发现服务 / 描述需求 / 确认范围与授权 / 查看进度 / 接收交付样例。重开或重置会清空阶段和样例产物。没有任务执行、Agent 网络调用、服务端任务 ID、真实授权或协议符合性声明；不提供 `.well-known` Agent Card。机器目录保持 `version=1` / `kind=service-catalog`，`services` 包含洞察服务与成果转移及概念验证两项 `manual-contact` 对象；`tools` 数组描述四个工具的真实 ID、名称、URL、可用状态及事实边界。`a2a.available=false`、`a2a.endpoint=null`；可打开工具不代表生产自动化或在线咨询接口可用。公开 Patent MCP、MACS 仓库只证明代码存在，不证明托管服务健康。
 
 需求表单只要求业务问题，期望结果与约束可选，不收集个人邮箱或电话。不要输入敏感数据、密码或密钥。打开/准备草稿都不发信、不上传；用户必须主动点邮件链接，并在本机邮件客户端确认发送。mailto 使用 RFC6068 百分号编码，空格为 `%20`，不是 `+`。复制失败时可手动复制；关闭窗口清空字段与草稿；不依赖 localStorage。文本通过 `textContent` 显示，不插入用户 HTML。短草稿仅在用户主动打开的本机 mailto 中携带正文；编码 URI 超过 1800 字符时保留完整可复制文本，邮件链接不带正文，并提示先复制再粘贴，避免客户端截断。统计和目录不包含正文。
 
@@ -42,7 +45,7 @@ A2A 仅保留一个 Deep BLM 本地虚构样例，明确“演示样例，非真
 | --- | --- |
 | `version` | `"1"` |
 | `event` | `product_view`, `demo_open`, `demo_complete`, `intent_open`, `mail_draft_ready`, `mailto_click`, `a2a_step`, `a2a_interest` |
-| `service` | 当前 UI 仅发送 `deep-blm` 或 `null`（通用入口与洞察咨询）；接收端冻结枚举仍含历史 ID，前端不发送 |
+| `service` | 当前 UI 仅发送 `deep-blm` 或 `null`（通用入口与两项业务咨询）；接收端冻结枚举仍含历史 ID，前端不发送 |
 | `category` | `product`, `a2a`, `consulting`, `integration`, `general`, `partnership` |
 | `surface` | `cards`, `demo`, `a2a`, `support`, `contact`, `demand` |
 | `audience` | `"browser_interaction"`（浏览器交互，无法据此核验自然人或自动化） |
@@ -70,7 +73,9 @@ git diff --check
 
 浏览器脚本默认仅监听 `127.0.0.1` 的临时随机端口，并在成功/失败时关闭服务器、线程与浏览器；无常驻进程。可传 `BASE_URL` 使用父流程提供的预览，脚本不会管理该外部服务器；`CHROME_PATH` 可指向既有 Chromium。所有测试页面使用测试标识，正式文件不注入测试配置。
 
-浏览器用例覆盖（本轮因沙箱 socket 拒绝尚待重跑）：320/390/820/1440/1920 无溢出、导航与锚点、键盘/减少动态效果、原前三项 A2A 虚构样例、IP/架构演示按钮的样例内容及 Deep BLM 原生工具入口、首项洞察服务详情与无 JS 全文、四个工具原生路由/本地壳及强制颜色、关闭/Escape/背景点击及焦点、A2A 全流程/重置/切换、各类需求来源、必填与编码、文本不执行为 HTML、不自动发信、剪贴板拒绝、存储不可用、无 JS、同意/拒绝/DNT/GPC。统计配置与 transport 均为明确 fixture，无真实远端测试。最终实际浏览器视觉检查、receiver 验收和发布由父流程负责。
+此前合并验收记录（不代表本次修复的浏览器结果）：父流程实际执行了57 项 Node 测试、15 项 Python 单测、站点静态检查、首页 visual-smoke、Deep BLM smoke 和 deep-ux-smoke 均通过。首页浏览器用例覆盖两项主业等宽、工具四列/两列降级、320/390/820/1440/1920 无溢出、导航、无 JS 全文、洞察详情、原生工具路由、强制颜色、关闭/Escape/焦点、A2A 五步样例及重置、两项业务通用咨询、需求草稿、剪贴板拒绝、同意/拒绝/DNT/GPC。统计验证使用明确 fixture，无真实远端收件或模型调用；本地通过不代表已经发布。
+
+本次 B 档本地修复先补真实主 CTA 与 computed font-size 回归，再改 HTML/CSS。离线验收：58 项 Node 测试（`node --test --experimental-test-isolation=none tests/*.test.mjs`，沙箱内同进程运行）、15 项 Python 单测、站点静态检查与 `git diff --check` 均通过；受保护文件字节指纹及 CSS 哈希引用通过。Python 命令使用已安装 Playwright 的项目虚拟环境。浏览器回归新增 JS/无 JS 主入口重复开合、目录首次 hash、同页 hashchange、重复同片段导航、桌面主 CTA 对齐和独立咨询检查；字体在 320/390/820/1440/1920 下读取实际 computed font-size，不缩减原有断言。`tests/landing-page.test.mjs` 的四入口/唯一可访问名称断言保留，仅将成果转移链接匹配更新为原生 summary。编码沙箱在临时 HTTP 服务器创建 socket 时返回 `PermissionError: [Errno 1] Operation not permitted`，未绕过沙箱。父流程随后使用上述 Python 环境实际补跑并通过：58 项 Node 测试（标准命令 `node --test tests/*.test.mjs`）、15 项 Python 单测、站点静态检查、首页 visual-smoke、Deep BLM smoke 与 deep-ux-smoke。独立浏览器复验覆盖五档宽度、JS/无 JS 共 10 个组合：真实主入口鼠标/键盘/重复开合、目录片段、computed font-size、无溢出与体验区次级层级均通过；另核对两张主业卡的主 CTA 对齐及咨询按钮间距一致。未推送或发布。
 
 编码子进程的沙箱可能禁止创建本地 socket，不能据此宣称浏览器通过；应在已授权的父流程环境中真跑交互。实际发布状态以对应 PR 的 CI、Pages 构建及发布后核验报告为准，本机测试不代表线上发布成功或真实手机蜂窝网可达。
 

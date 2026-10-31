@@ -21,6 +21,16 @@
       "description": "AI 驱动研究与专家专业判断；具体服务范围、交付周期与成果形式以双方约定为准。无自动在线订阅、支付或 A2A 服务。",
       "details_url": "index.html#insight-details",
       "human_contact": "contact@deeparchi.com.cn"
+    },
+    {
+      "id": "tech-transfer-poc",
+      "name": "技术成果转移及概念验证",
+      "availability": "manual-contact",
+      "production_ready": false,
+      "delivery_mode": "人工咨询；项目制、分阶段推进",
+      "description": "梳理成果价值、应用场景与合作路径，约定 PoC 目标、指标和验证边界；不承诺交易达成、技术验证通过或转化成功。无自动在线订阅、支付或 A2A 服务。",
+      "details_url": "index.html#transfer-details-body",
+      "human_contact": "contact@deeparchi.com.cn"
     }
   ],
   "tools": [

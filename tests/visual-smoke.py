@@ -93,18 +93,18 @@ def check_desktop(browser):
     errors, failed_responses, failed_requests = page_errors(page)
     try:
         page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
-        assert page.locator("#hero-title").text_content() == "AI原生服务，全新体验"
-        assert page.locator("#capabilities .product").count() == 1
+        assert page.locator("#hero-title").text_content() == "让技术看得清，让成果走得通。"
+        assert page.locator("#capabilities .product").count() == 2
         assert page.locator("main > section").count() == 5
         assert not page.locator("#a2a-dialog").is_visible()
         assert page.locator("main .a2a-workspace").count() == 0
         assert page.locator("#online-tools .tool-card").count() == 4
         for card in page.locator("#capabilities .product").all():
-            assert card.locator(":scope > p").count() == 3
-            assert card.locator(".outcome, ul, ol").count() == 0
-            assert ("订阅 / 定制服务" if card.get_attribute("id") == "tech-insight" else "概念 Demo") in card.inner_text()
+            assert card.locator(".lead").count() == 1
+            assert card.locator(".deliverables li").count() == 3
+            assert ("订阅 / 定制服务" if card.get_attribute("id") == "tech-insight" else "项目制 / 分阶段推进") in card.inner_text()
         assert page.locator("#hero-title").evaluate("el => getComputedStyle(el).fontSize") == "56px"
-        page.get_by_role("link", name="了解专业服务").click()
+        page.get_by_role("link", name="了解两项服务").click()
         page.wait_for_function("location.hash === '#capabilities'")
         products = {"deep-blm": "Deep BLM"}
         assert page.locator('#a2a-product option').evaluate_all("els => els.map(el => el.value)") == ['deep-blm']
@@ -194,8 +194,8 @@ def check_mobile(browser):
                 page.wait_for_function("location.hash === '#capabilities'")
                 assert menu.get_attribute("aria-expanded") == "false"
                 menu.click()
-                page.locator('#nav-links a[href="#integrate"]').click()
-                page.wait_for_function("location.hash === '#integrate'")
+                page.locator('#nav-links a[href="#online-tools"]').click()
+                page.wait_for_function("location.hash === '#online-tools'")
             for anchor in ("contact-consulting", "contact-partnership", "contact-a2a"):
                 page.evaluate("anchor => { location.hash = anchor; }", anchor)
                 target = page.locator(f"#{anchor}")
@@ -228,7 +228,7 @@ def check_mobile(browser):
     try:
         nojs = context.new_page()
         nojs.goto(BASE_URL, wait_until="networkidle")
-        assert nojs.locator("#capabilities .product").count() == 1
+        assert nojs.locator("#capabilities .product").count() == 2
         assert nojs.locator("main > section").count() == 5
         assert not nojs.locator("#a2a-dialog").is_visible()
         assert not nojs.locator("#open-a2a").is_visible()
@@ -239,6 +239,70 @@ def check_mobile(browser):
         assert nojs.evaluate("document.documentElement.scrollWidth <= innerWidth")
     finally:
         context.close()
+
+
+def check_transfer_entry(browser):
+    for javascript in (True, False):
+        context = browser.new_context(java_script_enabled=javascript, reduced_motion='reduce', viewport={'width':1440, 'height':960})
+        try:
+            page = context.new_page()
+            errors, responses, failures = page_errors(page)
+            page.goto(BASE_URL + '/?internal_test=1', wait_until='networkidle')
+            details = page.locator('#transfer-details')
+            body = details.locator('p')
+            primary = page.locator('#tech-transfer-poc .button.primary')
+            assert not details.evaluate('el => el.open')
+            # Use the actual main CTA, never a second disclosure as a workaround.
+            for activation in ('click', 'Enter', 'Space'):
+                if activation == 'click':
+                    primary.click()
+                else:
+                    primary.press(activation)
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                assert '不承诺交易达成、技术验证通过或转化成功' in body.inner_text()
+                details.locator('summary').press('Space')
+                assert not details.evaluate('el => el.open')
+            assert primary.evaluate("el => el.tagName") == 'SUMMARY'
+            assert page.locator('#tech-transfer-poc a[href^="#transfer"]').count() == 0
+            if javascript:
+                # Both primary actions share a desktop baseline and visual hierarchy.
+                boxes = [page.locator(selector).bounding_box() for selector in ('#open-insight', '#tech-transfer-poc .primary')]
+                assert abs(boxes[0]['y'] - boxes[1]['y']) < 2, boxes
+                assert abs(boxes[0]['height'] - boxes[1]['height']) < 2, boxes
+                consulting_boxes = [page.locator(selector).bounding_box() for selector in ('#insight-card-consulting', '#transfer-card-consulting')]
+                gaps = [consulting_boxes[i]['x'] - (boxes[i]['x'] + boxes[i]['width']) for i in range(2)]
+                assert abs(gaps[0] - gaps[1]) < 2, gaps
+                consulting = page.locator('#transfer-card-consulting')
+                consulting.click()
+                assert not details.evaluate('el => el.open')
+                assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
+                close_dialog(page)
+            catalog = page.request.get(BASE_URL + '/service-catalog.json').json()
+            href = next(s['details_url'] for s in catalog['services'] if s['id'] == 'tech-transfer-poc')
+            page.goto(BASE_URL + '/' + href.replace('#', '?internal_test=1#'), wait_until='networkidle')
+            assert details.evaluate('el => el.open')
+            assert body.is_visible()
+            # Real native links drive same-document hash changes, including reopening.
+            for _ in range(2):
+                details.locator('summary').click()
+                page.locator('#nav-links a[href="#capabilities"]').click()
+                page.wait_for_function("location.hash === '#capabilities'")
+                page.locator('#nav-links').evaluate("(el, href) => { const a = document.createElement('a'); a.href = href; a.textContent = '目录详情回归'; el.append(a); }", '#' + href.split('#')[1])
+                link = page.get_by_role('link', name='目录详情回归')
+                link.click()
+                page.wait_for_function('(hash) => location.hash === hash', arg='#' + href.split('#')[1])
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                details.locator('summary').click()
+                # A repeat activation of the current fragment must also reveal it.
+                link.click()
+                assert details.evaluate('el => el.open')
+                assert body.is_visible()
+                link.evaluate('el => el.remove()')
+            assert not errors and not responses and not failures, (errors, responses, failures)
+        finally:
+            context.close()
 
 
 def check_insight_services(browser):
@@ -258,7 +322,7 @@ def check_insight_services(browser):
             outbound = []
             page.on("request", lambda request: outbound.append(request.url) if request.method == "POST" else None)
             page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
-            assert page.locator('main > section').evaluate_all("els => els.map(el => el.id)") == ["top", "capabilities", "online-tools", "integrate", "contact"]
+            assert page.locator('main > section').evaluate_all("els => els.map(el => el.id)") == ["top", "capabilities", "service-method", "online-tools", "contact"]
             assert page.locator('#insight-services, #nav-links a[href="#insight-services"]').count() == 0
             assert page.locator('#a2a-product option').evaluate_all("els => els.map(el => el.value)") == ['deep-blm']
             assert "Tech M&A" not in page.locator('body').text_content()
@@ -273,25 +337,34 @@ def check_insight_services(browser):
             for width in (320, 390, 820, 1440, 1920):
                 page.set_viewport_size({"width": width, "height": 960})
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (javascript, width)
-                # One centered, bounded service; tools remain two columns or one on mobile.
+                # Equal service columns on desktop; compact four/two-column tool grid.
                 boxes = [el.bounding_box() for el in page.locator('#capabilities .product').all()]
                 tools = [el.bounding_box() for el in page.locator('#online-tools .tool-card').all()]
-                assert len(boxes) == 1 and len(tools) == 4
-                service_box = boxes[0]
-                assert service_box['width'] <= 840
-                assert abs(service_box['x'] + service_box['width'] / 2 - width / 2) < 2
+                assert len(boxes) == 2 and len(tools) == 4
+                assert abs(boxes[0]['width'] - boxes[1]['width']) < 2
                 if width > 900:
+                    assert abs(boxes[0]['y'] - boxes[1]['y']) < 2
+                    assert abs(boxes[0]['height'] - boxes[1]['height']) < 2
+                    assert all(abs(tool['y'] - tools[0]['y']) < 2 for tool in tools)
+                else:
+                    assert boxes[1]['y'] > boxes[0]['y']
                     assert abs(tools[0]['y'] - tools[1]['y']) < 2
                     assert abs(tools[2]['y'] - tools[3]['y']) < 2
                     assert tools[2]['y'] > tools[0]['y']
-                else:
-                    assert all(tools[i+1]['y'] > tools[i]['y'] for i in range(3))
-                assert page.locator('#hero-title').text_content() == 'AI原生服务，全新体验'
-                for selector in ('.hero', '.section-heading', '#tech-insight', '#integrate', '#contact'):
+                assert page.locator('#online-tools #integrate #open-a2a').count() == 1
+                assert '运行中的 A2A 端点' in page.locator('#online-tools').inner_text()
+                transfer = page.locator('#transfer-details')
+                if not transfer.evaluate('el => el.open'):
+                    transfer.locator('summary').click()
+                assert '不承诺交易达成、技术验证通过或转化成功' in transfer.inner_text()
+                transfer.locator('summary').click()
+                assert page.locator('#hero-title').text_content() == '让技术看得清，让成果走得通。'
+                for selector in ('.hero', '.section-heading', '#integrate', '#contact'):
                     for element in page.locator(selector).all():
                         assert element.evaluate('el => getComputedStyle(el).textAlign') == 'center', (width, selector)
-                for selector in ('.hero .actions', '.signal-choice', '#tech-insight .actions', '#contact .actions', '.contact-shortcuts'):
+                for selector in ('.hero .actions', '.signal-choice', '#contact .actions', '.contact-shortcuts'):
                     assert page.locator(selector).evaluate('el => getComputedStyle(el).justifyContent') == 'center', (width, selector)
+                assert page.locator('#capabilities').evaluate("el => getComputedStyle(el).backgroundColor") == 'rgb(255, 255, 255)'
                 assert page.locator('body').evaluate("el => getComputedStyle(el).getPropertyValue('--blue').trim()") == '#0066cc'
                 assert page.locator('body').evaluate("el => getComputedStyle(el).getPropertyValue('--hover').trim()") == '#0055ad'
                 assert page.locator('.hero .primary').evaluate('el => getComputedStyle(el).backgroundColor') == 'rgb(0, 102, 204)'
@@ -299,6 +372,12 @@ def check_insight_services(browser):
                     assert cta.get_attribute('class') == 'button outline'
                     assert cta.evaluate('el => getComputedStyle(el).borderColor') == 'rgb(0, 102, 204)'
                     assert cta.bounding_box()['height'] >= 44
+                for selector, minimum in (('#online-tools .tool-card > p:not(.tool-hint)', 14), ('#online-tools .tool-hint', 13), ('#online-tools a.button, #online-tools button.button', 14), ('#online-tools .section-heading > p:last-child, #integrate .panel-copy', 14), ('#integrate .concept-note', 13)):
+                    elements = page.locator(selector).all()
+                    assert elements, selector
+                    for element in elements:
+                        size = element.evaluate('el => parseFloat(getComputedStyle(el).fontSize)')
+                        assert size >= minimum, (javascript, width, selector, size, minimum)
                 assert page.locator('#online-tools .tool-card h3').all_text_contents() == ['Deep BLM', '专利体检', '制裁与出口管制速查', 'Source Slide Editor']
                 assert page.locator('#online-tools #deep-blm a.button').inner_text() == '打开规划工具（试用）'
                 for removed in ('技术架构规划', 'IP 守护', 'ip-guard', 'sourceIP', 'architecture'):
@@ -393,7 +472,7 @@ def check_insight_services(browser):
             else:
                 assert fallback.locator('summary').is_visible()
             catalogue = page.request.get(BASE_URL + '/service-catalog.json').json()
-            assert [service['id'] for service in catalogue['services']] == ['tech-insight']
+            assert [service['id'] for service in catalogue['services']] == ['tech-insight', 'tech-transfer-poc']
             assert [tool['id'] for tool in catalogue['tools']] == ['deep-blm', 'patent-health', 'sanctions-quickcheck', 'source-slide-editor']
             assert catalogue['a2a'] == {'available': False, 'endpoint': None}
             assert outbound == []
@@ -411,7 +490,7 @@ def check_contact_paths(browser):
         page.goto(BASE_URL + "/?internal_test=1", wait_until="networkidle")
         # Clipboard denial is an explicit fixture, not a successful system clipboard claim.
         page.evaluate("Object.defineProperty(navigator, 'clipboard', {value: {writeText: async () => {throw new Error('fixture denial');}}, configurable:true})")
-        routes = [('#insight-card-consulting','咨询服务'),('.contact-shortcuts [data-intent="consulting"]','咨询服务'),('.contact-shortcuts [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
+        routes = [('#transfer-card-consulting','咨询服务'),('#insight-card-consulting','咨询服务'),('.contact-shortcuts [data-intent="consulting"]','咨询服务'),('.contact-shortcuts [data-intent="integration"]','工具集成'),('#contact [data-intent="general"]','通用需求'),('#contact-consulting','咨询服务'),('#contact-partnership','伙伴合作'),('#contact-a2a','A2A 意向')]
         user_text = '<img src=x onerror="window.BAD=true"> + 商业问题 & 第二行'
         for selector, source in routes:
             trigger = page.locator(selector)
@@ -524,6 +603,12 @@ def check_contact_paths(browser):
         page.locator('#insight-card-consulting').click()
         close_dialog(page)
         page.wait_for_function("window.fixtureEvents.some(e => e.event === 'intent_open' && e.category === 'consulting' && e.surface === 'cards' && e.service === null)")
+        page.locator('#transfer-card-consulting').click()
+        assert page.locator('#demand-source').inner_text() == '来源：咨询服务'
+        assert page.locator('dialog[open]').count() == 1
+        close_dialog(page)
+        page.wait_for_function("document.activeElement.id === 'transfer-card-consulting'")
+        assert all(event['service'] is None for event in page.evaluate('window.fixtureEvents') if event['category'] == 'consulting')
         # Opening a static sample is neither completed work nor confirmed intent.
         # Scrolling can legitimately produce card views; inspect only actions tied to the sample.
         sample_events = "window.fixtureEvents.filter(e => ['a2a_step','a2a_interest','intent_open','demo_complete'].includes(e.event))"
@@ -593,7 +678,7 @@ def check_contact_paths(browser):
         assert not any(event['event'] == 'a2a_interest' and event['surface'] == 'contact' for event in recorded)
         assert {"demo_open", "intent_open", "mail_draft_ready", "mailto_click"}.issubset({event["event"] for event in recorded})
         assert all(event['event'] != 'demo_complete' for event in recorded)
-        assert all(event['service'] not in ('ip-guard', 'architecture', 'tech-ma', 'tech-insight', 'patent-health', 'sanctions-quickcheck', 'source-slide-editor') for event in recorded)
+        assert all(event['service'] not in ('ip-guard', 'architecture', 'tech-ma', 'tech-insight', 'tech-transfer-poc', 'patent-health', 'sanctions-quickcheck', 'source-slide-editor') for event in recorded)
         assert {e['service'] for e in recorded if e['event'] == 'product_view'} <= {'deep-blm'}
         assert any(event['event'] == 'intent_open' and event['category'] == 'consulting' and event['service'] is None and event['surface'] == 'cards' for event in recorded)
         assert all(event['service'] is None for event in recorded if event['category'] == 'consulting')
@@ -746,8 +831,10 @@ if __name__ == "__main__":
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(executable_path=CHROME_PATH, headless=True)
             try:
+                check_transfer_entry(browser)
+                print('PASS: real native transfer CTA, repeated opening, catalog initial fragment and same-page/repeated fragments, JS/no-JS', flush=True)
                 check_insight_services(browser)
-                print("PASS: one centered professional service + four tools + one A2A sample — full insight dialog, generic consultation, responsive grids at 320/390/820/1440/1920, no-JS", flush=True)
+                print("PASS: two equal professional services + compact four/two-column tools + one A2A sample — full insight dialog, generic consultation, responsive grids at 320/390/820/1440/1920, no-JS", flush=True)
                 check_official_brand(browser)
                 print("PASS: official logo and favicon — all three pages, image decode, proportional sizing, 320/390/820/1440", flush=True)
                 check_desktop(browser)
