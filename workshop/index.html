@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 战略转型工作坊 · DeepArchi 深度架构</title>
+<meta name="description" content="AI 战略转型工作坊：企业决策者带真实业务问题，观看顾问现场演示 AI，梳理阶段性 AI 转型路线图。半天或一天为建议安排，以双方确认为准。">
+<style>
+  :root {
+    --bg: #FAFAFA;
+    --ink: #111111;
+    --muted: #666666;
+    --faint: #999999;
+    --border: #E5E5E5;
+    --glow: rgba(0,102,204,0.08);
+    --card: #FFFFFF;
+    --accent: #0066cc;
+    --accent-light: #0055ad;
+    --accent-faint: #8ab9e8;
+    --dark: #0F0F11;
+    --dark-muted: #9CA3AF;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+    font-size: 15px; overflow-wrap: anywhere;
+  }
+
+  .ambient {
+    position: absolute; pointer-events: none; z-index: 0;
+    width: min(600px, 80vw); aspect-ratio: 1; border-radius: 50%;
+    filter: blur(180px); opacity: 0.10;
+  }
+  .ambient-1 { top: -240px; right: -120px; background: #0066cc; }
+  .ambient-2 { bottom: -260px; left: -120px; background: #0055ad; }
+
+  /* Nav */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(250,250,250,0.88);
+    backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    height: 52px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px; font-size: 13px;
+  }
+  nav .logo { font-weight: 600; font-size: 15px; letter-spacing: 0.3px; }
+  .nav-links { display: flex; gap: 28px; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-size: 13px; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--ink); }
+
+  .hamburger {
+    display: none; background: none; border: none; cursor: pointer;
+    width: 32px; height: 32px; flex-direction: column;
+    justify-content: center; gap: 5px; padding: 4px; z-index: 300;
+  }
+  .hamburger span { display: block; width: 22px; height: 1.5px; background: var(--ink); border-radius: 1px; transition: 0.2s; }
+  .hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity: 0; }
+  .hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+
+  section { padding: 64px 32px; position: relative; z-index: 1; }
+  .inner { max-width: 1040px; margin: 0 auto; }
+
+  .sec-num { font-size: 11px; letter-spacing: 2px; color: #0066cc; margin-bottom: 10px; text-transform: uppercase; }
+  .sec-title { font-size: 26px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 36px; }
+
+  /* Hero */
+  .hero { padding: 110px 32px 44px; text-align: center; }
+  .hero .tag {
+    display: inline-block; font-size: 11px; letter-spacing: 2.5px;
+    color: var(--faint); margin-bottom: 24px;
+    padding: 4px 12px; border: 1px solid var(--border); border-radius: 20px;
+  }
+  .hero h1 {
+    font-size: clamp(40px, 7vw, 64px); font-weight: 600;
+    letter-spacing: -1.5px; line-height: 1.12; margin-bottom: 20px;
+  }
+  .hero .gradient-text {
+    background: linear-gradient(135deg, #0066cc, #0055ad, #0066cc);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; color: transparent; font-weight: 700;
+  }
+  .hero .sub { font-size: 18px; color: var(--muted); max-width: 520px; margin: 0 auto 24px; }
+  .hero .lead { font-size: 15px; color: var(--ink); max-width: 540px; margin: 0 auto 40px; font-weight: 500; }
+  .hero-compare {
+    display: inline-flex; align-items: center; gap: 8px 14px;
+    font-size: 13px; color: var(--muted);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 20px;
+    flex-wrap: wrap; justify-content: center; margin-bottom: 36px;
+  }
+  .hero-compare .compare-vs { color: var(--accent); font-weight: 700; background: var(--glow); padding: 2px 8px; border-radius: 20px; }
+  .hero-compare .hc-row { display: flex; align-items: center; gap: 8px; }
+  .hero-compare .hc-label { color: var(--ink); font-weight: 600; }
+  .hero-cta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    text-decoration: none; font-size: 15px; font-weight: 500;
+    padding: 12px 28px; border-radius: 24px; transition: all 0.2s; border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--accent); color: #FFF; }
+  .btn-primary:hover { background: var(--accent-light); }
+  .btn-secondary { color: var(--ink); border-color: var(--border); background: var(--card); }
+  .btn-secondary:hover { border-color: var(--accent-faint); }
+
+  hr { border: none; border-top: 1px solid var(--border); max-width: 1040px; margin: 0 auto; }
+
+  /* Value prop */
+  .value-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .value-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 24px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .value-card:hover { border-color: var(--accent-faint); box-shadow: 0 4px 16px rgba(0,102,204,0.06); }
+  .value-card .num {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--glow); color: var(--accent-light);
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  .value-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .value-card p { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+  /* Audience */
+  .audience-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .audience-card {
+    border: 1px solid var(--border); border-radius: 14px; padding: 26px 24px;
+    background: var(--card);
+  }
+  .audience-card .icon { font-size: 22px; margin-bottom: 14px; }
+  .audience-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .audience-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .audience-note { margin-top: 28px; font-size: 14px; color: var(--muted); text-align: center; }
+
+  /* Curriculum */
+  .curriculum-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .curriculum-block { border: 1px solid var(--border); border-radius: 16px; padding: 28px; background: var(--card); }
+  .curriculum-block h3 { font-size: 18px; font-weight: 600; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  .curriculum-block .badge { font-size: 10px; letter-spacing: 1px; color: var(--accent); border: 1px solid var(--accent-faint); padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+  .curriculum-block ol { list-style: none; }
+  .curriculum-block li { position: relative; padding-left: 28px; margin-bottom: 18px; }
+  .curriculum-block li:last-child { margin-bottom: 0; }
+  .curriculum-block li::before {
+    content: attr(data-step); position: absolute; left: 0; top: 0;
+    width: 18px; height: 18px; border-radius: 50%; background: var(--glow); color: var(--accent-light);
+    font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  }
+  .curriculum-block li strong { display: block; font-size: 15px; color: var(--ink); margin-bottom: 4px; }
+  .curriculum-block li span { font-size: 13px; color: var(--muted); line-height: 1.6; display: block; }
+  .curriculum-block .duration { font-size: 13px; color: var(--faint); margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* Fee */
+  .fee-card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 40px 36px; max-width: 760px; margin: 0 auto; }
+  .fee-price { font-size: clamp(26px, 6.4vw, 44px); font-weight: 700; letter-spacing: -1px; line-height: 1.15; white-space: nowrap; }
+  .fee-unit { font-size: 0.42em; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .fee-lede { margin-top: 14px; font-size: 15px; color: var(--muted); line-height: 1.7; }
+  .fee-list { list-style: none; margin: 24px 0 0; display: grid; gap: 12px; }
+  .fee-list li { position: relative; padding-left: 16px; font-size: 14px; color: var(--ink); line-height: 1.7; }
+  .fee-list li::before { content: ""; position: absolute; left: 0; top: 10px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-faint); }
+  .fee-list strong { color: var(--accent-light); margin-right: 6px; }
+  .fee-note { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 14px; color: var(--muted); }
+  .fee-cta { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* CTA */
+  .cta-section { text-align: center; padding: 80px 32px; }
+  .cta-section .sec-title { margin-bottom: 14px; }
+  .cta-section p { max-width: 560px; margin: 0 auto 28px; font-size: 15px; color: var(--muted); line-height: 1.7; }
+  .cta-email { display: inline-block; margin-top: 14px; font-size: 14px; color: var(--muted); }
+
+  /* FAQ */
+  .faq-list { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .faq-item { border: 1px solid var(--border); border-radius: 12px; background: var(--card); overflow: hidden; }
+  .faq-question {
+    width: 100%; text-align: left; background: none; border: none; padding: 18px 20px;
+    font-size: 15px; font-weight: 500; color: var(--ink); cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .faq-question::after { content: '+'; font-size: 20px; color: var(--faint); font-weight: 300; }
+  .faq-item[open] .faq-question::after { content: '−'; }
+  .faq-answer { overflow-wrap: anywhere; }
+  .faq-answer p { padding: 0 20px 18px; font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+  /* Footer */
+  footer { padding: 32px 32px; text-align: center; font-size: 12px; color: var(--faint); border-top: 1px solid var(--border); }
+  footer .brand-note { margin-top: 6px; color: var(--faint); font-size: 11px; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .value-grid, .audience-grid, .curriculum-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    nav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .hamburger { display: flex; }
+    section { padding: 48px 20px; }
+    .hero { padding: 90px 20px 36px; }
+    .hero-compare { padding: 12px 16px; }
+    .curriculum-layout { gap: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* v3: keep v2 sections/cards; contain decorative paint rather than hiding body overflow. */
+  [hidden] { display: none !important; }
+  .ambient-layer { position: fixed; inset: 0; overflow: clip; pointer-events: none; z-index: 0; }
+  section { scroll-margin-top: 80px; }
+  .inner, .value-card, .audience-card, .curriculum-block, .fee-card { min-width: 0; }
+  .value-grid, .audience-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .curriculum-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-light); }
+  button, textarea { font: inherit; }
+  button { cursor: pointer; }
+  button, .btn, nav a, .email-fallback a, .faq-question { min-height: 44px; min-width: 44px; }
+  .btn { justify-content: center; max-width: 100%; text-align: center; }
+  .btn-primary:hover { color: #fff; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .skip-link { position: absolute; left: 12px; top: -100px; z-index: 400; padding: 10px; background: #fff; }
+  .skip-link:focus { top: 8px; }
+  nav { position: relative; height: auto; min-height: 60px; flex-wrap: wrap; gap: 8px; }
+  .js nav { position: fixed; height: 60px; flex-wrap: nowrap; }
+  nav a { display: inline-flex; align-items: center; justify-content: center; }
+  .nav-links { flex-wrap: wrap; gap: 8px 20px; }
+  .hamburger { width: 44px; height: 44px; padding: 10px; }
+  .hero .tag { max-width: 100%; overflow-wrap: anywhere; }
+  .hero-compare .hc-row { flex-wrap: wrap; justify-content: center; }
+  .value-card .num { width: auto; min-height: 28px; border-radius: 12px; display: inline-flex; padding: 2px 10px; }
+  .curriculum-block h3 { flex-wrap: wrap; }
+  .curriculum-block li { padding-left: 44px; }
+  .curriculum-block li::before { width: 34px; height: 24px; border-radius: 6px; }
+  .email-fallback { margin: 16px auto 0; font-size: 13px; color: var(--muted); }
+  .email-fallback a { display: inline-flex; align-items: center; overflow-wrap: anywhere; }
+  .small { font-size: 13px; color: var(--muted); }
+  .analytics-panel { background: var(--card); border-top: 1px solid var(--border); }
+  .analytics-panel p { margin: 10px 0; }
+  .analytics-actions, .draft-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+  #analytics-status, #preview-status { font-weight: 600; }
+  #preview-status { color: var(--accent); }
+  dialog { width: min(640px, calc(100% - 32px)); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); margin: auto; padding: 24px; border: 1px solid var(--border); border-radius: 16px; color: var(--ink); background: var(--card); overflow-y: auto; overscroll-behavior: contain; }
+  dialog::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog h2 { font-size: 24px; margin: 12px 0; }
+  dialog p { margin: 12px 0; }
+  .close { display: block; margin-left: auto; }
+  #demand-form { display: flex; flex-direction: column; gap: 10px; }
+  #demand-form label { font-weight: 500; }
+  textarea { width: 100%; min-width: 0; min-height: 76px; resize: vertical; padding: 10px; border: 1px solid #888; border-radius: 8px; background: #fff; color: var(--ink); }
+  #demand-form .btn { align-self: flex-start; }
+  #draft { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  #draft-text { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; user-select: text; padding: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+  @media (max-width: 900px) {
+    .value-grid, .audience-grid, .curriculum-layout { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 768px) {
+    nav .nav-links { display: flex; gap: 4px 12px; width: 100%; }
+    .js nav .nav-links { position: absolute; top: 60px; left: 0; padding: 16px 20px; background: var(--bg); border-bottom: 1px solid var(--border); max-height: calc(100dvh - 60px); overflow-y: auto; }
+    .js .hamburger:not([hidden]) { display: flex; }
+    .hero { padding: 30px 20px 36px; }
+    .js .hero { padding-top: 86px; }
+    .hero .tag { margin-bottom: 18px; font-size: 10px; letter-spacing: 1.5px; }
+    .hero h1 { font-size: clamp(32px, 9vw, 40px); }
+    .hero .sub { font-size: 16px; margin-bottom: 16px; }
+    .hero .lead { margin-bottom: 22px; }
+    .hero-compare { margin-bottom: 22px; }
+    .hero-cta { gap: 10px; }
+    .btn { padding: 11px 20px; }
+    .fee-card { padding: 26px 20px; }
+    .fee-price { letter-spacing: -0.5px; }
+    dialog { padding: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#top">跳到工作坊内容</a>
+<div class="ambient-layer" aria-hidden="true"><div class="ambient ambient-1"></div><div class="ambient ambient-2"></div></div>
+
+<nav aria-label="主要导航">
+  <div class="logo">DeepArchi</div>
+  <div class="nav-links" id="nav-links">
+    <a href="#value">价值</a>
+    <a href="#audience">适合谁</a>
+    <a href="#curriculum">内容</a>
+    <a href="#fee">费用</a>
+    <a href="#enroll">报名</a>
+  </div>
+  <button type="button" class="hamburger" id="menu-button" hidden aria-label="打开导航菜单" aria-controls="nav-links" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+
+<main>
+<!-- Hero -->
+<section class="hero" id="top">
+  <div class="tag">WORKSHOP · AI STRATEGY TRANSFORMATION</div>
+  <h1>通过工作坊，建立 AI 转型的<br><span class="gradient-text">真实体感</span></h1>
+  <p class="sub">不讲 PPT，顾问现场演示。企业决策者专属。</p>
+  <p class="lead">带着业务问题来，共同梳理阶段性 AI 转型路线图。</p>
+  <div class="hero-compare">
+    <div class="hc-row"><span class="hc-label">传统培训</span><span>听课 · PPT · 回去再议</span></div>
+    <span class="compare-vs">vs</span>
+    <div class="hc-row"><span class="hc-label">DeepArchi 工作坊</span><span>顾问实操演示 · 讨论方案 · 规划后续验证</span></div>
+  </div>
+  <div class="hero-cta">
+    <button type="button" class="btn btn-primary" data-demand data-surface="support" aria-haspopup="dialog" aria-controls="demand-dialog" hidden>预约工作坊</button>
+    <a href="#curriculum" class="btn btn-secondary">查看工作坊安排</a>
+  </div>
+  <p class="email-fallback">也可邮件沟通：<a href="mailto:contact@deeparchi.com.cn">contact@deeparchi.com.cn</a><br>预约需双方确认；此页面只准备邮件草稿。</p>
+  <p class="small" id="preview-status" role="status">本地预览默认拒绝匿名统计，不会真实上报。</p>
+  <noscript><p class="small">JavaScript 已禁用，可阅读全部工作坊内容并通过邮件沟通需求。</p></noscript>
+</section>
+
+<hr>
+
+<!-- Value -->
+<section id="value">
+  <div class="inner">
+    <div class="sec-num">WHY THIS WORKSHOP</div>
+    <h2 class="sec-title">AI 转型最大的成本，不是钱，是误判。</h2>
+    <div class="value-grid">
+      <div class="value-card">
+        <div class="num">识别</div>
+        <h3>看清能力边界</h3>
+        <p>知道 AI 能替代什么、辅助什么、不能碰什么。避免把预算花在暂时不可行的场景。</p>
+      </div>
+      <div class="value-card">
+        <div class="num">筛选</div>
+        <h3>找到高价值场景</h3>
+        <p>从业务真实痛点出发，而非追风口。讨论投入产出与风险，筛选适合验证的入手点。</p>
+      </div>
+      <div class="value-card">
+        <div class="num">规划</div>
+        <h3>获得可执行路线图</h3>
+        <p>梳理阶段性行动计划、预算范围与风险清单，形成供后续确认的决策文档。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Audience -->
+<section id="audience">
+  <div class="inner">
+    <div class="sec-num">WHO IT'S FOR</div>
+    <h2 class="sec-title">谁应该来参加？</h2>
+    <div class="audience-grid">
+      <div class="audience-card">
+        <div class="icon">🎯</div>
+        <h3>企业决策者</h3>
+        <p>创始人、CEO、事业部总经理。需要判断 AI 投入优先级，看清投入产出。</p>
+      </div>
+      <div class="audience-card">
+        <div class="icon">⚙️</div>
+        <h3>战略与运营负责人</h3>
+        <p>市场、运营、供应链、人力。需要找到可落地的提效场景，而不是泛泛的概念。</p>
+      </div>
+      <div class="audience-card">
+        <div class="icon">🛠️</div>
+        <h3>技术与产品负责人</h3>
+        <p>CTO、产品总监、IT 负责人。需要评估系统改造、数据合规与工程可行性。</p>
+      </div>
+    </div>
+    <p class="audience-note">建议跨职能团队共同参加，使用脱敏业务材料讨论；参与规模在沟通后确认。</p>
+  </div>
+</section>
+
+<hr>
+
+<!-- Curriculum -->
+<section id="curriculum">
+  <div class="inner">
+    <div class="sec-num">WHAT WE DO</div>
+    <h2 class="sec-title">半天 / 一天，建议如何安排？</h2>
+    <p class="small" style="margin-bottom: 20px">以下为现有产品方案的建议安排，实际内容、时长与安排以双方沟通确认为准；计价按场，详见「费用」。</p>
+    <div class="curriculum-layout">
+      <div class="curriculum-block">
+        <h3>半天版 <span class="badge">建议安排</span></h3>
+        <ol>
+          <li data-step="了解">
+            <strong>开场：AI 现状速览</strong>
+            <span>不是趋势介绍，而是「现在能用的真实能力」地图。</span>
+          </li>
+          <li data-step="拆解">
+            <strong>场景拆解：你的业务能被 AI 改变什么</strong>
+            <span>参与者提出脱敏业务问题，共同拆解。</span>
+          </li>
+          <li data-step="体验">
+            <strong>现场演示：顾问用自用系统跑通业务场景</strong>
+            <span>参与者带真实业务问题作为输入；顾问现场用自用系统演示并跑通 1–2 个场景，过程投屏可见；现场仅使用脱敏数据。</span>
+          </li>
+          <li data-step="规划">
+            <strong>输出：AI 机会清单 + 阶段性 AI 转型路线图</strong>
+            <span>顾问协助，梳理待确认的决策文档。</span>
+          </li>
+        </ol>
+        <p class="duration">适合：时间紧、需要快速建立体感的决策团队。</p>
+      </div>
+      <div class="curriculum-block">
+        <h3>一天版 <span class="badge">建议安排</span></h3>
+        <ol>
+          <li data-step="了解">
+            <strong>半天版全部内容</strong>
+            <span>建立体感、找到机会，观看顾问演示并跑通场景。</span>
+          </li>
+          <li data-step="拆解">
+            <strong>深度诊断：AI 就绪度评估</strong>
+            <span>讨论数据、流程、组织与合规的准备情况。</span>
+          </li>
+          <li data-step="体验">
+            <strong>优先级排序与预算估算</strong>
+            <span>按 ROI 与风险排序，形成投资计划。</span>
+          </li>
+          <li data-step="规划">
+            <strong>落地路径与后续支持</strong>
+            <span>可讨论后续诊断、工程落地与持续支持，范围和周期另行确认。</span>
+          </li>
+        </ol>
+        <p class="duration">适合：准备启动 AI 项目、需要完整判断的团队。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Fee -->
+<section id="fee">
+  <div class="inner">
+    <div class="sec-num">FEE</div>
+    <h2 class="sec-title">费用按场计价，区间公开。</h2>
+    <div class="fee-card">
+      <p class="fee-price">¥80,000–150,000<span class="fee-unit"> / 场</span></p>
+      <p class="fee-lede">一场是一个交付单位，不是人头票。半天或一天是形式，计价单位仍是「场」。</p>
+      <ul class="fee-list">
+        <li><strong>含</strong>半天或一天形式（形式不改变计价单位）、现场诊断、90 天路线图交付。</li>
+        <li><strong>不含</strong>差旅、后续实施。</li>
+      </ul>
+      <p class="fee-note">具体金额按目标范围与交付深度在诊断对话后确认。</p>
+      <div class="fee-cta">
+        <a href="#enroll" class="btn btn-secondary">预约诊断对话</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="inner">
+    <div class="sec-num">FAQ</div>
+    <h2 class="sec-title">你可能还想问</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary class="faq-question">没有技术背景，能跟上吗？</summary>
+        <div class="faq-answer"><p>可以。工作坊专为决策者设计，不需要写代码。你带来的业务问题比技术能力更重要。</p></div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">需要自己带电脑吗？</summary>
+        <div class="faq-answer"><p>无需每位参与者携带电脑或登录系统操作。参与者带真实业务问题作为输入，观看顾问使用自用系统投屏演示；现场仅使用脱敏数据，不要输入真实敏感数据。</p></div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">半天和一天有什么区别？</summary>
+        <div class="faq-answer"><p>半天建议聚焦「建立体感 + 找到机会」；一天建议增加「就绪度诊断 + 投资预算排序」。均为建议安排，以双方确认为准。</p></div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">可以团队定制吗？</summary>
+        <div class="faq-answer"><p>可以沟通团队定制，按业务场景讨论安排。参与规模、材料与流程在沟通后确认。</p></div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">结束后有后续支持吗？</summary>
+        <div class="faq-answer"><p>可讨论深度诊断、AI 系统落地或持续支持；具体范围、周期与方案在沟通后确认。</p></div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-question">费用是多少？</summary>
+        <div class="faq-answer"><p>按场计价，公开区间为 ¥80,000–150,000 / 场。含半天或一天形式（形式不改变计价单位）、现场诊断、90 天路线图交付；不含差旅与后续实施。具体金额按目标范围与交付深度在诊断对话后确认，页面区间不构成交付承诺。</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- CTA -->
+<section class="cta-section" id="enroll">
+  <div class="inner">
+    <div class="sec-num">ENROLL</div>
+    <h2 class="sec-title">先预约一场诊断对话，再决定是否报名。</h2>
+    <p>我们不直接卖课。先了解你的业务阶段、问题和目标，再推荐半天版、一天版或定制方案。对话本身也是一次轻量诊断。</p>
+    <div class="hero-cta">
+      <button type="button" class="btn btn-primary" data-demand data-surface="contact" aria-haspopup="dialog" aria-controls="demand-dialog" hidden>预约工作坊</button>
+    </div>
+    <p class="email-fallback">邮件沟通：<a href="mailto:contact@deeparchi.com.cn">contact@deeparchi.com.cn</a><br>具体金额与安排在诊断对话后确认；预约需双方确认。</p>
+  </div>
+</section>
+
+
+<section class="analytics-panel" aria-labelledby="analytics-title">
+  <div class="inner">
+    <h2 id="analytics-title">匿名交互统计与隐私</h2>
+    <p>匿名交互统计不是有效线索、预约或成交；不包含需求正文、个人邮箱或电话。草稿仅在当前页面内存中准备，不上传正文；仅在你选择并确认发信后由邮件客户端处理。</p>
+    <p class="small">沿用官网冻结口径，来源只发送 origin，不发送路径。同域只能汇总，不能独立识别 /workshop 路径。统计许可仅在当前页面有效，不使用 cookie 或 localStorage。</p>
+    <p id="analytics-status" role="status" aria-live="polite">匿名统计未获同意，未收集事件。启用 JavaScript 后可选择允许或撤回。</p>
+    <div class="analytics-actions" id="analytics-options" hidden>
+      <button type="button" class="btn btn-secondary" id="consent-allow">允许匿名统计</button>
+      <button type="button" class="btn btn-secondary" id="consent-withdraw">拒绝 / 撤回匿名统计</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<dialog id="demand-dialog" aria-labelledby="demand-title" aria-describedby="demand-note data-warning">
+  <button type="button" class="btn btn-secondary close" data-close aria-label="关闭需求草稿">关闭 ×</button>
+  <h2 id="demand-title">描述我的需求</h2>
+  <p id="demand-source">来源：咨询服务 / AI 战略转型工作坊</p>
+  <p id="demand-note">此处只准备邮件草稿，不代表已提交或已预约。请在邮件客户端确认发送；预约需双方确认。</p>
+  <p class="small" id="data-warning">请勿填写敏感数据、密码或密钥。页面不收集个人邮箱或电话；选择发信后由邮件客户端提供回复身份。</p>
+  <!-- Three fields follow v4 current.html L171–174, with identical constraints. -->
+  <form id="demand-form">
+    <label for="problem">业务问题（必填，最多 500 字）</label><textarea id="problem" name="problem" required maxlength="500" rows="3" aria-describedby="data-warning"></textarea>
+    <label for="result">期望结果（选填，最多 500 字）</label><textarea id="result" name="result" maxlength="500" rows="2"></textarea>
+    <label for="constraints">约束条件（选填，最多 300 字）</label><textarea id="constraints" name="constraints" maxlength="300" rows="2"></textarea>
+    <button type="submit" class="btn btn-primary">准备邮件草稿</button>
+  </form>
+  <div id="draft" hidden>
+    <p role="status">准备的是邮件草稿，尚未发送；不是已提交或已预约，请在邮件客户端确认发送。</p>
+    <pre id="draft-text" tabindex="0" aria-label="可选择并复制的邮件草稿"></pre>
+    <div class="draft-actions"><a class="btn btn-primary" id="draft-mailto">打开邮件客户端确认</a><button type="button" class="btn btn-secondary" id="copy-draft">复制草稿</button></div>
+    <p id="copy-status" role="status" aria-live="polite" class="small"></p>
+  </div>
+</dialog>
+
+<footer>
+  © 上海申渡架固信息技术有限公司
+  <div class="brand-note">DeepArchi 是申渡架固旗下方法论品牌</div>
+</footer>
+
+<script type="application/json" id="workshop-analytics-config">
+{
+  "version": "1",
+  "enabled": true,
+  "endpoint": "https://qunling-001-d7gwxqdou24c9dad4.service.tcloudbase.com/demand/collect",
+  "site_id": "deeparchi",
+  "consent_required": true
+}
+</script>
+<script>
+// BEGIN VERBATIM live-signals.mjs — only export keywords removed.
+const VERSION = '1';
+const EMAIL = 'contact@deeparchi.com.cn';
+const SERVICES = Object.freeze(['ip-guard', 'deep-blm', 'architecture', 'tech-ma']);
+const CATEGORIES = Object.freeze(['product', 'a2a', 'consulting', 'integration', 'general', 'partnership']);
+const SURFACES = Object.freeze(['cards', 'demo', 'a2a', 'support', 'contact', 'demand']);
+const EVENTS = Object.freeze(['product_view', 'demo_open', 'demo_complete', 'intent_open', 'mail_draft_ready', 'mailto_click', 'a2a_step', 'a2a_interest']);
+const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every(key => keys.includes(key));
+const token = value => typeof value === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(value);
+const SOURCE_MAX = 120;
+const RAW_MAX = 2048;
+const SOURCE_RE = /^https?:\/\/[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?(?::[0-9]{1,5})?$/;
+const SOURCE_STATES = Object.freeze(['ok', 'empty', 'no_prop', 'no_doc', 'invalid']);
+
+// 只取站点身份：scheme + host（+端口），去掉路径/查询/片段/userinfo；解析失败即空串（由 observeSource 判 invalid）。
+function canonicalReferrer(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return '';
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    if (url.username || url.password) return '';
+    const origin = `${url.protocol}//${url.hostname.toLowerCase()}${url.port ? `:${url.port}` : ''}`;
+    return origin.length <= SOURCE_MAX && SOURCE_RE.test(origin) ? origin : '';
+  } catch { return ''; }
+}
+
+// v3：来源「证据状态」—— 把「没来源」与「没证据」分开，空串不再被当作直接可得结论。
+// 返回 {state, origin}；state ∈ SOURCE_STATES，origin 仅在 state==='ok' 时非空。
+function observeSource(doc) {
+  if (doc === undefined || doc === null) return Object.freeze({state: 'no_doc', origin: ''});
+  let raw;
+  try { raw = doc.referrer; } catch { return Object.freeze({state: 'no_prop', origin: ''}); }
+  if (typeof raw !== 'string') return Object.freeze({state: 'no_prop', origin: ''});
+  if (raw.trim() === '') return Object.freeze({state: 'empty', origin: ''});
+  if (raw.length > RAW_MAX) return Object.freeze({state: 'invalid', origin: ''}); // 超长原串不裁成 host，直接判无证据
+  const origin = canonicalReferrer(raw);
+  return origin ? Object.freeze({state: 'ok', origin}) : Object.freeze({state: 'invalid', origin: ''});
+}
+
+function validateConfig(config) {
+  if (!exactKeys(config, ['version', 'enabled', 'endpoint', 'site_id', 'consent_required']) || config.version !== VERSION || typeof config.enabled !== 'boolean' || config.consent_required !== true) return null;
+  if (config.site_id !== undefined && (typeof config.site_id !== 'string' || !/^[a-zA-Z0-9_-]{1,40}$/.test(config.site_id))) return null;
+  if (!config.enabled) return config.endpoint === null ? Object.freeze({...config}) : null;
+  try {
+    const url = new URL(config.endpoint);
+    // Only an explicitly configured public HTTPS receiver; no credentials or URL metadata.
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.port || !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(url.hostname) || /(?:^|\.)(?:localhost|local|internal|test|invalid)$/.test(url.hostname)) return null;
+    return Object.freeze({...config, endpoint: url.href});
+  } catch { return null; }
+}
+
+function validatePayload(payload) {
+  return Boolean(exactKeys(payload, ['version', 'event', 'service', 'category', 'surface', 'audience', 'is_test', 'session_id', 'event_id', 'step', 'source_origin', 'source_state']) &&
+    (payload.source_origin === undefined || (typeof payload.source_origin === 'string' && (payload.source_origin === '' || (payload.source_origin.length <= SOURCE_MAX && SOURCE_RE.test(payload.source_origin))))) &&
+    // v3：state 与 origin 必须互证 —— ok 必带非空 origin，其余 state 必为空 origin；不一致一律不校验通过。
+    (payload.source_state === undefined ||
+      (SOURCE_STATES.includes(payload.source_state) && payload.source_origin !== undefined &&
+        (payload.source_state === 'ok') === (payload.source_origin !== ''))) &&
+    payload.version === VERSION && EVENTS.includes(payload.event) && (payload.service === null || SERVICES.includes(payload.service)) &&
+    CATEGORIES.includes(payload.category) && SURFACES.includes(payload.surface) && payload.audience === 'browser_interaction' && typeof payload.is_test === 'boolean' && token(payload.session_id) && token(payload.event_id) &&
+    (payload.event === 'a2a_step' ? Number.isInteger(payload.step) && payload.step >= 1 && payload.step <= 5 : payload.step === undefined) &&
+    (!['product_view', 'demo_open', 'demo_complete', 'a2a_step', 'a2a_interest'].includes(payload.event) || SERVICES.includes(payload.service)));
+}
+
+function privacyBlocked(navigatorLike = {}) {
+  return navigatorLike.globalPrivacyControl === true || ['1', 'yes'].includes(String(navigatorLike.doNotTrack).toLowerCase());
+}
+
+function createSignals(rawConfig, {navigatorLike = {}, isTest = false, local = false, transport, idFactory = () => globalThis.crypto.randomUUID()} = {}) {
+  const config = validateConfig(rawConfig);
+  let consent = false;
+  const blocked = () => privacyBlocked(navigatorLike);
+  const available = () => Boolean(config?.enabled && !blocked());
+  let session;
+  let queue = Promise.resolve(); // Avoid self-conflicting concurrent quota transactions.
+  let nextSendAt = 0;
+  const sent = new Set(); // In-memory session dedupe only; never a unique-person count.
+  return {
+    available,
+    status: () => {
+      const status = !config ? rawConfig == null ? '匿名统计未连接，未收集事件。' : '统计配置无法读取或无效，已关闭；未收集事件。' : !config.enabled ? '匿名统计未连接，未收集事件。' : blocked() ? '已尊重 DNT/GPC，匿名统计关闭。' : consent ? '已允许匿名统计，可随时关闭。' : '匿名统计未获同意，未收集事件。';
+      return (isTest || local ? '内部测试 / 本地预览：不会真实上报。' : '') + status;
+    },
+    setConsent(value) { consent = available() && value === true; if (!consent) { session = undefined; sent.clear(); } },
+    async track(fields) {
+      if (!available() || !consent || !exactKeys(fields, ['event', 'service', 'category', 'surface', 'step'])) return false;
+      // Automated/local runs never use the real transport, even with an enabled fixture config.
+      if ((isTest || local) && !transport) return false;
+      try {
+        session ??= idFactory();
+        const source = observeSource(globalThis.document);
+        const payload = {...fields, version: VERSION, audience: 'browser_interaction', is_test: Boolean(isTest || local), session_id: session, event_id: idFactory(), source_origin: source.origin, source_state: source.state};
+        if (!validatePayload(payload)) return false;
+        const key = JSON.stringify([fields.event, fields.service, fields.category, fields.surface, fields.step]);
+        if (sent.has(key)) return false;
+        sent.add(key);
+        const send = transport ?? ((endpoint, body) => fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', cache: 'no-store', redirect: 'error'}));
+        const task = queue.then(async () => {
+          // Pace this page below gateway QPS; never batch-replay pre-consent actions.
+          const wait = Math.max(0, nextSendAt - Date.now());
+          if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+          // Consent can be withdrawn while an earlier request is still in flight.
+          if (!available() || !consent || session !== payload.session_id) return false;
+          nextSendAt = Date.now() + 600;
+          const response = await send(config.endpoint, payload);
+          return response?.ok === true;
+        });
+        queue = task.catch(() => false);
+        return await task;
+      } catch { return false; }
+    }
+  };
+}
+
+function mailDraft({source, problem, result = '', constraints = ''}) {
+  if (typeof source !== 'string' || !source.trim() || /[\r\n]/.test(source)) throw new TypeError('Invalid source');
+  if (typeof problem !== 'string' || !problem.trim() || problem.length > 500 || typeof result !== 'string' || result.length > 500 || typeof constraints !== 'string' || constraints.length > 300) throw new TypeError('Invalid draft');
+  const subject = `DeepArchi｜${source} 需求意向`;
+  const body = `来源：${source}\r\n业务问题：${problem.trim()}\r\n期望结果：${result.trim() || '未填写'}\r\n约束：${constraints.trim() || '未填写'}`;
+  const encode = value => encodeURIComponent(value).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+  const uri = `mailto:${EMAIL}?subject=${encode(subject)}&body=${encode(body)}`;
+  const tooLong = uri.length > 1800;
+  return {text: `收件人：${EMAIL}\n主题：${subject}\n\n${body}`, uri: tooLong ? `mailto:${EMAIL}?subject=${encode(subject)}` : uri, tooLong};
+}
+// END VERBATIM live-signals.mjs
+
+// BEGIN WORKSHOP PAGE GLUE — independent of v4 initHome and its other dialogs.
+(() => {
+  'use strict';
+  const $ = selector => document.querySelector(selector);
+  const config = JSON.parse($('#workshop-analytics-config').textContent);
+  const local = location.protocol !== 'https:' || !['deeparchi.com.cn', 'www.deeparchi.com.cn'].includes(location.hostname);
+  const isTest = new URLSearchParams(location.search).get('internal_test') === '1';
+  // Injection is opt-in AND function-only; never fall through to real fetch in local/test mode.
+  const options = {navigatorLike: navigator, local, isTest};
+  if (isTest && typeof window.__WORKSHOP_TEST_TRANSPORT__ === 'function') options.transport = window.__WORKSHOP_TEST_TRANSPORT__;
+  const signals = createSignals(config, options);
+  const track = (event, service, category, surface) => signals.track({event, service, category, surface});
+  if (isTest) window.workshopTest = {signals, track};
+  const renderConsent = () => {
+    $('#analytics-status').textContent = signals.status();
+    $('#consent-allow').disabled = !signals.available();
+  };
+  $('#preview-status').textContent = isTest
+    ? '内部测试：不会真实上报。仅显式注入测试函数时记录测试事件，不代表真实上报。'
+    : local ? '本地预览：不会真实上报；允许匿名统计也不会发送真实请求。'
+    : '正式域名环境：默认拒绝，仅明确同意且未启用 DNT/GPC 后可发送匿名交互统计。';
+  $('#analytics-options').hidden = false;
+  $('#consent-allow').addEventListener('click', () => { signals.setConsent(true); renderConsent(); });
+  $('#consent-withdraw').addEventListener('click', () => { signals.setConsent(false); renderConsent(); });
+  renderConsent();
+  document.querySelectorAll('.email-fallback a').forEach(link => {
+    link.addEventListener('click', () => track('mailto_click', null, 'consulting', 'demand'));
+  });
+
+  const menu = $('#menu-button');
+  const nav = $('#nav-links');
+  const mobile = window.matchMedia('(max-width: 768px)');
+  let menuOpen = false;
+  const renderMenu = () => {
+    const wasFocused = nav.contains(document.activeElement);
+    nav.hidden = mobile.matches && !menuOpen;
+    menu.hidden = !mobile.matches;
+    menu.classList.toggle('open', menuOpen);
+    menu.setAttribute('aria-expanded', String(menuOpen));
+    menu.setAttribute('aria-label', menuOpen ? '关闭导航菜单' : '打开导航菜单');
+    if (nav.hidden && wasFocused) menu.focus();
+  };
+  const closeMenu = () => { menuOpen = false; renderMenu(); };
+  menu.addEventListener('click', () => { menuOpen = !menuOpen; renderMenu(); });
+  nav.addEventListener('click', event => { if (event.target.closest('a')) closeMenu(); });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && menuOpen) { closeMenu(); menu.focus(); }
+  });
+  document.addEventListener('click', event => {
+    if (menuOpen && !event.target.closest('nav')) closeMenu();
+  });
+  mobile.addEventListener('change', closeMenu);
+  document.documentElement.classList.add('js');
+  renderMenu();
+
+  const demand = $('#demand-dialog');
+  const form = $('#demand-form');
+  const problem = $('#problem');
+  const result = $('#result');
+  const constraints = $('#constraints');
+  const copyButton = $('#copy-draft');
+  let opener;
+  let draft;
+  let draftEpoch = 0;
+  let copySequence = 0;
+  function clearDraft() {
+    draftEpoch++;
+    copySequence++;
+    draft = undefined;
+    $('#draft').hidden = true;
+    $('#draft-text').textContent = '';
+    $('#draft-mailto').removeAttribute('href');
+    $('#draft-mailto').textContent = '打开邮件客户端确认';
+    $('#copy-status').textContent = '';
+    copyButton.disabled = false;
+  }
+  function resetForm() {
+    form.reset();
+    [problem, result, constraints].forEach(field => field.setCustomValidity(''));
+    clearDraft();
+  }
+  function closeDemand() {
+    if (!demand.open) return;
+    const returnTo = opener;
+    opener = undefined;
+    resetForm(); // Invalidate asynchronous clipboard work before closing.
+    demand.close();
+    returnTo?.focus();
+  }
+  if (typeof demand.showModal === 'function') {
+    document.querySelectorAll('[data-demand]').forEach(button => {
+      button.hidden = false;
+      button.addEventListener('click', () => {
+        if (demand.open) return;
+        closeMenu();
+        opener = button;
+        resetForm();
+        demand.showModal();
+        demand.scrollTop = 0;
+        problem.focus({preventScroll: true});
+        track('intent_open', null, 'consulting', button.dataset.surface);
+      });
+    });
+  }
+  $('[data-close]').addEventListener('click', closeDemand);
+  demand.addEventListener('cancel', event => { event.preventDefault(); closeDemand(); });
+  demand.addEventListener('close', () => {
+    // A queued close event must not clear a newly reopened dialog.
+    if (!demand.open) {
+      const returnTo = opener;
+      opener = undefined;
+      resetForm();
+      returnTo?.focus();
+    }
+  });
+  demand.addEventListener('click', event => {
+    const rect = demand.getBoundingClientRect();
+    if (event.target === demand && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) closeDemand();
+  });
+  demand.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.preventDefault(); closeDemand(); return; }
+    if (event.key !== 'Tab') return;
+    const controls = [...demand.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')]
+      .filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (!controls.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+    else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+  form.addEventListener('input', () => {
+    [problem, result, constraints].forEach(field => field.setCustomValidity(''));
+    clearDraft();
+  });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!demand.open) return;
+    problem.setCustomValidity(problem.value.trim() ? '' : '请简要描述业务问题，不能只填空白。');
+    [problem, result, constraints].forEach(field => {
+      if (field.value.length > field.maxLength) field.setCustomValidity('请检查文本长度并重新准备草稿。');
+    });
+    if (!form.reportValidity()) return;
+    // No duplicate work on a double click; createSignals also deduplicates event keys.
+    if (draft) return;
+    try {
+      draft = mailDraft({source: '咨询服务 / AI 战略转型工作坊', problem: problem.value, result: result.value, constraints: constraints.value});
+      $('#draft-text').textContent = draft.text;
+      $('#draft-mailto').href = draft.uri;
+      $('#draft-mailto').textContent = draft.tooLong ? '打开邮件后粘贴草稿并确认' : '打开邮件客户端确认';
+      $('#draft').hidden = false;
+      $('#copy-status').textContent = draft.tooLong
+        ? '草稿较长，邮件链接不携带正文。请先复制完整草稿，再打开邮件客户端粘贴并确认发送。'
+        : '可复制草稿粘贴到你使用的邮箱；页面不会代你发送邮件。';
+      track('mail_draft_ready', null, 'consulting', 'demand');
+      $('#draft-text').focus();
+    } catch {
+      clearDraft();
+      problem.setCustomValidity('请检查文本长度并重新准备草稿。');
+      form.reportValidity();
+    }
+  });
+  $('#draft-mailto').addEventListener('click', event => {
+    if (!draft || !demand.open) { event.preventDefault(); return; }
+    track('mailto_click', null, 'consulting', 'demand');
+  });
+  copyButton.addEventListener('click', async () => {
+    if (!draft || !demand.open || copyButton.disabled) return;
+    const capturedDraft = draft;
+    const epoch = draftEpoch;
+    const sequence = ++copySequence;
+    const current = () => demand.open && draft === capturedDraft && epoch === draftEpoch && sequence === copySequence;
+    copyButton.disabled = true;
+    try {
+      await navigator.clipboard.writeText(capturedDraft.text);
+      if (current()) $('#copy-status').textContent = '已复制草稿；仍需在邮件客户端确认发送。';
+    } catch {
+      if (current()) {
+        const text = $('#draft-text');
+        text.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        $('#copy-status').textContent = '无法自动复制，请选中上方草稿手动复制，再在邮件客户端确认发送。';
+      }
+    } finally { if (current()) copyButton.disabled = false; }
+  });
+})();
+// END WORKSHOP PAGE GLUE
+</script>
+</body>
+</html>
