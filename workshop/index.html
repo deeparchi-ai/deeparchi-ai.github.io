@@ -313,7 +313,7 @@
     <a href="#curriculum" class="btn btn-secondary">查看工作坊安排</a>
   </div>
   <p class="email-fallback">也可邮件沟通：<a href="mailto:contact@deeparchi.com.cn">contact@deeparchi.com.cn</a><br>预约需双方确认；此页面只准备邮件草稿。</p>
-  <p class="small" id="preview-status" role="status">本地预览默认拒绝匿名统计，不会真实上报。</p>
+  <p class="small" id="preview-status" role="status" hidden></p>
   <noscript><p class="small">JavaScript 已禁用，可阅读全部工作坊内容并通过邮件沟通需求。</p></noscript>
 </section>
 
@@ -634,7 +634,7 @@ function createSignals(rawConfig, {navigatorLike = {}, isTest = false, local = f
     available,
     status: () => {
       const status = !config ? rawConfig == null ? '匿名统计未连接，未收集事件。' : '统计配置无法读取或无效，已关闭；未收集事件。' : !config.enabled ? '匿名统计未连接，未收集事件。' : blocked() ? '已尊重 DNT/GPC，匿名统计关闭。' : consent ? '已允许匿名统计，可随时关闭。' : '匿名统计未获同意，未收集事件。';
-      return (isTest || local ? '内部测试 / 本地预览：不会真实上报。' : '') + status;
+      return (isTest ? '内部测试：事件只写入显式注入的测试函数。' : '') + status;
     },
     setConsent(value) { consent = available() && value === true; if (!consent) { session = undefined; sent.clear(); } },
     async track(fields) {
@@ -696,10 +696,11 @@ function mailDraft({source, problem, result = '', constraints = ''}) {
     $('#analytics-status').textContent = signals.status();
     $('#consent-allow').disabled = !signals.available();
   };
-  $('#preview-status').textContent = isTest
-    ? '内部测试：不会真实上报。仅显式注入测试函数时记录测试事件，不代表真实上报。'
-    : local ? '本地预览：不会真实上报；允许匿名统计也不会发送真实请求。'
-    : '正式域名环境：默认拒绝，仅明确同意且未启用 DNT/GPC 后可发送匿名交互统计。';
+  if (isTest) {
+    const preview = $('#preview-status');
+    preview.textContent = '内部测试：仅显式注入测试函数时记录测试事件。';
+    preview.hidden = false;
+  }
   $('#analytics-options').hidden = false;
   $('#consent-allow').addEventListener('click', () => { signals.setConsent(true); renderConsent(); });
   $('#consent-withdraw').addEventListener('click', () => { signals.setConsent(false); renderConsent(); });
