@@ -133,3 +133,11 @@
   .homepage .button{border:1px solid ButtonText}
   .homepage .product,.homepage .tool-card,.homepage .integration-band{border:1px solid CanvasText}
 }
+/* English copy uses the same design tokens, with room for longer labels. */
+.homepage .nav-links:lang(en){flex-wrap:wrap;justify-content:flex-end;gap:4px 24px}
+.homepage .product .transfer-actions:lang(en){flex-wrap:wrap}
+.homepage .integration-actions:lang(en){flex-wrap:wrap;flex-shrink:1}
+.homepage dialog:lang(en),.homepage .footer:lang(en){overflow-wrap:anywhere}
+@media(max-width:600px){
+  .homepage .nav-links:lang(en){justify-content:flex-start}
+}
