@@ -1,0 +1,29 @@
+{
+  "baseline": "db91fb85c0a30c5bdcbed20039cfb136ccdb4973",
+  "normalized_sha256": {
+    "index.html": "2c4d5c1a988b026ab8d86b9e09047e5a79a410d89f480841a4979ef581b9caa2",
+    "developers.html": "194f02980a967b025c6cdc625e2a28c3be6dae91a4f09f2545f1627d65cfe59c",
+    "privacy.html": "6036dc85dca1772fc257dd2d758dbc210c24d6618c9fc40c528763279cf591cc",
+    "assets/signals.mjs": "d72684815971275d5d1ec242966825caa900d4ca8f78e13cc91815b62bdedc59",
+    "analytics-config.json": "2029a5c6b00139777e3c20a985828f9e003790d2076594779f55f1778819889c",
+    "CNAME": "b7a85760a477ae329b398bfa48f3d093fdff21a24eb94c8fd51182f9072b4aea",
+    "service-catalog.json": "bd16ece4670f9277ecc78e482b4eed60e6457531d849453757e623e503a02f7e",
+    "apps/deepblm.html": "65b3f218f7c176ae0a3a22215f7b59eaba32b4b8e7c930b844b92a6ecc23be9f",
+    "apps/patent-health-selfcheck.html": "8579f270def6cc3da6834e1f7bf53ab3cc22cff91152e7094317d9fddad5500c",
+    "apps/sanctions-quickcheck.html": "3b794df53c16722bd4d814a3ab92d64b6996721e614e2b7b3c83c173e2c06ed7",
+    "apps/source-slide-editor/index.html": "f25609a2b0bd16b12c1b7a8c2eb10022ffc936dba8c0c8ba53d9e23735d0cb14",
+    "assets/homepage.css": "ff30d22cd927b3a4154ec41f458a77e9e64bbde191857617aa22388199714017"
+  },
+  "track_calls": [
+    "track('product_view', card.id, 'product', 'cards');",
+    "track('demo_open', id, 'product', 'cards');",
+    "track('demo_open', id, 'product', 'cards');",
+    "track('intent_open', service, category, button.dataset.surface);",
+    "track('a2a_interest', service, category, button.dataset.surface);",
+    "track('mail_draft_ready', activeSource.service, activeSource.category, 'demand');",
+    "track('mailto_click', activeSource.service, activeSource.category, 'demand'));",
+    "track('a2a_step', $('#a2a-product').value, 'a2a', 'a2a', {step: stage + 1});",
+    "track('a2a_step', $('#a2a-product').value, 'a2a', 'a2a', {step: 1}); };",
+    "track('product_view', entry.target.id, 'product', 'cards');"
+  ]
+}

@@ -3,7 +3,7 @@ import test from 'node:test';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {canonicalReferrer, observeSource, validatePayload, createSignals} from '../assets/signals.mjs';
-// Frozen byte fingerprints from PR15 779d1e1775ed838c6b573f655f7c14f2404dfc78.
+// Frozen byte fingerprints from PR15 (site.mjs localized and privacy entry hash versioned for English homepage) 779d1e1775ed838c6b573f655f7c14f2404dfc78.
 const frozenFiles = {
   ".github/workflows/site-checks.yml": "68f0fac3f2bccc4bc64382562be5a2cef5a6ee70978fdf7d3da8710e25830198",
   ".gitignore": "05371ed6a21f2d135fd1d29281c0aaa956254169b40da5397e4b32008d1efc12",
@@ -33,7 +33,7 @@ const frozenFiles = {
   "assets/insight-services.css": "cc40c4fd49fb0dbec564e6bd84168f54ff43bc2701bc585c38f387936e398d5f",
   "assets/signals.mjs": "d72684815971275d5d1ec242966825caa900d4ca8f78e13cc91815b62bdedc59",
   "assets/site.css": "738eb81c4c95dd36cb7ba7e8a7caf8ba5341f4f30bf457dc1d7ab168b5df5597",
-  "assets/site.mjs": "603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e",
+  "assets/site.mjs": "d01b96b69380be41b39ee7387c67ad1d9fa3f8cacd2359f837fb4540352997bc",
   "assets/vendor/dompurify/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
   "assets/vendor/dompurify/purify.min.js": "cd37898f9782adf54820c413191b5691803f0f137c799d6edcfd38523b4c2c31",
   "assets/vendor/easymde/LICENSE": "98eee44a1cdad5ad0bb0ea976791ab57b5eef7ac4cafeb162f30e3808564a564",
@@ -47,7 +47,7 @@ const frozenFiles = {
   "assets/vendor/manifest.json": "67b525031307051cbca9198aec1dedaf3f0cd1cbb99d2491be6b60c3e0ff158d",
   "docs/superpowers/plans/2026-07-15-deeparchi-landing-page.md": "b481ce468a9900c5c4814eb2b2c8efee5fb5a6e6d8bf9d88be603002a9b31e25",
   "intake/index.html": "9226c401423bd8674ad23a10990b2e412395533ec19a5b1c6ce2af443d00eae7",
-  "privacy.html": "0b7dda9fc91f8e788cfda539369db3743b875878dc0b00dd7787052d730f3801",
+  "privacy.html": "05b2ce54b14a43955c20078774951212e3fb35fe3532afc14f8de899b0db6d23",
   "requirements-dev.txt": "e827fdacfd5dc97883736d6ea33ab26b369b1265e74df0bc25d932d3802260c9",
   "scripts/check_site.py": "599bbf6b38ad0317be61a09a55a33031779f9f0fa32e5348bd9fb9b27a9745a5",
   "tests/brand-assets.test.mjs": "5909259e9dad8d0f1a4499cc0cfd26c67164bf20fa0143251a81765b150f6bdd",
@@ -82,15 +82,15 @@ test('transfer has one native primary entry and catalog targets its enclosed bod
   assert.doesNotMatch(html, /\son\w+\s*=/i);
 });
 
-test('PR15 production script and dialog transition order are frozen', () => {
-  assert.equal(sha(js), '603651731d9c7ca2c7c2030fb26d658532e8981664f72a966878bfefca5daf0e');
+test('localized production script is pinned and dialog transition order remains frozen', () => {
+  assert.equal(sha(js), 'd01b96b69380be41b39ee7387c67ad1d9fa3f8cacd2359f837fb4540352997bc');
   const transition = js.slice(js.indexOf("activeSource = {category, service, source}"), js.indexOf("track('intent_open'"));
   for (const dialog of ['demo', 'a2a', 'insight']) {
     assert.ok(transition.indexOf(`if (${dialog}.open) ${dialog}.close();`) >= 0);
     assert.ok(transition.indexOf(`if (${dialog}.open) ${dialog}.close();`) < transition.indexOf('demand.showModal();'));
   }
   for (const page of ['index.html','developers.html','privacy.html']) {
-    assert.match(read(page), /src="assets\/site.mjs\?v=603651731d9c"/);
+    assert.match(read(page), /src="assets\/site.mjs\?v=d01b96b69380"/);
   }
 });
 
