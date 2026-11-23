@@ -14,6 +14,22 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = 'export const EN = '
+P3_INTRO = '        <p>For specific technology choices, product plans, competitive strategies or business development needs, we conduct focused research and solution design, with action preparation, implementation coordination and review support within the agreed scope.</p>\n'
+P3_DELIVERABLES = '        <div class="insight-deliverables">\n'
+LI1_SERVICES = '''        <!-- english-only:start:li1-services -->
+        <p><strong>systems assessment</strong>: Clarify your business context, application scenarios and constraints to identify the key questions, feasibility considerations and risks for an agreed assessment.</p>
+        <p><strong>technology selection</strong>: Compare technology options using research evidence and expert analysis to develop judgments and recommendations in your business context.</p>
+        <p><strong>migration planning</strong>: Define a staged plan with agreed scope, milestones and validation goals, reviewing risks and decision criteria before the next stage.</p>
+        <!-- english-only:end:li1-services -->
+'''
+
+def insert_li1_services(page):
+    anchor = P3_INTRO + P3_DELIVERABLES
+    if page.count(anchor) != 1:
+        raise ValueError('Expected exactly one LI-1 services anchor')
+    if 'english-only:' in page:
+        raise ValueError('Unexpected English-only marker in generated source')
+    return page.replace(anchor, P3_INTRO + LI1_SERVICES + P3_DELIVERABLES, 1)
 
 def english_page():
     data = (ROOT / 'assets/homepage-locale.mjs').read_text()
@@ -24,7 +40,7 @@ def english_page():
     page = page.replace('lang="zh-CN"', 'lang="en"', 1)
     page = page.replace('href="en.html" lang="en" hreflang="en" aria-label="English homepage">English',
                         'href="index.html" lang="zh-CN" hreflang="zh-CN" aria-label="Chinese homepage">中文 (Chinese)')
-    return page
+    return insert_li1_services(page)
 
 def log(path, status):
     with (ROOT / 'progress.md').open('a') as stream:

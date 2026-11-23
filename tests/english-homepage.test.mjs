@@ -12,6 +12,39 @@ const english = read('en.html');
 const chinese = read('index.html');
 const sha = text => createHash('sha256').update(text).digest('hex');
 const unversion = html => html.replace(/(assets\/(?:site.mjs|homepage.css)\?v=)[a-f0-9]{12}/g, '$1HASH');
+const p3Intro = '        <p>For specific technology choices, product plans, competitive strategies or business development needs, we conduct focused research and solution design, with action preparation, implementation coordination and review support within the agreed scope.</p>\n';
+const p3Deliverables = '        <div class="insight-deliverables">\n';
+const li1Start = '        <!-- english-only:start:li1-services -->\n';
+const li1End = '        <!-- english-only:end:li1-services -->\n';
+const li1Content = `        <p><strong>systems assessment</strong>: Clarify your business context, application scenarios and constraints to identify the key questions, feasibility considerations and risks for an agreed assessment.</p>
+        <p><strong>technology selection</strong>: Compare technology options using research evidence and expert analysis to develop judgments and recommendations in your business context.</p>
+        <p><strong>migration planning</strong>: Define a staged plan with agreed scope, milestones and validation goals, reviewing risks and decision criteria before the next stage.</p>
+`;
+const li1Block = li1Start + li1Content + li1End;
+const p3Anchor = p3Intro + p3Deliverables;
+
+function generatedEnglishPage() {
+  const escape = text => text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#x27;');
+  let generated = chinese;
+  for (const [source,target] of Object.entries(EN).sort((a,b)=>b[0].length-a[0].length)) generated = generated.replaceAll(source,escape(target));
+  return generated.replace('lang="zh-CN"','lang="en"').replace('href="en.html" lang="en" hreflang="en" aria-label="English homepage">English','href="index.html" lang="zh-CN" hreflang="zh-CN" aria-label="Chinese homepage">中文 (Chinese)');
+}
+
+function validateEnglishOnlyBlock(document, generated) {
+  assert.equal(generated.includes('english-only'), false, 'generated source must contain no whitelist markers');
+  assert.equal(generated.split(p3Anchor).length, 2, 'P3 anchor must occur exactly once');
+  assert.equal((document.match(/english-only/g) || []).length, 2, 'only two whitelist markers are allowed');
+  assert.equal(document.split(li1Start).length, 2, 'LI-1 start marker must occur exactly once');
+  assert.equal(document.split(li1End).length, 2, 'LI-1 end marker must occur exactly once');
+  const start = document.indexOf(li1Start);
+  const end = document.indexOf(li1End) + li1End.length;
+  assert.equal(document.slice(start, end), li1Block, 'whitelist content and marker order must be exact');
+  assert.equal(start, generated.indexOf(p3Anchor) + p3Intro.length, 'block must immediately follow the P3 introduction');
+  assert.equal(document.slice(end, end + p3Deliverables.length), p3Deliverables, 'block must immediately precede P3 deliverables');
+  const stripped = document.slice(0, start) + document.slice(end);
+  assert.equal(stripped, generated, 'whole document outside the exact whitelist block must match generation');
+  return stripped;
+}
 
 test('Chinese homepage preserves baseline bytes except language links, alternates and authorized asset versions', () => {
   const stripped = chinese.replace(/  <link rel="alternate"[^>]+>\n/g, '')
@@ -42,12 +75,36 @@ test('static English document has reciprocal language links, matching structure 
   }
   assert.deepEqual([...english.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]), [...chinese.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
   assert.match(read('assets/site.mjs'), new RegExp(`homepage-locale.mjs\\?v=${sha(read('assets/homepage-locale.mjs')).slice(0,12)}`));
-  const escape = text => text.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#x27;');
-  let generated = chinese;
-  for (const [source,target] of Object.entries(EN).sort((a,b)=>b[0].length-a[0].length)) generated = generated.replaceAll(source,escape(target));
-  generated = generated.replace('lang="zh-CN"','lang="en"').replace('href="en.html" lang="en" hreflang="en" aria-label="English homepage">English','href="index.html" lang="zh-CN" hreflang="zh-CN" aria-label="Chinese homepage">中文 (Chinese)');
+  let generated = generatedEnglishPage();
+  assert.equal(validateEnglishOnlyBlock(english, generated), generated);
+  generated = generated.replace(p3Anchor, p3Intro + li1Block + p3Deliverables);
   assert.equal(english,generated);
 });
+
+for (const [name, mutate] of [
+  ['changed outside text', page => page.replace('Focused decision &amp; action support', 'Changed decision support')],
+  ['missing block', page => page.replace(li1Block, '')],
+  ['missing start marker', page => page.replace(li1Start, '')],
+  ['duplicate block', page => page.replace(li1Block, li1Block + li1Block)],
+  ['duplicate start marker', page => page.replace(li1Start, li1Start + li1Start)],
+  ['duplicate end marker', page => page.replace(li1End, li1End + li1End)],
+  ['unknown markers', page => page.replaceAll(':li1-services', ':unknown')],
+  ['additional unknown block', page => page.replace(li1Block, li1Block + '        <!-- english-only:start:unknown -->\n        <!-- english-only:end:unknown -->\n')],
+  ['nested markers', page => page.replace(li1Content, li1Start + li1Content + li1End)],
+  ['unclosed marker', page => page.replace(li1End, '')],
+  ['reversed markers', page => page.replace(li1Block, li1End + li1Content + li1Start)],
+  ['moved block', page => page.replace(li1Block, '').replace(p3Intro, li1Block + p3Intro)],
+  ['block moved into deliverables', page => page.replace(li1Block + p3Deliverables, p3Deliverables + li1Block)],
+  ['modified block content', page => page.replace('Clarify your business context', 'Change your business context')],
+]) {
+  test(`strict English-only whitelist rejects ${name}`, () => {
+    const generated = generatedEnglishPage();
+    assert.equal(validateEnglishOnlyBlock(english, generated), generated);
+    const mutated = mutate(english);
+    assert.notEqual(mutated, english, 'mutation must change the document');
+    assert.throws(() => validateEnglishOnlyBlock(mutated, generated), {code:'ERR_ASSERTION'});
+  });
+}
 
 test('English text has no unexpected Han and clearly labels every Chinese destination', () => {
   const permitted = english.replace('Legal company name: 上海申渡架固信息技术有限公司', '').replace('>中文 (Chinese)<', '><');
